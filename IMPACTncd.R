@@ -10,7 +10,7 @@ gc()
 # User input
 init.year <- 2001
 
-n <- 100000  # Define the sample size
+n <- 10000  # Define the sample size
 
 yearstoproject <- 20  # NEED TO force >=1 and up to 50
 
@@ -60,7 +60,7 @@ options(warn = 1)
 if (Sys.info()[1] == "Linux") {
     if (system("whoami", T )== "mdxasck2") {
         setwd("~/IMPACTncd/")
-        clusternumber <- 100 # overwrites previous
+        ifelse (clusternumber<100, 100,clusternumber)  # overwrites previous if <100
     } else {
     setwd(paste("/home/", 
                 system("whoami", T), 

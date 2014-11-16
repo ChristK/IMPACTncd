@@ -30,8 +30,43 @@ all.files <- as.list(list.files(path = "./Output", pattern = ".ind.mortal.rds", 
 life.exp <- rbindlist(lapply(all.files, readRDS), fill=T)
 life.exp[sex == "1", sex := "Men"]
 life.exp[sex == "2", sex := "Women"]
-#write.csv(life.exp, file="./Output/Other/life.exp.csv", row.names = F)
-save(life.exp, file="./Output/Other/life.exp.RData")
+
+# Life expectancy at birth
+output <- vector("list", 4)
+
+output[[1]] <- life.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, year.death, scenario, mc)][, group := "S"]
+
+output[[2]] <- life.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, year.death, scenario, mc)][, group := "SA"]
+
+output[[3]] <- life.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, qimd, year.death, scenario, mc)][, group := "SQ"]
+
+output[[4]] <- life.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, qimd, year.death, scenario, mc)][, group := "SAQ"]
+
+life.exp0 <- rbindlist(output, fill = T)[, `:=` (year = year.death)]
+life.exp0 <- merge(life.exp0, 
+                  riskfactors[, list(pop, qimd, sex, agegroup, scenario, mc, group, year)], 
+                  by= c("qimd", "sex", "agegroup", "scenario", "mc", "group", "year"), 
+                  all.x = T)
+save(life.exp0, file="./Output/Other/life.exp0.RData")
+
+# Life expectancy at 65
+output <- vector("list", 4)
+
+output[[1]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, year.death, scenario, mc)][, group := "S"]
+
+output[[2]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, year.death, scenario, mc)][, group := "SA"]
+
+output[[3]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, qimd, year.death, scenario, mc)][, group := "SQ"]
+
+output[[4]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, qimd, year.death, scenario, mc)][, group := "SAQ"]
+
+life.exp65 <- rbindlist(output, fill = T)[, `:=` (year = year.death)]
+life.exp65 <- merge(life.exp65, 
+                   riskfactors[, list(pop, qimd, sex, agegroup, scenario, mc, group, year)], 
+                   by= c("qimd", "sex", "agegroup", "scenario", "mc", "group", "year"), 
+                   all.x = T)
+save(life.exp65, file="./Output/Other/life.exp65.RData")
+
 
 if ("CHD" %in% diseasestoexclude) {
     cat("Collecting CHD burden output...\n")
@@ -47,13 +82,13 @@ if ("CHD" %in% diseasestoexclude) {
     #write.csv(chd.burden, file="./Output/CHD/chd.burden.csv", row.names = F)
     save(chd.burden, file="./Output/CHD/chd.burden.RData")
     
-    cat("Calculating healthy life expectancy...\n")
     all.files <- as.list(list.files(path = "./Output", pattern = "chd.ind.incid.rds", full.names = T, recursive = T)) 
-    healthylife.exp <- rbindlist(lapply(all.files, readRDS), fill=T)
-    healthylife.exp[sex == "1", sex := "Men"]
-    healthylife.exp[sex == "2", sex := "Women"]
+    healthylife.exp.chd <- rbindlist(lapply(all.files, readRDS), fill=T)
+    healthylife.exp.chd[sex == "1", sex := "Men"]
+    healthylife.exp.chd[sex == "2", sex := "Women"]
+    setnames(healthylife.exp.chd, "chd.incidence", "year")
     #write.csv(healthylife.exp, file="./Output/CHD/healthylife.exp.csv", row.names = F)
-    save(healthylife.exp, file="./Output/CHD/healthylife.exp.RData")
+    #save(healthylife.exp.chd, file="./Output/CHD/indiv.incid.RData")
 }
 
 if ("stroke" %in% diseasestoexclude) {
@@ -70,19 +105,56 @@ if ("stroke" %in% diseasestoexclude) {
     #write.csv(stroke.burden, file="./Output/Stroke/stroke.burden.csv", row.names = F)
     save(stroke.burden, file="./Output/Stroke/stroke.burden.RData")
     
-    cat("Calculating healthy life expectancy...\n")
     all.files <- as.list(list.files(path = "./Output", pattern = "stroke.ind.incid.rds", full.names = T, recursive = T)) 
-    healthylife.exp <- rbindlist(lapply(all.files, readRDS), fill=T)
-    healthylife.exp[sex == "1", sex := "Men"]
-    healthylife.exp[sex == "2", sex := "Women"]
+    healthylife.exp.stroke <- rbindlist(lapply(all.files, readRDS), fill=T)
+    healthylife.exp.stroke[sex == "1", sex := "Men"]
+    healthylife.exp.stroke[sex == "2", sex := "Women"]
+    setnames(healthylife.exp.stroke, "stroke.incidence", "year")
     #write.csv(healthylife.exp, file="./Output/stroke/healthylife.exp.csv", row.names = F)
-    save(healthylife.exp, file="./Output/Stroke/healthylife.exp.RData")
+    #save(healthylife.exp.stroke, file="./Output/Stroke/indiv.incid.RData")
 }
 
 if ("C34" %in% diseasestoexclude) {
     dir.create(path = "./Output/Lung Cancer/", recursive = T, showWarnings = F)
     
 }
+
+# Healthy life expectancy
+cat("Calculating healthy life expectancy...\n")
+# Gather all objects starting with healthylife.exp.
+healthylife.exp <- rbindlist(lapply(as.list(apropos("healthylife.exp.")), get), fill=T)
+
+output <- vector("list", 4)
+
+output[[1]] <- healthylife.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, year, scenario, mc)][, group := "S"]
+
+output[[2]] <- healthylife.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, year, scenario, mc)][, group := "SA"]
+
+output[[3]] <- healthylife.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, qimd, year, scenario, mc)][, group := "SQ"]
+
+output[[4]] <- healthylife.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, qimd, year, scenario, mc)][, group := "SAQ"]
+
+hlife.exp <- rbindlist(output, fill = T)
+hlife.exp <- merge(hlife.exp, 
+                   riskfactors[, list(pop, qimd, sex, agegroup, scenario, mc, group, year)], 
+                   by= c("qimd", "sex", "agegroup", "scenario", "mc", "group", "year"), 
+                   all.x = T)
+save(hlife.exp, file="./Output/Other/hlife.exp.RData")
+
+
+# Export graphs
+dir.create(path = "./Output/Graphs/", recursive = T, showWarnings = F)
+Graphs <- mclapply(Graphs.fn, function(f) f(), mc.preschedule = T, mc.cores = clusternumber) # run all functions in the list
+save(Graphs, file="./Output/Graphs/Graphs.rda")
+
+# to extract data from graph use
+# ggplot_build(Graphs$smoking.S)$data[[1]]
+
+# Export tables
+dir.create(path = "./Output/Tables/", recursive = T, showWarnings = F)
+Tables <- mclapply(Tables.fn, function(f) f(), mc.preschedule = T, mc.cores = clusternumber) # run all functions in the list
+save(Tables, file="./Output/Tables/Tables.rda")
+
 
 if (cleardirectories == T) {
     scenarios.list <- list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = F, recursive = F)
