@@ -12,4 +12,9 @@
 *.RData
 *.rda
 *.rds
+*.xls
+*.xlsx
+*.pdf
+*.directory
 .Rproj.user
+Graphs for Martin/
