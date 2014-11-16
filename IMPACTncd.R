@@ -60,7 +60,7 @@ options(warn = 1)
 if (Sys.info()[1] == "Linux") {
     if (system("whoami", T )== "mdxasck2") {
         setwd("~/IMPACTncd/")
-        clusternumber <- 50 # overwrites previous
+        clusternumber <- 100 # overwrites previous
     } else {
     setwd(paste("/home/", 
                 system("whoami", T), 
