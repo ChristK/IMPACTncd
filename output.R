@@ -60,7 +60,7 @@ output[[3]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, qimd, 
 
 output[[4]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, qimd, year.death, scenario, mc)][, group := "SAQ"]
 
-life.exp65 <- rbindlist(output, fill = T)[, `:=` (year = year.death)]
+life.exp65 <- rbindlist(output, fill = T)[, `:=` (year = year.death, mean = mean - 65)]
 life.exp65 <- merge(life.exp65, 
                    riskfactors[, list(pop, qimd, sex, agegroup, scenario, mc, group, year)], 
                    by= c("qimd", "sex", "agegroup", "scenario", "mc", "group", "year"), 
@@ -86,7 +86,7 @@ if ("CHD" %in% diseasestoexclude) {
     healthylife.exp.chd <- rbindlist(lapply(all.files, readRDS), fill=T)
     healthylife.exp.chd[sex == "1", sex := "Men"]
     healthylife.exp.chd[sex == "2", sex := "Women"]
-    setnames(healthylife.exp.chd, "chd.incidence", "year")
+    healthylife.exp.chd[, year := chd.incidence]
     #write.csv(healthylife.exp, file="./Output/CHD/healthylife.exp.csv", row.names = F)
     #save(healthylife.exp.chd, file="./Output/CHD/indiv.incid.RData")
 }
@@ -109,7 +109,7 @@ if ("stroke" %in% diseasestoexclude) {
     healthylife.exp.stroke <- rbindlist(lapply(all.files, readRDS), fill=T)
     healthylife.exp.stroke[sex == "1", sex := "Men"]
     healthylife.exp.stroke[sex == "2", sex := "Women"]
-    setnames(healthylife.exp.stroke, "stroke.incidence", "year")
+    healthylife.exp.stroke[, year := stroke.incidence]
     #write.csv(healthylife.exp, file="./Output/stroke/healthylife.exp.csv", row.names = F)
     #save(healthylife.exp.stroke, file="./Output/Stroke/indiv.incid.RData")
 }
@@ -145,7 +145,32 @@ save(hlife.exp, file="./Output/Other/hlife.exp.RData")
 # Export graphs
 dir.create(path = "./Output/Graphs/", recursive = T, showWarnings = F)
 Graphs <- mclapply(Graphs.fn, function(f) f(), mc.preschedule = T, mc.cores = clusternumber) # run all functions in the list
+# To bypass ggplot bug that facet when operate within a function produce massive objects when saved
+for (uu in grep(glob2rx("*.S"), names(Graphs))) {
+  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ .)
+} 
+
+for (uu in grep(glob2rx("*.SA"), names(Graphs))) {
+  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ agegroup)
+} 
+
+for (uu in grep(glob2rx("*.SQ"), names(Graphs))) {
+  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ qimd)
+} 
+
+for (uu in grep(glob2rx("*.SAQ"), names(Graphs))) {
+  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex + qimd ~ agegroup)
+}
+
 save(Graphs, file="./Output/Graphs/Graphs.rda")
+
+# Export pdfs
+mclapply(names(Graphs), 
+       function(x) ggsave(filename=paste0(x,".pdf"),
+                          plot=Graphs[[x]], 
+                          path = "./Output/Graphs", 
+                          width = 11.69,
+                          height = 8.27), mc.cores = clusternumber)
 
 # to extract data from graph use
 # ggplot_build(Graphs$smoking.S)$data[[1]]

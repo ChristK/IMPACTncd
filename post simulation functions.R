@@ -3,8 +3,8 @@ require("binom")
 
 # Define function to summarise output RF
 MC.mean <- function(m, sd, n, ...) {
-  sd <- ifelse(is.na(sd), 2 * m, sd)
-  m <- rnorm(n, m, sd)
+  sd <- ifelse(is.na(sd), 2 * m, sd) # if mean of 0ne value then sd is technically NA. This is an assumption sd =2*m
+  m <- rtruncnorm(n, 0, Inf, m, sd)
   return(list(mean= mean(m, na.rm=T),
               lui = quantile(m, probs = 0.025, na.rm = T),
               uui = quantile(m, probs = 0.975, na.rm = T)))
@@ -151,28 +151,28 @@ for (type in c("S", "SQ", "SA", "SAQ")) {
   Graphs.fn[[paste0("smoking.", type)]] <- closure.graph.cat(riskfactors,
                                                              type,
                                                              smok.cvd.active, 
-                                                             0,
+                                                             cvd.lag,
                                                              "Prevalence",
                                                              "Smoking Prevalence")
   
   Graphs.fn[[paste0("ets.", type)]] <- closure.graph.cat(riskfactors,
                                                          type,
                                                          ets.1, 
-                                                         0,
+                                                         cvd.lag,
                                                          "Prevalence",
                                                          "Environmental Tobacco Smoking")
   
   Graphs.fn[[paste0("diabetes.", type)]] <- closure.graph.cat(riskfactors,
                                                               type,
                                                               diab.cvd.yes, 
-                                                              0,
+                                                              cvd.lag,
                                                               "Prevalence",
                                                               "Diabetes Prevalence")
   
   Graphs.fn[[paste0("fv.", type)]] <- closure.graph.cat(riskfactors,
                                                         type,
                                                         fv.cvd.6+fv.cvd.7+fv.cvd.8+fv.cvd.9, 
-                                                        0,
+                                                        cvd.lag,
                                                         "Prevalence",
                                                         "Five or more F&V portions a day")
   
@@ -180,7 +180,7 @@ for (type in c("S", "SQ", "SA", "SAQ")) {
                                                           type,
                                                           bmi.cvd.mean, 
                                                           bmi.cvd.sd,
-                                                          0,
+                                                          cvd.lag,
                                                           "BMI (kg/m^2)",
                                                           "BMI")
   
@@ -188,7 +188,7 @@ for (type in c("S", "SQ", "SA", "SAQ")) {
                                                          type,
                                                          tc.cvd.mean, 
                                                          tc.cvd.sd,
-                                                         0,
+                                                         cvd.lag,
                                                          "Total Cholesterol (mmol/l)",
                                                          "Total Cholesterol")
   
@@ -196,7 +196,7 @@ for (type in c("S", "SQ", "SA", "SAQ")) {
                                                           type,
                                                           sbp.cvd.mean, 
                                                           sbp.cvd.sd,
-                                                          0,
+                                                          cvd.lag,
                                                           "Systolic Blood Pressure (mmHg)",
                                                           "Systolic Blood Pressure")
   # Life expectancy

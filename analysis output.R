@@ -9,43 +9,26 @@ source(file = "./post simulation functions.R")
 # healthylife.exp <- fread("./output/CHD/healthylife.exp.csv")
 
 load("./Output/RF/riskfactors.RData")
-load("./Output/Other/life.exp.RData")
+load("./Output/Other/life.exp0.RData")
+load("./Output/Other/life.exp65.RData")
+load("./Output/Other/hlife.exp.RData")
+load("./Output/Other/other.mortality.RData")
 load("./Output/CHD/chd.burden.RData")
-load("./Output/CHD/healthylife.exp.RData")
 load("./Output/Stroke/stroke.burden.RData")
-load("./Output/Stroke/healthylife.exp.RData")
 load("./Output/Graphs/Graphs.rda")
 load("./Output/Tables/Tables.rda")
 
 pd <- position_dodge(.3) 
 
+# Save graphs to pdfs A4 landscape
+lapply(names(Graphs), 
+       function(x) ggsave(filename=paste0(x,".pdf"),
+                          plot=Graphs[[x]], 
+                          path = "./Output/Graphs", 
+                          width = 11.69,
+                          height = 8.27))
 
 
-# Healthy Life Expectancy (CHD)
-healthylife.exp[,.(mean=mean(age), sd=sd(age)), by=.(sex, chd.incidence, scenario, mc)][, MC.mean(mean,sd,.N), by=.(sex, chd.incidence, scenario)]
-
-Graphs$hle.s <- ggplot(healthylife.exp[,mean_se(age), by=.(sex, chd.incidence, scenario)],
-            aes(x=chd.incidence, y=y, colour=scenario, ymax=max(y)*1.05, ymin = 70)) + 
-    geom_errorbar(aes(ymin = ymin, ymax = ymax), width=.1, position=pd) +
-    geom_line(position=pd) +
-    geom_point(position=pd, size=3) +
-    facet_grid(sex ~ .) +
-    ylab("Age (years)") + scale_x_continuous(name="Year") + 
-    ggtitle("Healthy Life Expectancy")    
-print(Graphs$hle.s)
-
-Graphs$hle.sq <- ggplot(healthylife.exp[,mean_se(age), by=.(sex, chd.incidence, scenario, qimd)],
-            aes(x=chd.incidence, y=y, colour=scenario, ymax=max(y)*1.05, ymin = 70)) + 
-    geom_errorbar(aes(ymin = ymin, ymax = ymax), width=.1, position=pd) +
-    geom_line(position=pd) +
-    geom_point(position=pd, size=3) +
-    facet_grid(sex ~ qimd) +
-    ylab("Age (years)") + scale_x_continuous(name="Year") + 
-    ggtitle("Healthy Life Expectancy")    
-print(Graphs$hle.sq)
-
-
-# Risk Factors (CHD)
 # Using exact Binomial from agresti-coull
 riskfactors[group=="S", binom.confint(sum(smok.cvd.active), sum(pop), method="agresti-coull"), by=.(year, scenario, sex)]
 
