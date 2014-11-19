@@ -67,6 +67,13 @@ LifetableW <- as.data.table(life.table.Women$qx, keep.rownames = T)[, sex := 2]
 Lifetable <- rbind(LifetableM, LifetableW)
 setnames(Lifetable, "rn", "age")
 Lifetable[, `:=` (sex = factor(sex), age = as.numeric(age))]
+
+# Load rr of death for smokers from Peto, Mortality in relation to smoking: 50 years{\textquoteright} observations on male British doctors. Table 1
+smokriskofdeath <- fread("./LifeTables/smokriskofdeath.csv")
+setkey(smokriskofdeath)
+smokriskofdeath <- smokriskofdeath[!diseasestoexclude, ] # Need to adjust 1st column for each new disease
+smokriskofdeath <- smokriskofdeath[,sum(Current)/sum(Lifelong.non.smokers)]
+
 # Garbage cleaning
 rm(agegrouptoexclude, diseasestoexclude.ICD, 
    mortal.Men, mortal.Women, mortal.Men.sm, mortal.Women.sm, mortal.Men.sm.fdm, mortal.Women.sm.fdm,

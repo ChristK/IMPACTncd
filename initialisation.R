@@ -293,30 +293,11 @@ pred.diab <- function(year, age, sex, qimd, bmival) {
                        ordered = T)
     }
     bmival[bmival>50] <- 50 # otherwise predicts NAN values
-    pr <- data.frame(predict(diab.svylr, data.frame(year = year, age = age, sex = sex, qimd = qimd, bmival = bmival), type = "response", se.fit=T))
-    #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
-    return(pr[[1]])
+    pr <- data.frame(predict(diab.svylr, data.frame(year = year, age = age, sex = sex, qimd = qimd, bmival = bmival), type = "response", se.fit = T))
+    return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+    #return(pr[[1]])
 }
 
-# plot(pred.diab(10, 20:70, 1,1,40,0), ylim=c(0,1))
-# test
-# summary(pred.diab(sample(c(0:50), n, replace = T), 
-#                   sample(c(20,85), n, replace = T), 
-#                   sample(c(1,2), n, replace = T), 
-#                   sample(c(1:5), n, replace = T),
-#                   runif(n, 10, 90),
-#                   sample(c(1,10), n, replace = T)))
-
-# Define function to extract mq from Lifetable2012
-# death.pr <- function(age1, sex1) {
-#     agegroup1 <- agegroup.fn(age1)
-#     sex1 <- factor(sex1, 
-#                   levels = c(1,2), 
-#                   ordered = F)
-#     x <- data.table(agegroup=agegroup1, sex=sex1)
-#     x <- merge(x, Lifetable2012, by=c("agegroup", "sex"), all.x = T)
-#     return(x[,mq])
-# }
 
 # function to estimate diabetes incidence
 # rr = the rr of dying because of diabetes from Group TDS. Is the Current Definition for Diabetes Relevant to Mortality Risk From All Causes and Cardiovascular and Noncardiovascular Diseases? Dia Care. 2003 Jan 3;26(3):688–96. 
@@ -325,14 +306,13 @@ pred.diab.incid <- function(year, age, sex, qimd, bmival, lag ) {
     prev1 <- pred.diab(year = year - lag + 1, age = age - lag + 1, sex = sex, qimd = qimd, bmival = bmival)
     tc <- ifelse ((prev1 - prev0) <= 0, 0, (prev1 - prev0)) # incidence in year = year. Produces values above 1 occassionaly
     return(as.logical(rbinom(length(tc), 1, tc)))
-    
 }
 
-pred.diab.incid.lag <- function(year, age, sex, qimd, bmival, lag, duration = 1, n) { 
+pred.diab.incid.lag <- function(year, age, sex, qimd, bmival, lag, duration = lag, n) { 
     prev0 <- pred.diab(year = year-lag, age = age-lag, sex = sex, qimd = qimd, bmival = bmival)
-    prev1 <- pred.diab(year = year-lag+duration, age = age-lag+duration, sex = sex, qimd = qimd, bmival = bmival)
+    prev1 <- pred.diab(year = year-lag + duration, age = age-lag+duration, sex = sex, qimd = qimd, bmival = bmival)
     tc <- prev0 / prev1 # derived from bayes theorem P(diab2008|diab2011)= P(diab2011|diab2008)*P(diab2008)/P(diab2011) and P(diab2011|diab2008) = 1)
-    return(as.factor(ifelse(dice(n) <tc, 2,1)))
+    return(as.factor(ifelse(dice(n) < tc, "2","1")))
 }
 
 

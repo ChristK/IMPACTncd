@@ -78,7 +78,6 @@ POP[cigst1.cvdlag == "4", cigst1.calag := ifelse((packyears * 20 /cigdyalCat) < 
 POP[, cigst1.calag := factor(cigst1.calag)]
 
 
-
 # ETS 
 if (i > (init.year-2011)) {
     cat("Estimating ETS...\n")
@@ -100,14 +99,15 @@ cat("DIAB estimation\n")
 # to predict diabetics that where healthy x years ago you need to apply current.prevalence-x*(diab.incid - mortality)
 # Diabetes incidence from Holden SE, Barnett AH, Peters JR, et al. The incidence of type 2 diabetes in the United Kingdom from 1991 to 2010. Diabetes Obes Metab 2013;15:844–52. doi:10.1111/dom.12123
 # NOTE: this is for type 2 diabetes only. For this ages I am concerned with this is absolutely fine. very few new diabetes I patients older than 35 
-if (i == (init.year-2011)) { # will need special case when cvd.lag=0
+if (i == (init.year - 2011)) { # will need special case when cvd.lag = 0
     POP[, diabtotr.cvdlag := diabtotr]
-    POP[between(age, ageL, ageH) & diabtotr == "2", 
-        diabtotr.cvdlag := pred.diab.incid.lag(i, age, sex, qimd, bmival.cvdlag, lag = cvd.lag, duration = cvd.lag, n=.N)]
+    POP[between(age, 20, 70) & diabtotr == "2", 
+        diabtotr.cvdlag := pred.diab.incid.lag(i, age, sex, qimd, bmival, cvd.lag, cvd.lag, .N)]
 } 
 
 if (i > (init.year - 2011) & i < (init.year - 2011 + cvd.lag)) {
-    POP[diabtotr == 2 & diabtotr.cvdlag == 1, diabtotr.cvdlag := as.factor(ifelse(dice(.N) < 1/(cvd.lag + 1-i), 2, 1))]
+    POP[between(age, 20, 70) & diabtotr == "2" & diabtotr.cvdlag == "1", 
+        diabtotr.cvdlag := as.factor(ifelse(dice(.N) < 1/(cvd.lag + 1-i), 2, 1))]
 } 
 
 if (i == (init.year - 2011 + cvd.lag)) {
@@ -115,7 +115,7 @@ if (i == (init.year - 2011 + cvd.lag)) {
 } 
 
 if (i > (init.year - 2011 + cvd.lag)) {
-    POP[between(age, ageL, ageH) & diabtotr.cvdlag == 1, 
+    POP[between(age, ageL, ageH) & diabtotr.cvdlag == "1", 
         diabtotr.cvdlag := ifelse(pred.diab.incid(i, age, sex, qimd, bmival.cvdlag, cvd.lag), 2L, 1L)]
 } 
 

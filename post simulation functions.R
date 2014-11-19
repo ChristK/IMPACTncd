@@ -85,9 +85,10 @@ closure.graph.cat <- function (dt, type, rf, lag, yaxis, title, yscale = 1) {
         width=.1
       ) +
       geom_line() +
-      geom_point(size=3) +
+      geom_point(size = 2) +
       ylab(ifelse(yscale == 1, yaxis, paste0(yaxis, " per ", format(yscale, scientific = F)))) +
-      scale_x_continuous(name="Year")
+      scale_x_continuous(name="Year") +
+      theme(axis.text.x  = element_text(angle=90, vjust=0.5))
     
     if (type == "S") g <- g + facet_grid(sex ~ .) + ggtitle(paste0(title, " (ages ", ageL, " - ", ageH, ")")) 
     if (type == "SQ") g <- g + facet_grid(sex ~ qimd) + ggtitle(paste0(title, " by QIMD"))
@@ -129,9 +130,10 @@ closure.graph.cont <- function (dt, type, rf.m, rf.sd, lag = cvd.lag, yaxis, tit
         width=.1
       ) +
       geom_line() +
-      geom_point(size=3) +
+      geom_point(size = 2) +
       ylab(yaxis) +
-      scale_x_continuous(name="Year")
+      scale_x_continuous(name="Year") +
+      theme(axis.text.x  = element_text(angle=90, vjust=0.5))
     
     if (type == "S") g <- g + facet_grid(sex ~ .) + ggtitle(paste0(title, " (ages ", ageL, " - ", ageH, ")")) 
     if (type == "SQ") g <- g + facet_grid(sex ~ qimd) + ggtitle(paste0(title, " by QIMD"))
