@@ -11,7 +11,6 @@ cat("SBP estimation\n")
 if (i > (init.year-2011)) POP <- ageing.distr("omsysval")
 POP[between(age, ageL, ageH), omsysval.cvdlag := scale(omsysval, scale=F) + pred.sbp(i, age, sex, qimd, bmival.cvdlag, cvd.lag), by= group] 
 
-
 cat("CHOL estimation\n")
 if (i > (init.year-2011)) POP <- ageing.distr("cholval")
 POP[between(age, ageL, ageH), cholval.cvdlag := scale(cholval, scale=F) + pred.chol(i, age, sex, qimd, bmival.cvdlag, cvd.lag), by= group] 
@@ -25,6 +24,7 @@ POP[between(age, ageL, ageH), frtpor.calag := pred.fvrate(i, age, sex, qimd, por
 
 
 cat("Smoking initiation/cessation simulation\n")
+
 if (i == (init.year-2011)) {
     cat("Smoking lag\n")
     POP[cigst1=="1", cigst1.cvdlag := "1"]
@@ -36,12 +36,9 @@ if (i == (init.year-2011)) {
     POP[cigst1.cvdlag == "4", packyears := packyears - cvd.lag * cigdyalCat/20]
     POP[cigst1.cvdlag =="1", `:=` (cigdyalCat = 0, packyears = 0)]
     POP[, cigst1.cvdlag := factor(cigst1.cvdlag)]
-}
+    POP[age < 16, cigst1.cvdlag :="1"]
+} else {
 
-smoking.preva.forets0 <- POP[, list(old.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)] # to be used for ETS
-setkey(smoking.preva.forets0)
-
-if (i > (init.year-2011)) {
     POP[cigst1.cvdlag %in% c("2", "3"), endsmoke := endsmoke + 1]
     POP[cigst1.cvdlag == "4", packyears := packyears + cigdyalCat/20]
     
@@ -80,19 +77,24 @@ POP[cigst1.calag == "4", cigst1.calag := ifelse((packyears * 20 /numsmok) < canc
 POP[cigst1.cvdlag == "4", cigst1.calag := ifelse((packyears * 20 /cigdyalCat) < cancer.lag,  "1", "4")]
 POP[, cigst1.calag := factor(cigst1.calag)]
 
-# ETS (only works for decreasing smoking prevelence)
+
+
+# ETS 
 if (i > (init.year-2011)) {
     cat("Estimating ETS...\n")
     smoking.preva.forets1 <- POP[, list(new.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)]
-    cat("Estimating ETS...\n")
     setkey(smoking.preva.forets1)
-    cat("Estimating ETS...\n")
+    # works for decreasing smoking prevelence
     smoking.preva.forets <- merge(smoking.preva.forets1, smoking.preva.forets0, by="qimd")[,change := (old.preval-new.preval)/old.preval][change<0,change:=0][]
-    cat("Estimating ETS...\n")
     #POP[expsmokCat=="1", sample_frac(.SD, smoking.preva.forets[qimd==.BY, change]), by=qimd, .SDcols="hserial"][,hserial] # selects households to remove ets smokers
-    POP[hserial %in% POP[expsmokCat=="1", sample_frac(.SD, smoking.preva.forets[qimd==.BY, change]), by=qimd, .SDcols="hserial"][,hserial], expsmokCat :="0"]
+    POP[id %in% POP[expsmokCat=="1", sample_frac(.SD, smoking.preva.forets[qimd==.BY, change]), by=qimd, .SDcols="id"][,id], expsmokCat :="0"]
+    # works for increasing smoking prevelence
+    smoking.preva.forets <- merge(smoking.preva.forets1, smoking.preva.forets0, by="qimd")[,change := (-old.preval+new.preval)/old.preval][change<0,change:=0][]
+    POP[id %in% POP[expsmokCat=="0", sample_frac(.SD, smoking.preva.forets[qimd==.BY, change]), by=qimd, .SDcols="id"][,id], expsmokCat :="1"]
+    
 }
-
+smoking.preva.forets0 <- POP[, list(old.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)] # to be used for ETS
+setkey(smoking.preva.forets0) # to be used as a baseline for new years calculation
 
 cat("DIAB estimation\n")
 # to predict diabetics that where healthy x years ago you need to apply current.prevalence-x*(diab.incid - mortality)

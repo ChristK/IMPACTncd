@@ -8,13 +8,13 @@
 gc()
 
 # User input
-init.year <- 2001
+init.year <- 2011
 
-n <- 10000  # Define the sample size
+n <- 200000  # Define the sample size
 
-yearstoproject <- 20  # NEED TO force >=1 and up to 50
+yearstoproject <- 50  # NEED TO force >=1 and up to 50
 
-numberofiterations <- 2
+numberofiterations <- 100
 
 ageL <- 30  # Define lower age limit to diseases-model simulation (min = 30)
 
@@ -23,8 +23,6 @@ ageH <- 84  # Define lower age limit to diseases-model simulation (max = 84)
 alignment <- F # T or F (apply correction factor to counterpoise levin's and exposure error)
 
 Fertility.Assumption <- "N"  # Select (N)ormal, (H)igh or (L)ow fertility rate asumptions based on ONS scenarios. They do matter for accurate population statistics
-
-#cvd.factors <- c()
 
 cvd.lag <- 5 # Avoid 0
 fatality.annual.improvement.chd <- 3 # 3 means 3% annual improvement in fatality
@@ -35,7 +33,7 @@ fatality.sec.gradient.stroke <-40 # Percentage of difference in fatality between
 
 cancer.lag <- 10 # Needs to be longer than cvd.lag to work properly (smoking histories)
 
-clusternumber <- 4 # Change to your number of CPU cores 
+clusternumber <- 100 # Change to your number of CPU cores 
 
 cleardirectories <- T # If T delete auxiliary output directories when simulation finish
 
@@ -97,6 +95,7 @@ source(file = "./CVD statistics.R") # for cvd
 cl <- makeCluster(clusternumber) 
 registerDoParallel(cl)
 
+cat("Monte Carlo simulation...\n\n")
 foreach(iterations = 1 : it,
         .inorder = F,
         .verbose = T,

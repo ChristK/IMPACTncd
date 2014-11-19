@@ -21,15 +21,19 @@ POP <- rbind(POP,
                                                id = as.integer((1:.N) + POP[, max(id)]), 
                                                sex= ifelse(dice(.N) < 0.487804872, "2", "1"), 
                                                cigst1 = "1",
+                                               cigst1.cvdlag = "1",
+                                               cigst1.calag = "1",
                                                cigdyalCat = 0,
                                                givupsk = "99",
                                                endsmoke = 0,
                                                packyears = 0,
                                                #diabtyper = "2",
                                                diabtotr = "1",
+                                               diabtotr.cvdlag = "1",
                                                #lipid = "0",
                                                #bpmedc = "0",
-                                               cvdcon = "3")])
+                                               cvdcon = "3")], 
+             fill = T)
 agegroup.fn(POP)
 
 # export births 

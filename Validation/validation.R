@@ -30,7 +30,7 @@ men <- ggplot(mort[sex=="Men",],
     geom_errorbar(aes(ymin= lower*100000, ymax = upper*100000), width=.1, position=pd) +
     geom_line(position=pd) +
     geom_point(position=pd, size=3) +
-    facet_grid(agegroup ~ qimd) +
+    facet_grid(agegroup ~ qimd, scales="free_y") +
     ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + ylim(0,1500) + 
     ggtitle("CHD Mortality (Men)") 
 
@@ -39,7 +39,7 @@ women <- ggplot(mort[sex=="Women",],
     geom_errorbar(aes(ymin= lower*100000, ymax = upper*100000), width=.1, position=pd) +
     geom_line(position=pd) +
     geom_point(position=pd, size=3) +
-    facet_grid(agegroup ~ qimd) +
+    facet_grid(agegroup ~ qimd, scales="free_y") +
     ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + ylim(0,1500) + 
     ggtitle("CHD Mortality (Women)")
 

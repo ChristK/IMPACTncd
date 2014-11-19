@@ -20,6 +20,8 @@ dependencies(c("data.table",
                "reshape2", 
                "compiler",
                "survey",
+               "ggplot2",
+               "randtoolbox",
                "doParallel",
                "doRNG",
                "foreach"))
@@ -32,7 +34,7 @@ options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata 
 # OR install_local("~/R/data.table-master.zip") #after manually download from github
 
 # max projection horizon (limited by fertility)
-if (init.year + yearstoproject > 2061) yearstoproject <- 2061-init.year
+if (init.year + yearstoproject > 2061) yearstoproject <- 2061 - init.year
 
 # Define end() function to beep end print a message
 if (Sys.info()[1] == "Linux") {
@@ -329,7 +331,7 @@ pred.diab.incid <- function(year, age, sex, qimd, bmival, lag ) {
 pred.diab.incid.lag <- function(year, age, sex, qimd, bmival, lag, duration = 1, n) { 
     prev0 <- pred.diab(year = year-lag, age = age-lag, sex = sex, qimd = qimd, bmival = bmival)
     prev1 <- pred.diab(year = year-lag+duration, age = age-lag+duration, sex = sex, qimd = qimd, bmival = bmival)
-    tc <- prev0 / prev1 # derived from bayes theorem P(diab2008|diab2011= P(diab2011|diab2008)*P(diab2008)/P(diab2011) and P(diab2011|diab2008) = 1)
+    tc <- prev0 / prev1 # derived from bayes theorem P(diab2008|diab2011)= P(diab2011|diab2008)*P(diab2008)/P(diab2011) and P(diab2011|diab2008) = 1)
     return(as.factor(ifelse(dice(n) <tc, 2,1)))
 }
 
@@ -600,7 +602,7 @@ writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n
              paste0("cvd.lag = ", cvd.lag),
              paste0("cancer.lag = ", cancer.lag),
              paste0("diseases = ", diseasestoexclude),
-             paste0("Sample size = ", n),
+             paste0("Sample size = ", format(n, scientific = F)),
              paste0("Number of iterations = ", numberofiterations),
              paste0("Number of scenarios = ", n.scenarios), "\n"), fileOut)
 close(fileOut)
