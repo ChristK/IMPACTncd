@@ -22,29 +22,52 @@ chd.mort <- chd.mort[, binom.confint(sum(chd.mortality), sum(pop), method="agres
            by=.(year, agegroup, sex, qimd)]
 chd.mort[, `:=` (group="IMPACTncd", x=NULL, n=NULL, method=NULL)]
 mort <- rbind(chd.mort,chd.drates, fill=T)
-mort <- mort[agegroup!="85+" & between(year, 2000, 2035)]
+mort <- mort[agegroup!="85+" & between(year, 2000, 2060)]
 
 pd <- position_dodge(.3) 
-men <- ggplot(mort[sex=="Men",],
+men1 <- ggplot(mort[sex=="Men",],
        aes(x=year, y=mean*100000, colour=group, ymax=max(mean*100000)*1.05, ymin = 0)) + 
     geom_errorbar(aes(ymin= lower*100000, ymax = upper*100000), width=.1, position=pd) +
     geom_line(position=pd) +
     geom_point(position=pd, size=3) +
-    facet_grid(agegroup ~ qimd, scales="free_y") +
+    facet_grid(agegroup ~ qimd, scales="fixed") +
     ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + ylim(0,1500) + 
-    ggtitle("CHD Mortality (Men)") 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+    ggtitle("CHD Mortality Validation(Men)") 
 
-women <- ggplot(mort[sex=="Women",],
+women1 <- ggplot(mort[sex=="Women",],
               aes(x=year, y=mean*100000, colour=group, ymax=max(mean*100000)*1.05, ymin = 0)) + 
     geom_errorbar(aes(ymin= lower*100000, ymax = upper*100000), width=.1, position=pd) +
     geom_line(position=pd) +
     geom_point(position=pd, size=3) +
-    facet_grid(agegroup ~ qimd, scales="free_y") +
+    facet_grid(agegroup ~ qimd, scales="fixed") +
     ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + ylim(0,1500) + 
-    ggtitle("CHD Mortality (Women)")
+    ggtitle("CHD Mortality Validation(Women)")
 
-print(men)
-print(women)
+print(men1)
+print(women1)
+
+men2 <- ggplot(mort[sex=="Men",],
+              aes(x=year, y=mean*100000, colour=group, ymin = 0)) + 
+  geom_errorbar(aes(ymin= lower*100000, ymax = upper*100000), width=.1) +
+  geom_smooth(size = 2, alpha=1/4) +
+  geom_point(size= 2, alpha=3/4) +
+  facet_grid(agegroup ~ qimd, scales="free") +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+  ggtitle("CHD Mortality Validation (Men)") 
+
+women2 <- ggplot(mort[sex=="Women",],
+                 aes(x=year, y=mean*100000, colour=group, ymin = 0)) + 
+  geom_errorbar(aes(ymin= lower*100000, ymax = upper*100000), width=.1) +
+  geom_smooth(size = 2, alpha=1/4) +
+  geom_point( size= 2, alpha=3/4) +
+  facet_grid(agegroup ~ qimd, scales="free") +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  ggtitle("CHD Mortality Validation (Women)")
+
+print(men2)
+print(women2) 
 
 # Observed CHD mortality validation
 load("./LifeTables/deaths.by.cause.RData")

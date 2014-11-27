@@ -24,7 +24,7 @@ plot(pred.bmi(0:50, 50, 1, 1), ylim=c(0,35))
 points(pred.bmi(0:50, 50, 1, 3), ylim=c(0,35), col="blue")
 points(pred.bmi(0:50, 50, 1, 5), ylim=c(0,35), col="red")
 
-bmi.svylm$coefficients["year"] <- bmi.svylm$coefficients["year"] * 2
+bmi.svylm$coefficients["year"] <- bmi.svylm$coefficients[grep("year", names(bmi.svylm$coefficients))] * -1
 lines(pred.bmi(0:50, 50, 1, 1), ylim=c(0,35))
 lines(pred.bmi(0:50, 50, 1, 3), ylim=c(0,35), col="blue")
 lines(pred.bmi(0:50, 50, 1, 5), ylim=c(0,35), col="red")

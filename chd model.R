@@ -21,8 +21,10 @@ POP[cigst1.cvdlag == "4" & between(age, 60, 69) & sex == "2", chd.tob.rr := stoc
 POP[cigst1.cvdlag == "4" & between(age, 70, 79) & sex == "2", chd.tob.rr := stochRR(.N, 1.68, 1.93)]
 POP[cigst1.cvdlag == "4" & age >79 & sex == "2", chd.tob.rr := stochRR(.N, 1.38, 1.77)]
 
-# RR for ex-smokers from Huxley RR, Woodward M. Cigarette smoking as a risk factor for coronary heart disease
-# in women compared with men: a systematic review and meta-analysis of prospective cohort studies. The Lancet. 2011 Oct 14;378(9799):1297–305. 
+# RR for ex-smokers from Huxley RR, Woodward M. 
+# Cigarette smoking as a risk factor for coronary heart disease
+# in women compared with men: a systematic review and meta-analysis of prospective cohort studies. 
+# The Lancet. 2011 Oct 14;378(9799):1297–305. 
 # Appendix webfigure 8
 POP[cigst1.cvdlag == "3" & sex == "1" , chd.tob.rr := stochRR(.N, 1.25, 1.32)]
 POP[cigst1.cvdlag == "3" & sex == "2" , chd.tob.rr := stochRR(.N, 1.20, 1.34)]

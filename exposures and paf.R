@@ -209,8 +209,9 @@ chdsmokepaf[, Pe  := N/sum] # Calculate prevalence by agegroup and sex
 chdsmokepaf[, `:=` (N = NULL, sum = NULL)]
 write.csv(chdsmokepaf[Pe != 0,], file = "./Models/IMPACTncd/Exposure/TOBpreval2006.csv", row.names = F) # create csv with SBP prevalence
 
-# RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. Role of Smoking in Global and Regional 
-# Cardiovascular Mortality. Circulation. 2005 Jul 26;112(4):489–97.
+# RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. 
+# Role of Smoking in Global and Regional Cardiovascular Mortality. 
+# Circulation. 2005 Jul 26;112(4):489–97.
 # Table 1 Model B
 chdsmokepaf[, rr := 1]
 chdsmokepaf[cigst1 == "4" & agegroup %in% c("30-34", "35-39","40-44") & sex == "1", rr := 5.51]
@@ -223,8 +224,10 @@ chdsmokepaf[cigst1 == "4" & agegroup %in% c("60-64", "65-69") & sex == "2", rr :
 chdsmokepaf[cigst1 == "4" & agegroup %in% c("70-74", "75-79") & sex == "2", rr := 1.68]
 chdsmokepaf[cigst1 == "4" & agegroup %in% c("80-84", "85+") & sex == "2", rr := 1.38]
 
-# RR for ex-smokers from Huxley RR, Woodward M. Cigarette smoking as a risk factor for coronary heart disease
-# in women compared with men: a systematic review and meta-analysis of prospective cohort studies. The Lancet. 2011 Oct 14;378(9799):1297–305. 
+# RR for ex-smokers from Huxley RR, Woodward M. 
+# Cigarette smoking as a risk factor for coronary heart disease in women 
+# compared with men: a systematic review and meta-analysis of prospective cohort studies. 
+# The Lancet. 2011 Oct 14;378(9799):1297–305. 
 # Appendix webfigure 8
 chdsmokepaf[cigst1 == "3" & agegroup %!in% c("<1   ", "01-04", "05-09", "10-14", "15-19", "20-24", "25-29") & sex == "1" , rr := 1.25]
 chdsmokepaf[cigst1 == "3" & agegroup %!in% c("<1   ", "01-04", "05-09", "10-14", "15-19", "20-24", "25-29") & sex == "2" , rr := 1.20]
@@ -250,8 +253,9 @@ chdsmokepaf[, Pe  := N/sum] # Calculate prevalence by agegroup and sex
 chdsmokepaf[, `:=` (N = NULL, sum = NULL)]
 
 # Calculate PAF for stroke
-# RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. Role of Smoking in Global and Regional 
-# Cardiovascular Mortality. Circulation. 2005 Jul 26;112(4):489–97.
+# RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. 
+# Role of Smoking in Global and Regional Cardiovascular Mortality. 
+# Circulation. 2005 Jul 26;112(4):489–97.
 # Table 1 Model B
 chdsmokepaf[, rr := 1]
 chdsmokepaf[cigst1 == "4" & agegroup %in% c("30-34", "35-39","40-44") & sex == "1", rr := 3.12] # arbitrary
@@ -265,10 +269,12 @@ chdsmokepaf[cigst1 == "4" & agegroup %in% c("60-64", "65-69") & sex == "2", rr :
 chdsmokepaf[cigst1 == "4" & agegroup %in% c("70-74", "75-79") & sex == "2", rr := 1.95]
 chdsmokepaf[cigst1 == "4" & agegroup %in% c("80-84", "85+") & sex == "2", rr := 1]
 
-#ex-smokers
+# ex-smokers
+# Wolf PA, D’Agostino RB, Kannel WB, Bonita R, Belanger AJ. 
+# Cigarette smoking as a risk factor for stroke: The framingham study. 
+# JAMA 1988;259:1025–9. 
 # Stroke risk decreased significantly by two years and was at the level of nonsmokers
 # by five years after cessation of cigarette smoking.
-
 chdsmokepaf[, tobaccopaf := sum(Pe*(rr-1), na.rm = T)/(sum(Pe*(rr-1), na.rm = T) + 1), by = list(agegroup, sex)]
 chdsmokepaf[, group := paste(agegroup, sex, sep="")]
 setkey(chdsmokepaf, group)
@@ -314,8 +320,10 @@ ETS[, plot(etspaf, col=c("blue", "red")[sex], main = "PAF of ETS on lung cancer"
 ETS[, lines(smoothed,  lwd=2)]
 
 # Calculate PAF of ETS for CHD
-# RR from He J, Vupputuri S, Allen K, et al. Passive Smoking and the Risk of Coronary Heart Disease — A Meta-Analysis of Epidemiologic Studies. 
+# RR from He J, Vupputuri S, Allen K, et al. 
+# Passive Smoking and the Risk of Coronary Heart Disease — A Meta-Analysis of Epidemiologic Studies. 
 # New England Journal of Medicine 1999;340:920–6. doi:10.1056/NEJM199903253401204
+# Fully adjusted (10 studies)
 ETS[, rr := c(rep(1, 7), rep(1.26, 12),
               rep(1, 7), rep(1.26, 12))]
 ETS[, etspaf := Pe*(rr-1)/(1+Pe*(rr-1))]
@@ -332,6 +340,7 @@ ETS[, lines(smoothed,  lwd=2)]
 # Calculate PAF of ETS for stroke
 # RR from Oono IP, Mackay DF, Pell JP. Meta-analysis of the association between secondhand smoke exposure and stroke. 
 # J Public Health 2011;33:496–502. doi:10.1093/pubmed/fdr025
+
 ETS[, rr := c(rep(1, 7), rep(1.25, 12),
               rep(1, 7), rep(1.25, 12))]
 ETS[, etspaf := Pe*(rr-1)/(1+Pe*(rr-1))]
@@ -358,7 +367,8 @@ SBP[, Pe  := Freq/sum] # Calculate prevalence by agegroup and sex
 SBP[, `:=` (Freq = NULL, sum = NULL)]
 write.csv(SBP[Pe != 0,], file = "./Models/IMPACTncd/Exposure/SBPpreval2006.csv", row.names = F) # create csv with SBP prevalence
 
-# Calculate RR for CHD. Optimal SBP level at 115mmHg and RR(HR) of dying from CHD was taken from "Age-specific relevance of
+# Calculate RR for CHD. Optimal SBP level at 115mmHg and RR(HR) of dying from CHD was taken from 
+# "Age-specific relevance of
 # usual blood pressure to vascular mortality: 
 # a meta-analysis of individual data for one million adults in 61 prospective studies. 
 # The Lancet. 2002 Dec 14;360(9349):1903–1913" 
@@ -614,8 +624,9 @@ DIAB2[, plot(diabpaf, col=c("blue", "red")[sex], main = "PAF of diabetes on Isch
 DIAB2[, lines(smoothed,  lwd=2)]
 
 # ************************************************************** F & V *****************************************************************
-HSE[, porfv := round(porfv, 1)]
-HSE.srv <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE)
+HSE[, porfv := round(porfv, 0)]
+HSE[porfv >10, porfv := 10] # Set max effect of 10 portions a day
+HSE.srv <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE)
 FV <-data.table(data.frame(svytable(~agegroup + sex + porftvg, HSE.srv, exclude=NULL, na.action=na.pass)))
 FV[, porftvg := as.numeric(as.character(porftvg))]
 FV[, sum := sum(Freq), by=list(agegroup, sex)] # count number of people in each agegroup by sex (denominator for prevalence)
@@ -623,7 +634,8 @@ FV[, Pe  := Freq/sum] # Calculate prevalence by agegroup and sex
 FV[, `:=` (Freq = NULL, sum = NULL)]
 write.csv(FV[Pe != 0,], file = "./Models/IMPACTncd/Exposure/FVpreval2006.csv", row.names = F) # create csv with SBP prevalence
 
-# Calculate RR for CHD. From Dauchet L, Amouyel P, Hercberg S, Dallongeville J. Fruit and Vegetable Consumption and Risk of Coronary Heart Disease: 
+# Calculate RR for CHD. From Dauchet L, Amouyel P, Hercberg S, Dallongeville J. 
+# Fruit and Vegetable Consumption and Risk of Coronary Heart Disease: 
 # A Meta-Analysis of Cohort Studies. J Nutr. 2006 Oct 1;136(10):2588–93. 
 FV[, rr := 0.96 ^ (porftvg)]
 

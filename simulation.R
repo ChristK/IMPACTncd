@@ -36,4 +36,4 @@ cat("advance age\n")
 }
 
 sink()
-gc()
+#gc()

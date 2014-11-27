@@ -96,6 +96,7 @@ cl <- makeCluster(clusternumber)
 registerDoParallel(cl)
 
 cat("Monte Carlo simulation...\n\n")
+time.mark("start parallelisation")
 foreach(iterations = 1 : it,
         .inorder = F,
         .verbose = T,
@@ -118,11 +119,13 @@ foreach(iterations = 1 : it,
             
         # Actual simulation
         sys.source(file = "./simulation.R", my.env)
-        
+        time.mark(paste0(it,"before rm env"))
         rm(my.env)
+        time.mark(paste0(it,"after rm env"))
 }
 
 stopCluster(cl)
+time.mark("End of parallelisation")
 
 # Output
 source(file = "./post simulation functions.R")
