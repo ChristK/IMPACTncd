@@ -81,7 +81,8 @@ POP[, cigst1.calag := factor(cigst1.calag)]
 # ETS 
 if (i > (init.year-2011)) {
   cat("Estimating ETS...\n")
-  smoking.preva.forets1 <- POP[between(age, 18, ageH), list(new.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)]
+  smoking.preva.forets1 <- POP[between(age, 18, ageH),
+                               list(new.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)]
   setkey(smoking.preva.forets1)
   # works for decreasing smoking prevelence
   smoking.preva.forets <- merge(
@@ -91,13 +92,22 @@ if (i > (init.year-2011)) {
     )[,
       change := (old.preval - new.preval) / old.preval][change<0, change:=0]
   
-  POP[id %in% POP[expsmokCat=="1", sample_frac(.SD, smoking.preva.forets[qimd == .BY, change]), by=qimd, .SDcols="id"][,id], expsmokCat :="0"]
+  POP[id %in% POP[expsmokCat=="1", 
+                  sample_frac(.SD, smoking.preva.forets[qimd == .BY, change]),
+                  by = qimd,
+                  .SDcols="id"][,id],
+      expsmokCat :="0"]
+  
   # works for increasing smoking prevelence
   smoking.preva.forets <- merge(
     smoking.preva.forets1, smoking.preva.forets0, by="qimd"
     )[,change := (new.preval - old.preval) / new.preval][change<0,change:=0]
   
-  POP[id %in% POP[expsmokCat=="0", sample_frac(.SD, smoking.preva.forets[qimd==.BY, change]), by=qimd, .SDcols="id"][,id], expsmokCat :="1"]
+  POP[id %in% POP[expsmokCat=="0",
+                  sample_frac(.SD, smoking.preva.forets[qimd==.BY, change]), 
+                  by = qimd,
+                  .SDcols="id"][,id], 
+      expsmokCat := "1"]
   
 }
 
