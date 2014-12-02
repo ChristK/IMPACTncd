@@ -2,10 +2,10 @@ require("ggplot2")
 require("binom")
 
 # Define function to summarise output RF
-MC.mean <- function(m, sd, n, ...) {
+MC.mean <- function(m, sd, n, lim = Inf, ...) {
   sd <- ifelse(is.na(sd), 2 * m, sd) # if mean of 0ne value then sd is technically NA. This is an assumption sd =2*m
-  m <- rtruncnorm(n, 0, Inf, m, sd)
-  return(list(mean= mean(m, na.rm=T),
+  m <- rtruncnorm(n, 0, lim, m, sd)
+  return(list(mean = mean(m, na.rm = T),
               lui = quantile(m, probs = 0.025, na.rm = T),
               uui = quantile(m, probs = 0.975, na.rm = T)))
 }
@@ -34,6 +34,12 @@ direct.standard <- data.table(agegroup = ordered(c("<1   ", "01-04", "05-09",
                               )
 )
 
+# Set cutoff to exlude subgroups with population less than cut off from graphs
+# Else it produces wrong CI
+
+cutoff <- 500
+
+
 direct.standard[, who.pop := who.pop / 100] # per 1
 direct.standard[, esp.pop := esp.pop / 100000] # per 1
 setkey(direct.standard, agegroup)
@@ -44,6 +50,7 @@ age.limit <- levels(factor((agegroup.fn(ageL:ageH))))
 closure.table.cat <- function (dt, type, rf, ...) {
   rf <- substitute(rf)
   grp <- c("year", "scenario")
+  dt2 <- NULL
   
   if (type == "S") grp <- c(grp, "sex")
   if (type == "SQ") grp <- c(grp, "sex", "qimd")
@@ -51,7 +58,12 @@ closure.table.cat <- function (dt, type, rf, ...) {
   if (type == "SAQ") grp <- c(grp, "sex", "agegroup", "qimd")
   
   function() {
-    dt <- dt[agegroup %in% age.limit,]
+    
+    
+    if ("pop" %in% names(dt)) {
+      dt <-   dt[pop > cutoff, ]
+    }
+    
     dt1 <- dt[group == type,
              MC.mean(eval(rf)/pop, 
                      sqrt((eval(rf)/pop)*(1-eval(rf)/pop)/pop),
@@ -59,18 +71,19 @@ closure.table.cat <- function (dt, type, rf, ...) {
              by = grp]
     
     if (type %in% c("SA", "SAQ")) {
+      dt <- dt[agegroup %in% age.limit,]
       if (type == "SA") grp <- c("year", "scenario", "sex")
       if (type == "SAQ") grp <- c("year", "scenario", "sex", "qimd")
       dt2 <- merge(direct.standard, dt, by = "agegroup", all.y = T)
       dt2 <- dt2[group == type,]
       dt2 <- dt2[,
                `:=` (
-                 who.pop.mean = sum(eval(rf)* who.pop/pop, na.rm = T) / sum(who.pop, na.rm = T),
+                 who.pop.mean = sum(eval(rf) * who.pop/pop, na.rm = T) / sum(who.pop, na.rm = T),
                  who.pop.se = sqrt((sum(eval(rf) * (who.pop/pop)^2, na.rm = T)) / sum(who.pop, na.rm = T)),
-                 esp.pop.mean = sum(eval(rf)* esp.pop/pop, na.rm = T) / sum(esp.pop, na.rm = T),
+                 esp.pop.mean = sum(eval(rf) * esp.pop/pop, na.rm = T) / sum(esp.pop, na.rm = T),
                  esp.pop.se = sqrt((sum(eval(rf) * (esp.pop/pop)^2, na.rm = T)) / sum(esp.pop, na.rm = T))
                ),
-               by= c(grp, "mc")] #from http://www.iarc.fr/en/publications/pdfs-online/epi/sp155/ci5v8-chap8.pdf
+               by= c(grp, "mc")] # from http://www.iarc.fr/en/publications/pdfs-online/epi/sp155/ci5v8-chap8.pdf
      
       dt3 <- dt2[, MC.mean(who.pop.mean, who.pop.se, .N), by = grp]
       dt3 <- unique(dt3, by = grp)
@@ -80,10 +93,12 @@ closure.table.cat <- function (dt, type, rf, ...) {
       dt4 <- unique(dt4, by = grp)
       dt4[, agegroup := "esp.pop"]
       
-      dt2 <- rbind(dt3, dt4)
-      
+      dt2 <- rbind(dt3, dt4, fill = T)
     }
+    
     dt <- rbind(dt1, dt2, fill = T)  
+    setkeyv(dt, grp)
+      
     return(dt)  
   }
 }
@@ -92,6 +107,7 @@ closure.table.cont <- function (dt, type, rf.m, rf.sd, ...) {
   rf.m <- substitute(rf.m)
   rf.sd <- substitute(rf.sd)
   grp <- c("year", "scenario")
+  dt2 <- NULL
   
   if (type == "S") grp <- c(grp, "sex")
   if (type == "SQ") grp <- c(grp, "sex", "qimd")
@@ -99,7 +115,11 @@ closure.table.cont <- function (dt, type, rf.m, rf.sd, ...) {
   if (type == "SAQ") grp <- c(grp, "sex", "agegroup", "qimd")
   
   function() {
-    dt <- dt[agegroup %in% age.limit,]
+       
+    if ("pop" %in% names(dt)) {
+      dt <-   dt[pop > cutoff, ]
+    }
+    
     dt1 <- dt[group == type,
              MC.mean(eval(rf.m), 
                      eval(rf.sd)/sqrt(pop),
@@ -107,6 +127,7 @@ closure.table.cont <- function (dt, type, rf.m, rf.sd, ...) {
              by=grp]
     
     if (type %in% c("SA", "SAQ")) {
+      dt <- dt[agegroup %in% age.limit,]
       if (type == "SA") grp <- c("year", "scenario", "sex")
       if (type == "SAQ") grp <- c("year", "scenario", "sex", "qimd")
       dt2 <- merge(direct.standard, dt, by = "agegroup", all.y = T)
@@ -128,10 +149,11 @@ closure.table.cont <- function (dt, type, rf.m, rf.sd, ...) {
       dt4 <- unique(dt4, by = grp)
       dt4[, agegroup := "esp.pop"]
       
-      dt2 <- rbind(dt3, dt4)
+      dt2 <- rbind(dt3, dt4, fill = T)
       
     }
     dt <- rbind(dt1, dt2, fill = T)  
+    setkeyv(dt, grp)
     
     return(dt)  
   }
@@ -147,6 +169,10 @@ closure.graph.cat <- function (dt, type, rf, lag, yaxis, title, yscale = 1) {
   if (type == "SAQ") grp <- c(grp, "sex", "agegroup", "qimd")
   
   function() {
+    if ("pop" %in% names(dt)) {
+      dt <- dt[pop > cutoff, ]
+    }
+    
     dt <- dt[group == type,
              MC.mean(eval(rf)/pop, 
                      sqrt((eval(rf)/pop)*(1-eval(rf)/pop)/pop),
@@ -161,9 +187,9 @@ closure.graph.cat <- function (dt, type, rf, lag, yaxis, title, yscale = 1) {
     g <- ggplot(dt,
                 aes(x = year,
                     y = mean, 
-                    colour=scenario, 
-                    ymax=max(mean) * 1.05, 
-                    ymin = 0)
+                    colour = scenario, 
+                    ymax = max(mean) * 1.01) 
+                    #ymin = 0)
     ) + 
       geom_errorbar(
         aes(
@@ -198,6 +224,10 @@ closure.graph.std <- function (dt, type, rf, lag, yaxis, title, yscale = 1, std 
   if (type == "SAQ") grp <- c(grp, "sex", "qimd")
   
   function() {
+    if ("pop" %in% names(dt)) {
+      dt <-   dt[pop > cutoff, ]
+    }
+    
     dt <- merge(direct.standard, dt, by = "agegroup", all.y = T)
     dt <- dt[agegroup %in% age.limit,]
     dt <- dt[group == type,]
@@ -231,10 +261,10 @@ closure.graph.std <- function (dt, type, rf, lag, yaxis, title, yscale = 1, std 
       g <- ggplot(dt,
                   aes(x = year,
                       y = mean, 
-                      colour=scenario, 
-                      ymax=max(mean) * 1.05, 
+                      colour = scenario, 
+                      ymax = max(mean) * 1.01) 
                       # ymin = min(lui) * 0.95)
-                      ymin = 0)
+                      # ymin = 0)
       ) + 
         geom_errorbar(
           aes(
@@ -268,6 +298,10 @@ closure.graph.cont <- function (dt, type, rf.m, rf.sd, lag = cvd.lag, yaxis, tit
     if (type == "SAQ") grp <- c(grp, "sex", "agegroup", "qimd")
     
     function() {
+      if ("pop" %in% names(dt)) {
+        dt <-   dt[pop > cutoff, ]
+      }
+      
       dt <- dt[group == type,
                MC.mean(eval(rf.m), 
                        eval(rf.sd)/sqrt(pop),
@@ -277,9 +311,9 @@ closure.graph.cont <- function (dt, type, rf.m, rf.sd, lag = cvd.lag, yaxis, tit
       g <- ggplot(dt,
                   aes(x=year,
                       y=mean, 
-                      colour=scenario, 
-                      ymax=max(mean)*1.05, 
-                      ymin = 0)
+                      colour = scenario, 
+                      ymax = max(mean)*1.01) 
+                      # ymin = 0)
       ) + 
         geom_errorbar(
           aes(
@@ -316,6 +350,10 @@ closure.graph.std.cont <- function (dt, type, rf, lag = cvd.lag, yaxis, title, s
   if (type == "SAQ") grp <- c(grp, "sex", "qimd")
   
   function() {
+    if ("pop" %in% names(dt)) {
+      dt <-   dt[pop > cutoff, ]
+    }
+    
     dt <- merge(direct.standard, dt, by = "agegroup", all.y = T)
     dt <- dt[agegroup %in% age.limit,]
     dt <- dt[group == type,]
@@ -350,10 +388,10 @@ closure.graph.std.cont <- function (dt, type, rf, lag = cvd.lag, yaxis, title, s
     g <- ggplot(dt,
                 aes(x = year,
                     y = mean, 
-                    colour=scenario, 
-                    ymax=max(mean) * 1.05, 
+                    colour = scenario, 
+                    ymax = max(mean) * 1.01) 
                     # ymin = min(lui) * 0.95)
-                     ymin = 0)
+                    # ymin = 0)
     ) + 
       geom_errorbar(
         aes(
@@ -746,6 +784,7 @@ closure.graph.std.cont <- function (dt, type, rf, lag = cvd.lag, yaxis, title, s
     
   }
   
+
   Tables.fn <- list()
   for (type in c("S", "SQ", "SA", "SAQ")) {
     # Risk Factors
@@ -852,6 +891,7 @@ closure.graph.std.cont <- function (dt, type, rf, lag = cvd.lag, yaxis, title, s
                                                                    "Mortality",
                                                                    "CHD Mortality",
                                                                    100000)
+
     }
     
     # Stroke

@@ -24,7 +24,7 @@ fatality.sec.gradient.stroke <-40 # Percentage of difference in fatality between
 
 cancer.lag <- 10 # Needs to be longer than cvd.lag to work properly (smoking histories)
 
-clusternumber <- 100 # Change to your number of CPU cores 
+clusternumber <- 1 # Change to your number of CPU cores 
 
 cleardirectories <- T # If T delete auxiliary output directories when simulation finish
 

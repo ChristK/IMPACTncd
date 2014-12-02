@@ -26,7 +26,7 @@ dependencies(c("data.table",
                "doRNG",
                "foreach"))
 
-enableJIT(3) #set to 1,2 or 3 to enable different precompiling levels
+enableJIT(1) #set to 1,2 or 3 to enable different precompiling levels
 
 options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata around the sample grand mean rather than the stratum mean)
 #require(devtools)
@@ -142,7 +142,7 @@ agegroup.fn <- function(x, lagtime = 0) {
     return(invisible(agegroup))    
   } else {
     if (is.data.table(x)) {
-      x[, agegroup := cut(as.numeric(as.character(age)) + lagtime, 
+      x[, agegroup := cut(age + lagtime, 
                           breaks = breaks, 
                           labels = labels, 
                           include.lowest = T, 
@@ -172,7 +172,7 @@ agegroup.part <- function(x, lagtime = 0) {
     return(invisible(agegroup))    
   } else {
     if (is.data.table(x)) {
-      x[, agegroup := cut(as.numeric(as.character(age)) + lagtime, 
+      x[, agegroup := cut(age + lagtime, 
                           breaks = breaks, 
                           labels = labels, 
                           include.lowest = T, 
@@ -335,11 +335,11 @@ pred.diab.incid.lag <- function(year, age, sex, qimd, bmival, lag, duration = la
 
 # Gives the annual probability of a never smoker to become  smoker next year
 # all other remain never smokers
-pred.nev0sm1 <- function(year, age, qimd) {
+pred.nev0sm1 <- function(year, age, qimd, lag) {
   qimd <- ifelse(qimd == 1, "1", "2")
   qimd <- ordered(qimd, levels=1:2)
   
-  pnev0sm1 <- data.frame(predict(smok.start.svylr, data.frame(year = year, age = age, qimd = qimd), type = "response", se.fit=T))
+  pnev0sm1 <- data.frame(predict(smok.start.svylr, data.frame(year = year-lag, age = age-lag, qimd = qimd), type = "response", se.fit=T))
   return(rtruncnorm(nrow(pnev0sm1), 0, 1, pnev0sm1[[1]], pnev0sm1[[2]]))
 }
 
@@ -347,7 +347,7 @@ pred.nev0sm1 <- function(year, age, qimd) {
 # lines(pred.nev0sm1(16:60, "3"), ylim=c(0,0.2))
 
 # Predicts the annual probability of a smoker to become ex-smoker
-pred.sm0ex1 <- function(year, age, sex, qimd) {
+pred.sm0ex1 <- function(year, age, sex, qimd, lag) {
   if (is.factor(sex)==F) {
     sex <-  factor(sex, 
                    levels = c(1,2), 
@@ -358,7 +358,7 @@ pred.sm0ex1 <- function(year, age, sex, qimd) {
                    levels = c(1,2,3,4,5), 
                    ordered = T)
   }
-  sm0ex1 <- data.frame(predict(smok.cess.svylr, data.frame(year = year, age = age, sex = sex, qimd = qimd), type = "response", se.fit=T))
+  sm0ex1 <- data.frame(predict(smok.cess.svylr, data.frame(year = year-lag, age = age-lag, sex = sex, qimd = qimd), type = "response", se.fit=T))
   return(rtruncnorm(nrow(sm0ex1), 0, 1, sm0ex1[[1]], sm0ex1[[2]]))
   #return(sm0ex1[[1]])
 }
@@ -473,12 +473,12 @@ perc.rank <- function(x) rank(x,  ties.method = "random")/length(x)
 
 # Define function to match continuous distributions of each group with the one in SPOP2011 to simulate ageing 
 ageing.distr <- function(risk.factor) {
-  temp = copy(SPOP2011[, c(risk.factor, "group"), with = F])
+  temp <- SPOP2011[, c(risk.factor, "group"), with = F]
   nam <- paste0(risk.factor, ".rank")
-  temp[, (nam) := perc.rank(get(risk.factor)), by = group]
+  temp[, (nam) := percent_rank(get(risk.factor)), by = group]
   setkeyv(temp, c("group", nam))
   
-  POP[, (nam) := perc.rank(get(risk.factor)), by = group]
+  POP[, (nam) := percent_rank(get(risk.factor)), by = group]
   POP[, (risk.factor) := NULL]
   setkeyv(POP, c("group", nam))
   return(temp[POP, roll = "nearest"])
@@ -578,8 +578,14 @@ Fertility = data.table(Fertility)
 setnames(Fertility, c("age", 2000:2061))
 setkey(Fertility, age)
 
+# Function to apply after ageing
+scenario.fn <- function() {}
+
 # Find and load scenarios
-scenarios.list <- list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = F, recursive = F)
+if (!exists("scenarios.list")) {
+  scenarios.list <- list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = F, recursive = F)
+}
+
 n.scenarios <- length(scenarios.list)
 scenarios.list <- rep(scenarios.list, each = numberofiterations)
 

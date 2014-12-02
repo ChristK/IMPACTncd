@@ -61,6 +61,10 @@ riskfactors[
   sex := "Women"
   ]
 
+riskfactors[,
+  sex := factor(sex)
+  ]
+
 save(
   riskfactors,
   file="./Output/RF/riskfactors.RData"
@@ -117,6 +121,10 @@ other.mortality[
   sex := "Women"
   ]
 
+other.mortality[,
+  sex := factor(sex)
+  ]
+
 save(
   other.mortality,
   file = "./Output/Other/other.mortality.RData"
@@ -151,6 +159,10 @@ life.exp[
 life.exp[
   sex == "2", 
   sex := "Women"
+  ]
+
+life.exp[,
+  sex := factor(sex)
   ]
 
 # Life expectancy at birth
@@ -316,6 +328,10 @@ if ("CHD" %in% diseasestoexclude) {
     sex := "Women"
     ]
   
+  chd.burden[,
+    sex := factor(sex)
+    ]
+  
   save(
     chd.burden,
     file="./Output/CHD/chd.burden.RData"
@@ -346,6 +362,10 @@ if ("CHD" %in% diseasestoexclude) {
   healthylife.exp.chd[
     sex == "2",
     sex := "Women"
+    ]
+  
+  healthylife.exp.chd[,
+    sex := factor(sex)
     ]
   
   healthylife.exp.chd[
@@ -414,6 +434,10 @@ if ("stroke" %in% diseasestoexclude) {
     sex := "Women"
     ]
   
+  stroke.burden[,
+    sex := factor(sex)
+    ]
+  
   save(
     stroke.burden, 
     file="./Output/Stroke/stroke.burden.RData"
@@ -444,6 +468,10 @@ if ("stroke" %in% diseasestoexclude) {
   healthylife.exp.stroke[
     sex == "2",
     sex := "Women"
+    ]
+  
+  healthylife.exp.stroke[,
+    sex := factor(sex)
     ]
   
   healthylife.exp.stroke[
@@ -630,11 +658,12 @@ for (uu in grep(glob2rx("*.SAQ.WHO"), names(Graphs))) {
 for (uu in grep(glob2rx("*.SAQ.ESP"), names(Graphs))) {
   Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ qimd)
 }
+
+Graphs[sapply(Graphs, is.null)] <- NULL
+
 save(Graphs, file="./Output/Graphs/Graphs.rda")
 
 # Export pdfs
-Graphs[sapply(Graphs, is.null)] <- NULL
-
 mclapply(names(Graphs), 
          function(x) ggsave(filename=paste0(x,".pdf"),
                             plot=Graphs[[x]], 
@@ -675,7 +704,72 @@ lapply(
   )
 )
 
+# Calculate DPP 
+pop.abs <- riskfactors[group=="S",
+                       sum(pop),
+                       by = .(year,scenario, mc, sex)][,
+                                                       list(pop = mean(V1) / pop.fraction),
+                                                       by = .(year, scenario, sex)]
+if ("CHD" %chin% diseasestoexclude) {
+  chd.dpp <- merge(Tables$chdmortal.S, pop.abs, by = c("year", "scenario", "sex"))
+  chd.dpp[, deaths := MC.mean( mean * pop, (uui-lui) * pop / (2 * 1.96), .N * 1000)[1], 
+          by = .(scenario, sex, year)]
+  chd.dpp <- chd.dpp[year>2015, 
+                     binom.confint(sum(deaths),
+                                   sum(pop),
+                                   method="agresti-coull"),
+                     by=.(scenario)]
+  
+  chd.dpp <- chd.dpp[,  list(dpp = round(mean * n),
+                             upper = round(upper * n),
+                             lower = round(lower * n),
+                             scenario = scenario)
+                     ][,
+                       `:=` (dpp = round(.SD[scenario == "current trends", dpp] - dpp),
+                             lower = round(.SD[scenario == "current trends", lower] - lower),
+                             upper = round(.SD[scenario == "current trends", upper] - upper))][]
+  
+  write.csv(
+    chd.dpp,
+    file = paste0("./Output/Tables/chd.dpp.csv"),
+    quote = T,
+    row.names = F
+  )
+}
 
+if ("stroke" %in% diseasestoexclude) {
+  stroke.dpp <- merge(Tables$strokemortal.S, pop.abs, by = c("year", "scenario", "sex"))
+  stroke.dpp[, deaths := MC.mean( mean * pop, (uui-lui) * pop / (2 * 1.96), .N * 1000)[1], 
+             by = .(scenario, sex, year)]
+  stroke.dpp <- stroke.dpp[year>2015, 
+                           binom.confint(sum(deaths), 
+                                         sum(pop), 
+                                         method="agresti-coull"), 
+                           by=.(scenario)]
+  stroke.dpp <- stroke.dpp[,  list(dpp = round(mean * n),
+                                   upper = round(upper * n),
+                                   lower = round(lower * n),
+                                   scenario = scenario)
+                           ][,
+                             `:=` (
+                               dpp = round(.SD[scenario == "current trends", dpp] - dpp),
+                               lower = round(.SD[scenario == "current trends", lower] - lower),
+                               upper = round(.SD[scenario == "current trends", upper] - upper))][]
+  
+  write.csv(
+    stroke.dpp,
+    file = paste0("./Output/Tables/stroke.dpp.csv"),
+    quote = T,
+    row.names = F
+  )
+}
+
+# Calculate inequality
+Tables$chdincid.SAQ[agegroup == "esp.pop", glm(mean ~ sex + year + as.numeric(qimd),
+                                               family = "quasibinomial")$coefficients[4], 
+                    by = .(scenario)]
+
+# Clear intermediate files
 if (cleardirectories == T) {
   scenarios.list <- list.files(
     path = "./Scenarios",

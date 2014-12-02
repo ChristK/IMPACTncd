@@ -27,7 +27,7 @@ cat("Smoking initiation/cessation simulation\n")
 
 if (i == (init.year-2011)) {
   cat("Smoking lag\n")
-  POP[cigst1=="1", cigst1.cvdlag := "1"]
+  POP[cigst1 == "1", cigst1.cvdlag := "1"]
   POP[cigst1 %in% c("2", "3"), cigst1.cvdlag := ifelse(endsmoke < cvd.lag, "4", cigst1)] # slightly wrong.could also be a never smoker 
   POP[cigst1.cvdlag %in% c("2", "3"), endsmoke := endsmoke - cvd.lag]
   POP[cigst1.cvdlag == "4", `:=` (cigdyalCat = numsmok, endsmoke=0)]
@@ -51,12 +51,12 @@ if (i == (init.year-2011)) {
   
   cat("Smoking never to active smoker\n")
   POP[between(age, 16 + cvd.lag, 50 + cvd.lag) & (cigst1.cvdlag== "1"), 
-      cigst1.temp1 := dice(.N) < pred.nev0sm1(i - cvd.lag, age - cvd.lag, qimd)] 
+      cigst1.temp1 := dice(.N) < pred.nev0sm1(i, age, qimd, cvd.lag)] 
   POP[cigst1.temp1 == T, `:=` (cigdyalCat = resample(POP[qimd == .BY[[1L]] & cigst1.cvdlag == "4", cigdyalCat], .N, replace=T)), by=qimd]  
   
   cat("Smoking active to ex smoker\n")
-  POP[between(age, 16 + cvd.lag, ageH) & cigst1.cvdlag== "4", 
-      cigst1.temp2 := dice(.N) < pred.sm0ex1(i - cvd.lag, age - cvd.lag, sex, qimd)]
+  POP[between(age, 16 + cvd.lag, ageH) & cigst1.cvdlag == "4", 
+      cigst1.temp2 := dice(.N) < pred.sm0ex1(i , age , sex, qimd, cvd.lag)]
   
   cat("Smoking ex to active smoker\n")
   POP[between(age, 16 + cvd.lag, 75 + cvd.lag) & between(endsmoke, 1, 10), 
@@ -81,7 +81,7 @@ POP[, cigst1.calag := factor(cigst1.calag)]
 # ETS 
 if (i > (init.year-2011)) {
   cat("Estimating ETS...\n")
-  smoking.preva.forets1 <- POP[between(age, 18, ageH),
+  smoking.preva.forets1 <- POP[between(age, ageL, ageH),
                                list(new.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)]
   setkey(smoking.preva.forets1)
   # works for decreasing smoking prevelence
@@ -90,9 +90,24 @@ if (i > (init.year-2011)) {
     smoking.preva.forets0,
     by="qimd"
     )[,
-      change := (old.preval - new.preval) / old.preval][change<0, change:=0]
+      change := (old.preval - new.preval) / old.preval][
+        change<0, change:=0][
+          is.na(change), change:=0]
   
-  POP[id %in% POP[expsmokCat=="1", 
+  # Avoid crashes when a QIMD disappears due to scenarios
+  for (ll in levels(POP$qimd)) {
+    
+    if (length(smoking.preva.forets[qimd == ll,change]) == 0) {
+      smoking.preva.forets <- rbind(smoking.preva.forets, 
+                                    data.table(qimd = ll, 
+                                               new.preval = 0, 
+                                               old.preval = 0, 
+                                               change = 0))
+    }
+    
+  }
+  
+  POP[id %in% POP[between(age, ageL, ageH) & expsmokCat=="1", 
                   sample_frac(.SD, smoking.preva.forets[qimd == .BY, change]),
                   by = qimd,
                   .SDcols="id"][,id],
@@ -101,17 +116,34 @@ if (i > (init.year-2011)) {
   # works for increasing smoking prevelence
   smoking.preva.forets <- merge(
     smoking.preva.forets1, smoking.preva.forets0, by="qimd"
-    )[,change := (new.preval - old.preval) / new.preval][change<0,change:=0]
+    )[,change := (new.preval - old.preval) / new.preval][
+      change<0,change:=0][
+        is.na(change), change:=0]
   
-  POP[id %in% POP[expsmokCat=="0",
-                  sample_frac(.SD, smoking.preva.forets[qimd==.BY, change]), 
+  # Avoid crashes when a QIMD disappears due to scenarios
+  for (ll in levels(POP$qimd)) {
+    
+    if (length(smoking.preva.forets[qimd == ll,change]) == 0) {
+      smoking.preva.forets <- rbind(smoking.preva.forets, 
+                                    data.table(qimd = ll, 
+                                               new.preval = 0, 
+                                               old.preval = 0, 
+                                               change = 0))
+    }
+    
+  }
+  
+  POP[id %in% POP[between(age, ageL, ageH) & expsmokCat=="0",
+                  sample_frac(.SD, smoking.preva.forets[qimd == .BY, change]), 
                   by = qimd,
                   .SDcols="id"][,id], 
       expsmokCat := "1"]
   
 }
 
-smoking.preva.forets0 <- POP[between(age, 18, ageH), list(old.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)] # to be used for ETS
+smoking.preva.forets0 <- POP[between(age, ageL, ageH), 
+                             list(old.preval = prop.table(table(cigst1.cvdlag == "4"))[2]), 
+                             by =.(qimd)] # to be used for ETS
 setkey(smoking.preva.forets0) # to be used as a baseline for new years calculation
 
 cat("DIAB estimation\n")
@@ -139,8 +171,13 @@ if (i > (init.year - 2011 + cvd.lag)) {
 } 
 
 cat("DIAB finished\n")
+
 agegroup.fn(POP)
 agegroup.fn(SPOP2011)
+
+# Call scenario function
+scenario.fn()
+
 setkey(POP, qimd, sex, agegroup)
 setkey(SPOP2011, qimd, sex, agegroup)
 

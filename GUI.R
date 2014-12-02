@@ -1,10 +1,25 @@
 require("RGtk2")
 # needs sudo apt-get install libgtk2.0-dev before install in linux
 require("RGtk2Extras")
-input.fn <- function(yearstoproject=10, ageL=30, ageH=84, numberofiterations=1, diseasestoexclude, init.year = 2011, n=1,
-                     cvd.lag=5, cancer.lag=10, clusternumber = 4,cleardirectories=T,
-                     advanced, alignment, Fertility.Assumption=N, fatality.annual.improvement.chd, fatality.annual.improvement.stroke,
-                     fatality.sec.gradient.chd, fatality.sec.gradient.stroke) {
+
+input.fn <- function(yearstoproject=10,
+                     ageL= 30, 
+                     ageH = 84,
+                     numberofiterations = 1,
+                     diseasestoexclude, 
+                     init.year = 2011, 
+                     n = 1,
+                     cvd.lag = 5, 
+                     cancer.lag = 10, 
+                     clusternumber = 4,
+                     cleardirectories = T,
+                     advanced, 
+                     alignment, 
+                     Fertility.Assumption = "N", 
+                     fatality.annual.improvement.chd, 
+                     fatality.annual.improvement.stroke,
+                     fatality.sec.gradient.chd, 
+                     fatality.sec.gradient.stroke) {
   if (ageL > ageH) {
     tt <- ageL
     ageH <- ageL
@@ -26,7 +41,8 @@ input.fn <- function(yearstoproject=10, ageL=30, ageH=84, numberofiterations=1, 
               fatality.annual.improvement.stroke = fatality.annual.improvement.stroke,
               fatality.sec.gradient.chd = fatality.sec.gradient.chd,
               fatality.sec.gradient.stroke = fatality.sec.gradient.stroke,
-              numberofiterations = numberofiterations))
+              numberofiterations = numberofiterations)
+  )
 }
 
 
@@ -34,7 +50,7 @@ input.fn <- function(yearstoproject=10, ageL=30, ageH=84, numberofiterations=1, 
   title = "IMPACTncd by Chris Kypridemos",
   label = "Set Simulation Parameters",
   #long.running = TRUE,
-  yearstoproject.rangeItem = c(value=20, from=1, to=60, by=1), 
+  yearstoproject.rangeItem = c(value=30, from=1, to=60, by=1), 
   label = "Forecast horizon",
   ageL.rangeItem = c(value=30, from=30, to=84, by=1), 
   label = "Define lower age limit for the diseases-model simulation",
@@ -77,26 +93,27 @@ input.fn <- function(yearstoproject=10, ageL=30, ageH=84, numberofiterations=1, 
   init.year.integerItem = c(value=2011, from=2001, to=2020, by=1),
   label = "Define year to start the simulation",
   tooltip = "Use years other than 2011 with caution",
-  clusternumber.integerItem = c(value=100, from=1, to=400, by=1),
+  clusternumber.integerItem = c(value=70, from=1, to=80, by=1),
   label = "Define number of cores", 
   tooltip = "Each core needs about 3Gb of ram",
   alignment.trueFalseItem = FALSE,
   label = "Apply correction factor to counterpoise levin's and exposure error)",
   Fertility.Assumption.radiobuttonItem = c(value="N", "H", "L"),
   label = "Select (N)ormal, (H)igh or (L)ow fertility rate asumptions\nbased on ONS scenarios",
-  cleardirectories.trueFalseItem = TRUE,
+  cleardirectories.trueFalseItem = FALSE,
   label = "Delete intermediate output files and logs"
 )
-
-#win <- gtkScrolledWindow()
-#win$setSizeRequest(-1, 150)
-#win$add(run.dialog(input.fn, parent.window=NULL))
 
 run.dialog(input.fn)   
 
 list2env(input_fn_output, envir = .GlobalEnv)
       
-      
-      
-      
-      
+# Function to choose  scenarios     
+choose.scenarios <- function(x) {x}
+   
+.choose.scenarios.dialog = list(
+  title = "IMPACTncd by Chris Kypridemos",
+  label = "Choose scenarios",
+  x.variableSelectorItem =  list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = F, recursive = F))
+
+run.dialog(choose.scenarios, output.name = "scenarios.list") 

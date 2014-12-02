@@ -17,9 +17,9 @@ for (i in (init.year-2011):(yearstoproject + init.year - 2012)) {
     sys.source(file = paste0("./Scenarios/", scenarios.list[[iterations]]), my.env)
     
     # Start births engine
-    cat(paste0(POP[,.N], " population\n"))
+    # cat(paste0(POP[,.N], " population\n"))
     sys.source(file = "./birth engine.R", my.env)
-    cat(paste0(POP[,.N], " population\n"))
+    # cat(paste0(POP[,.N], " population\n"))
     
     # Start ageing engine
     sys.source(file = "./ageing engine.R", my.env)
@@ -27,7 +27,7 @@ for (i in (init.year-2011):(yearstoproject + init.year - 2012)) {
     # Estimating incidence and mortality of modelled NCDs
     diseases <- sample(diseases) # randomly change the order of diseases each year
     lapply(diseases, function(f) f()) # run all functions in the list
-    cat(paste0(POP[,.N], " population\n"))
+    #cat(paste0(POP[,.N], " population\n"))
    
 cat("advance age\n")
     POP[, `:=`(age = age + 1)]  # make pop older

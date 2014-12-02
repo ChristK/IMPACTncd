@@ -1,4 +1,4 @@
-#!/opt/gridware/apps/gcc/R/3.1.0/bin/Rscript
+#!/opt/gridware/apps/gcc/R/3.1.0/lib64/R/bin/Rscript
 #!/usr/bin/Rscript
 # ************************************************************************************************
 #
@@ -71,9 +71,7 @@ foreach(iterations = 1 : it,
             
         # Actual simulation
         sys.source(file = "./simulation.R", my.env)
-        time.mark(paste0(it,"before rm env"))
         rm(my.env)
-        time.mark(paste0(it,"after rm env"))
 }
 
 stopCluster(cl)

@@ -33,7 +33,7 @@ fatality.sec.gradient.stroke <-40 # Percentage of difference in fatality between
 
 cancer.lag <- 10 # Needs to be longer than cvd.lag to work properly (smoking histories)
 
-clusternumber <- 100 # Change to your number of CPU cores 
+clusternumber <- 6 # Change to your number of CPU cores 
 
 cleardirectories <- T # If T delete auxiliary output directories when simulation finish
 
@@ -58,7 +58,7 @@ options(warn = 1)
 if (Sys.info()[1] == "Linux") {
     if (system("whoami", T )== "mdxasck2") {
         setwd("~/IMPACTncd/")
-        ifelse (clusternumber<100, 100,clusternumber)  # overwrites previous if <100
+        ifelse (clusternumber<70, 70, clusternumber)  # overwrites previous if <60
     } else {
     setwd(paste("/home/", 
                 system("whoami", T), 
@@ -119,9 +119,7 @@ foreach(iterations = 1 : it,
             
         # Actual simulation
         sys.source(file = "./simulation.R", my.env)
-        time.mark(paste0(it,"before rm env"))
         rm(my.env)
-        time.mark(paste0(it,"after rm env"))
 }
 
 stopCluster(cl)

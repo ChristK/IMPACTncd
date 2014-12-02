@@ -59,12 +59,10 @@ POP = copy(SPOP2011[, sample_n(.SD, temp[age==.BY[1] & sex==.BY[2], pct]), by = 
 SPOP2011[, age2 := NULL]
 POP[, age2 := NULL]
 
-POP <- POP[age > 0,] # Delete all newborns from the population (an overestimation, probably because data collection lasted more than a year)
-
-
 # Calculate the exact fraction of the mid 2010 population this sample represents
 pop.fraction <- POP[,.N] / temp[, sum(pop)] # 53107200 is the total mid 2011 population of England (52642600 for 2010)
 
+POP <- POP[age > 0,] # Delete all newborns from the population (an overestimation, probably because data collection lasted more than a year)
 
 rm(random.pop.file, temp)
 sink() 

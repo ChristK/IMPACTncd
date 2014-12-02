@@ -1,8 +1,7 @@
-# This scenario is the absolute population level interventions one
-# Assumes that the SBP, TC, BMI will drop by a specific amount from the estimated one in the baseline scenario, 
-# every year
-
-cat("Rose absolute scenario\n\n")
+# This scenario is the high risk intervention one
+# Assumes that 80% of those with SBP above 140mmHg, TC above 5 mmol/l and BMI above 35 kgr/m2 have a
+# reduction of 30% on their estimated values
+cat("highrisk scenario\n\n")
 
 intervention.year <- 2016
 
@@ -22,11 +21,15 @@ if (i == (init.year - 2011)) {
   # Function to apply after ageing
   scenario.fn <- function() {
     if (i >= (intervention.year - 2011 + cvd.lag)) {
-      POP[, `:=` (bmival.cvdlag = bmival.cvdlag - 1,
-                  cholval.cvdlag = cholval.cvdlag - 0.3,
-                  omsysval.cvdlag = omsysval.cvdlag - 10,
-                  porftvg.cvdlag = porftvg.cvdlag + 1)]
-      POP[cigst1.cvdlag == "4", cigst1.cvdlag := ifelse(dice(.N) < 0.05, "3", "4")] 
+      
+      setkey(POP, id)
+      
+      POP[sample_frac(POP[bmival.cvdlag >= 35, .(id)], 0.8), bmival.cvdlag := bmival.cvdlag * 0.7]
+      POP[sample_frac(POP[omsysval.cvdlag >= 140, .(id)], 0.8), omsysval.cvdlag := omsysval.cvdlag * 0.7]
+      POP[sample_frac(POP[cholval.cvdlag >= 5, .(id)], 0.8), cholval.cvdlag := cholval.cvdlag * 0.7]
+      return()
     }
   }
 }
+
+

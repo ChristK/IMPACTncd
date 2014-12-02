@@ -1,5 +1,7 @@
-# Tris scenario assumes exposure stable at 2011 levels
+# This scenario assumes exposure stable at 2011 levels
 cat("no trends scenario (2011 exposures)\n\n")
+
+intervention.year <- 2016
 
 # Load prediction equations
 if (i == (init.year-2011)) {
@@ -13,9 +15,12 @@ if (i == (init.year-2011)) {
     load(file="./Lagtimes/smok.start.svylr.rda")
     load(file="./Lagtimes/fv.svylr.rda")
     load(file="./Lagtimes/fvrate.svylr.rda")
+    
+    # Function to apply after ageing
+    scenario.fn <- function() {}
 }
 
-if (i == (init.year-2011) + cvd.lag) {
+if (i == init.year-2011 + cvd.lag) {
     #bmi
     yr <- grep("year", names(bmi.svylm$coefficients)) # get coefficients containing year
     bmi.svylm$coefficients[yr] <- 0 # replace them with 0

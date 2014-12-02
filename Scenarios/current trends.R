@@ -1,4 +1,4 @@
-# This scenario is the fundumental one
+# This scenario is the fundamental one
 # Assumes that the trends that where observed since 2001 will continue in the future
 cat("current trends scenario\n\n")
 
@@ -14,4 +14,7 @@ if (i == (init.year-2011)) {
     load(file="./Lagtimes/smok.start.svylr.rda")
     load(file="./Lagtimes/fv.svylr.rda")
     load(file="./Lagtimes/fvrate.svylr.rda")
+	
+	# Function to apply after ageing
+	scenario.fn <- function() {}
 }

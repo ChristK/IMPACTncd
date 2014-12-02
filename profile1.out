@@ -1,0 +1,3 @@
+line profiling: sample.interval=20000
+#File 1: 
+"cat" "<Anonymous>" "notifyUndefVar" "cmpSym" "cmp" "genCode" "<Anonymous>" "cmpCallArgs" "cmpCallSymFun" "cmpCall" "cmp" "h" "tryInline" "cmpCall" "cmp" "genCode" "cmpfun" "doTryCatch" "tryCatchOne" "tryCatchList" "tryCatch" "<Anonymous>" 1#1 "FUN" "lapply" 
