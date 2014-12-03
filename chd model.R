@@ -102,43 +102,43 @@ POP[porftvg.cvdlag < 97, chd.fv.rr := stochRR(.N, 0.96^(porftvg.cvdlag), 0.99^(p
 
 # Estimate prevalence of CHD only in first run when i does not exist yet
 if (i == init.year - 2011) {
-    cat(paste0("Estimating CHD prevalence in ", init.year, " ...\n\n"))
-    
-    age.structure <- data.table(table(POP[, sex, by = agegroup]), key = c("sex", "agegroup"))
-    age.structure[CHDpreval, "Nprev" := as.integer(N * prevalence)]
-    setnames(age.structure, "N", "population")
-    setkey(POP, id)
-    
-    Temp <- POP[between(age, ageL, ageH), 
-                            sample_n(.SD, age.structure[sex == .BY[[2]] & agegroup == .BY[[1]], Nprev], 
-                                     weight = p0 * chd.tob.rr * chd.ets.rr * 
-                                         chd.sbp.rr * chd.chol.rr * chd.bmi.rr * chd.diab.rr * chd.fv.rr, 
-                                     replace = F), 
-                            by = list(agegroup, sex)]
-    setkey(Temp, id) # Temp is only used to select id for people with prevalent chd
-    POP[Temp, chd.incidence := init.year-1] # and then we assign these ids to the population
+  cat(paste0("Estimating CHD prevalence in ", init.year, " ...\n\n"))
+  
+  age.structure <- data.table(table(POP[, sex, by = agegroup]), key = c("sex", "agegroup"))
+  age.structure[CHDpreval, "Nprev" := as.integer(N * prevalence)]
+  setnames(age.structure, "N", "population")
+  setkey(POP, id)
+  
+  Temp <- POP[between(age, ageL, ageH), 
+              sample_n(.SD, age.structure[sex == .BY[[2]] & agegroup == .BY[[1]], Nprev], 
+                       weight = p0 * chd.tob.rr * chd.ets.rr * 
+                         chd.sbp.rr * chd.chol.rr * chd.bmi.rr * chd.diab.rr * chd.fv.rr, 
+                       replace = F), 
+              by = list(agegroup, sex)]
+  setkey(Temp, id) # Temp is only used to select id for people with prevalent chd
+  POP[Temp, chd.incidence := init.year-1] # and then we assign these ids to the population
 }
 
 # correction factor NEED TO make it work only for i==0
 if (alignment == T) {
-    if (i == init.year-2011) {
-        corr.factor.chd <- merge(POP[, mean(p0* chd.tob.rr * chd.ets.rr * 
-                                                chd.sbp.rr * chd.chol.rr * 
-                                                chd.bmi.rr * chd.diab.rr * chd.fv.rr),
-                                     by = c("agegroup", "sex")], CHDincid, by = c("agegroup", "sex"), all.x = T)
-        corr.factor.chd[,b := incidence/V1]
-        corr.factor.chd[, `:=` (p0=NULL, incidence=NULL, V1=NULL)]
-    } else {
-        POP <- merge(POP, corr.factor, by = c("agegroup", "sex"), all.x = T)
-    }
+  if (i == init.year-2011) {
+    corr.factor.chd <- merge(POP[, mean(p0* chd.tob.rr * chd.ets.rr * 
+                                          chd.sbp.rr * chd.chol.rr * 
+                                          chd.bmi.rr * chd.diab.rr * chd.fv.rr),
+                                 by = c("agegroup", "sex")], CHDincid, by = c("agegroup", "sex"), all.x = T)
+    corr.factor.chd[,b := incidence/V1]
+    corr.factor.chd[, `:=` (p0=NULL, incidence=NULL, V1=NULL)]
+  } else {
+    POP <- merge(POP, corr.factor, by = c("agegroup", "sex"), all.x = T)
+  }
 } else {POP[, b := 1]}
 
 # P= p0 * chd.tob.rr * chd.ets.rr * chd.sbp.rr * chd.chol.rr * chd.bmi.rr * chd.diab.rr * chd.fv.rr
 cat("Estimating CHD incidence...\n\n")
 if (alignment == T) cat("Alignment will be performed\n\n")
 POP[between(age, ageL, ageH) & chd.incidence == 0, v := dice(.N) <= (p0 * chd.tob.rr * chd.ets.rr * 
-                                                                         chd.sbp.rr * chd.chol.rr * 
-                                                                         chd.bmi.rr * chd.diab.rr * chd.fv.rr * b)] # b is the correction factor
+                                                                       chd.sbp.rr * chd.chol.rr * 
+                                                                       chd.bmi.rr * chd.diab.rr * chd.fv.rr * b)] # b is the correction factor
 #POP[,summary(as.factor(v))]
 
 POP[v == T, chd.incidence := 2011 + i]  
@@ -168,7 +168,8 @@ POP[chd.incidence > 0, dead:= dice(.N) <= fatality] # T = dead, F = alive
 
 cat("Export CHD burden summary...\n\n")
 output <- vector("list", 5)
-if (file.exists(paste0(output.dir(), "chd.burden.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "chd.burden.rds"))
+
+if (exists("chd.burden.rds")) output[[1]] <- chd.burden.rds
 
 output[[2]] <- POP[between(age, ageL, ageH), output.chd(.SD), by=.(qimd, sex, agegroup)]
 
@@ -178,24 +179,50 @@ output[[4]] <- POP[between(age, ageL, ageH), output.chd(.SD), by=.(qimd, sex)]
 
 output[[5]] <- POP[between(age, ageL, ageH), output.chd(.SD), by=.(sex)]
 
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "chd.burden.rds"))
+chd.burden.rds <- rbindlist(output, fill = T)
 
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(chd.burden.rds, file = paste0(output.dir(), "chd.burden.rds"))
+  )
 
 cat("Export CHD burden individuals...\n\n")
 output <- vector("list", 2)
-if (file.exists(paste0(output.dir(), "chd.ind.incid.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "chd.ind.incid.rds"))
+
+if (exists("chd.ind.incid.rds")) output[[1]] <- chd.ind.incid.rds
+
 output[[2]] <- POP[chd.incidence == 2011+i, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, chd.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "chd.ind.incid.rds"))
-    
-if (file.exists(paste0(output.dir(), "chd.ind.preval.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "chd.ind.preval.rds"))
-output[[2]] <- POP[chd.incidence > 0, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, chd.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "chd.ind.preval.rds"))
+
+chd.ind.incid.rds <- rbindlist(output, fill = T)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(chd.ind.incid.rds, file = paste0(output.dir(), "chd.ind.incid.rds"))
+}
 
 output <- vector("list", 2)
-if (file.exists(paste0(output.dir(), "chd.ind.mortal.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "chd.ind.mortal.rds"))
+
+if (exists("chd.ind.preval.rds")) output[[1]] <- chd.ind.preval.rds
+
+output[[2]] <- POP[chd.incidence > 0, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, chd.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
+
+chd.ind.preval.rds <- rbindlist(output, fill = T)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(chd.ind.preval.rds, file = paste0(output.dir(), "chd.ind.preval.rds"))
+}
+
+output <- vector("list", 2)
+
+if (exists("chd.ind.mortal.rds")) output[[1]] <- chd.ind.mortal.rds
+
 output[[2]] <- POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, chd.incidence)][,`:=` (year.death = 2011+i, cause.death = "CHD", scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "chd.ind.mortal.rds"))
+
+chd.ind.mortal.rds <- rbindlist(output, fill = T)
+
 rm(output)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(chd.ind.mortal.rds, file = paste0(output.dir(), "chd.ind.mortal.rds"))
+}
 
 POP = copy(POP[dead == F | is.na(dead)== T,])
 

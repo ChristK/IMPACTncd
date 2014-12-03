@@ -89,10 +89,10 @@ if (i > (init.year-2011)) {
     smoking.preva.forets1, 
     smoking.preva.forets0,
     by="qimd"
-    )[,
-      change := (old.preval - new.preval) / old.preval][
-        change<0, change:=0][
-          is.na(change), change:=0]
+  )[,
+    change := (old.preval - new.preval) / old.preval][
+      change<0, change:=0][
+        is.na(change), change:=0]
   
   # Avoid crashes when a QIMD disappears due to scenarios
   for (ll in levels(POP$qimd)) {
@@ -116,9 +116,9 @@ if (i > (init.year-2011)) {
   # works for increasing smoking prevelence
   smoking.preva.forets <- merge(
     smoking.preva.forets1, smoking.preva.forets0, by="qimd"
-    )[,change := (new.preval - old.preval) / new.preval][
-      change<0,change:=0][
-        is.na(change), change:=0]
+  )[,change := (new.preval - old.preval) / new.preval][
+    change<0,change:=0][
+      is.na(change), change:=0]
   
   # Avoid crashes when a QIMD disappears due to scenarios
   for (ll in levels(POP$qimd)) {
@@ -182,7 +182,7 @@ setkey(POP, qimd, sex, agegroup)
 setkey(SPOP2011, qimd, sex, agegroup)
 
 output <- vector("list", 5)
-if (file.exists(paste0(output.dir(), "riskfactors.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "riskfactors.rds"))
+if (exists("riskfactors.rds")) output[[1]] <- riskfactors.rds
 
 output[[2]] <- POP[, output.rf(.SD), 
                    by=.(qimd, sex, agegroup)]
@@ -193,8 +193,15 @@ output[[4]] <- POP[between(age, ageL, ageH), output.rf(.SD), by=.(qimd, sex)]
 
 output[[5]] <- POP[between(age, ageL, ageH), output.rf(.SD), by=.(sex)]
 
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "riskfactors.rds"))
+riskfactors.rds <- rbindlist(output, fill = T)
+
 rm(output)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(riskfactors.rds, file = paste0(output.dir(), "riskfactors.rds"))
+}
+
+
 
 
 

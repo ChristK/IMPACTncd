@@ -12,9 +12,9 @@ init.year <- 2011
 
 n <- 200000  # Define the sample size
 
-yearstoproject <- 50  # NEED TO force >=1 and up to 50
+yearstoproject <- 2  # NEED TO force >=1 and up to 50
 
-numberofiterations <- 100
+numberofiterations <- 1
 
 ageL <- 30  # Define lower age limit to diseases-model simulation (min = 30)
 

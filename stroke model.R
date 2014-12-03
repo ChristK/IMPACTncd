@@ -94,42 +94,42 @@ POP[porftvg.cvdlag < 97, stroke.fv.rr := stochRR(.N, 0.95^(porftvg.cvdlag), 0.97
 
 # Estimate prevalence of stroke only in first run when i does not exist yet
 if (i == init.year-2011) {
-    cat(paste0("Estimating stroke prevalence in ", init.year, " ...\n\n"))
-    
-    age.structure <- data.table(table(POP[, sex, by = agegroup]), key = c("sex", "agegroup"))
-    age.structure[strokepreval, "Nprev" := as.integer(N * prevalence)]
-    setnames(age.structure, "N", "population")
-    setkey(POP, id)
-    
-    Temp <- POP[between(age, ageL, ageH), 
-                            sample_n(.SD, age.structure[sex == .BY[[2]] & agegroup == .BY[[1]], Nprev], 
-                                     weight = p0 * stroke.tob.rr * stroke.ets.rr * 
-                                         stroke.sbp.rr * stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr, 
-                                     replace = F), 
-                            by = list(agegroup, sex)]
-    setkey(Temp, id) # Temp is only used to select id for people with prevalent stroke
-    POP[Temp, stroke.incidence := init.year-1] # and then we assign these ids to the population
+  cat(paste0("Estimating stroke prevalence in ", init.year, " ...\n\n"))
+  
+  age.structure <- data.table(table(POP[, sex, by = agegroup]), key = c("sex", "agegroup"))
+  age.structure[strokepreval, "Nprev" := as.integer(N * prevalence)]
+  setnames(age.structure, "N", "population")
+  setkey(POP, id)
+  
+  Temp <- POP[between(age, ageL, ageH), 
+              sample_n(.SD, age.structure[sex == .BY[[2]] & agegroup == .BY[[1]], Nprev], 
+                       weight = p0 * stroke.tob.rr * stroke.ets.rr * 
+                         stroke.sbp.rr * stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr, 
+                       replace = F), 
+              by = list(agegroup, sex)]
+  setkey(Temp, id) # Temp is only used to select id for people with prevalent stroke
+  POP[Temp, stroke.incidence := init.year-1] # and then we assign these ids to the population
 }
 
 # correction factor NEED TO make it work only for i==0
 if (alignment == T) {
-    if (i == init.year-2011) {
-        corr.factor.stroke <- merge(POP[, mean(p0* stroke.tob.rr * stroke.ets.rr * 
-                                                stroke.sbp.rr * stroke.chol.rr * 
-                                                stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr), by = c("agegroup", "sex")], strokeincid, by = c("agegroup", "sex"), all.x = T)
-        corr.factor.stroke[,b := incidence/V1]
-        corr.factor.stroke[, `:=` (p0=NULL, incidence=NULL, V1=NULL)]
-    } else {
-        POP <- merge(POP, corr.factor, by = c("agegroup", "sex"), all.x = T)
-    }
+  if (i == init.year-2011) {
+    corr.factor.stroke <- merge(POP[, mean(p0* stroke.tob.rr * stroke.ets.rr * 
+                                             stroke.sbp.rr * stroke.chol.rr * 
+                                             stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr), by = c("agegroup", "sex")], strokeincid, by = c("agegroup", "sex"), all.x = T)
+    corr.factor.stroke[,b := incidence/V1]
+    corr.factor.stroke[, `:=` (p0=NULL, incidence=NULL, V1=NULL)]
+  } else {
+    POP <- merge(POP, corr.factor, by = c("agegroup", "sex"), all.x = T)
+  }
 } else {POP[, b:=1]}
 
 # P= p0 * stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr
 cat("Estimating stroke incidence...\n\n")
 if (alignment == T) cat("Alignment will be performed\n\n")
 POP[between(age, ageL, ageH) & stroke.incidence == 0, v := dice(.N) <= (p0 * stroke.tob.rr * stroke.ets.rr * 
-                                                                         stroke.sbp.rr * stroke.chol.rr * 
-                                                                         stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr * b)] # b is the correction factor
+                                                                          stroke.sbp.rr * stroke.chol.rr * 
+                                                                          stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr * b)] # b is the correction factor
 #POP[,summary(as.factor(v))]
 
 POP[v == T, stroke.incidence := 2011 + i]  
@@ -159,7 +159,8 @@ POP[stroke.incidence > 0, dead:= dice(.N) <= fatality] # T = dead, F = alive
 
 cat("Export stroke burden summary...\n\n")
 output <- vector("list", 5)
-if (file.exists(paste0(output.dir(), "stroke.burden.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "stroke.burden.rds"))
+
+if (exists("stroke.burden.rds")) output[[1]] <- stroke.burden.rds
 
 output[[2]] <- POP[between(age, ageL, ageH), output.stroke(.SD), by=.(qimd, sex, agegroup)]
 
@@ -169,24 +170,51 @@ output[[4]] <- POP[between(age, ageL, ageH), output.stroke(.SD), by=.(qimd, sex)
 
 output[[5]] <- POP[between(age, ageL, ageH), output.stroke(.SD), by=.(sex)]
 
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "stroke.burden.rds"))
+stroke.burden.rds <- rbindlist(output, fill = T)
 
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(stroke.burden.rds, file = paste0(output.dir(), "stroke.burden.rds"))
+}
 
 cat("Export stroke burden individuals...\n\n")
 output <- vector("list", 2)
-if (file.exists(paste0(output.dir(), "stroke.ind.incid.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "stroke.ind.incid.rds"))
+
+if (exists("stroke.ind.incid.rds")) output[[1]] <- stroke.ind.incid.rds
+
 output[[2]] <- POP[stroke.incidence == 2011+i, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "stroke.ind.incid.rds"))
-    
-if (file.exists(paste0(output.dir(), "stroke.ind.preval.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "stroke.ind.preval.rds"))
-output[[2]] <- POP[stroke.incidence > 0, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "stroke.ind.preval.rds"))
+
+stroke.ind.incid.rds <- rbindlist(output, fill = T)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(stroke.ind.incid.rds, file = paste0(output.dir(), "stroke.ind.incid.rds"))
+}
 
 output <- vector("list", 2)
-if (file.exists(paste0(output.dir(), "stroke.ind.mortal.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "stroke.ind.mortal.rds"))
+
+if (exists("stroke.ind.preval.rds")) output[[1]] <- stroke.ind.preval.rds
+
+output[[2]] <- POP[stroke.incidence > 0, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
+
+
+stroke.ind.preval.rds <- rbindlist(output, fill = T)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(stroke.ind.preval.rds, file = paste0(output.dir(), "stroke.ind.preval.rds"))
+}
+
+output <- vector("list", 2)
+
+if (exists("stroke.ind.mortal.rds")) output[[1]] <- stroke.ind.mortal.rds
+
 output[[2]] <- POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (year.death = 2011+i, cause.death = "stroke", scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "stroke.ind.mortal.rds"))
+
+stroke.ind.mortal.rds <- rbindlist(output, fill = T)
+
 rm(output)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(stroke.ind.mortal.rds, file = paste0(output.dir(), "stroke.ind.mortal.rds"))
+}
 
 POP = copy(POP[dead == F | is.na(dead)== T,])
 

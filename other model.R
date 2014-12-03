@@ -19,7 +19,8 @@ POP[, `:=`(dead = dice(.N) <= qx)]  # mark deaths from lifetable
 
 cat("Export Other mortality summary...\n\n")
 output <- vector("list", 5)
-if (file.exists(paste0(output.dir(), "other.mortal.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "other.mortal.rds"))
+
+if (exists("other.mortal.rds")) output[[1]] <- other.mortal.rds
 
 output[[2]] <- POP[between(age, ageL, ageH), output.other(.SD), by=.(qimd, sex, agegroup)]
 
@@ -29,16 +30,27 @@ output[[4]] <- POP[between(age, ageL, ageH), output.other(.SD), by=.(qimd, sex)]
 
 output[[5]] <- POP[between(age, ageL, ageH), output.other(.SD), by=.(sex)]
 
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "other.mortal.rds"))
+other.mortal.rds <- rbindlist(output, fill = T)
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(other.mortal.rds, file = paste0(output.dir(), "other.mortal.rds"))
+}
 
 cat("Export Other mortality individuals...\n\n")
 output <- vector("list", 2)
-if (file.exists(paste0(output.dir(), "other.ind.mortal.rds"))) output[[1]] <- readRDS(paste0(output.dir(), "other.ind.mortal.rds"))
+
+if (exists("other.ind.mortal.rds")) output[[1]] <- other.ind.mortal.rds
 
 output[[2]] <- POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)][,`:=` (year.death = 2011+i, cause.death = "Other", scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
 
-saveRDS(rbindlist(output, fill = T), file = paste0(output.dir(), "other.ind.mortal.rds"))
+other.ind.mortal.rds <- rbindlist(output, fill = T)
+
 rm(output)
+
+if (i == yearstoproject + init.year - 2012) {
+saveRDS(other.ind.mortal.rds, file = paste0(output.dir(), "other.ind.mortal.rds"))
+}
+
    
 POP = copy(POP[dead == F,])  # remove dead 
 POP[, `:=`(qx = NULL)]

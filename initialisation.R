@@ -610,6 +610,14 @@ writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n
              paste0("Number of scenarios = ", n.scenarios), "\n"), fileOut)
 close(fileOut)
 
+# Match the sex and age structure of the initial year
+population.actual <- fread("./Population/population.struct.csv",  header = T)[, c("age", "sex", paste0(init.year)), with = F]
+setnames(population.actual, paste0(init.year), "pop")
+population.ac
+
+# Calculate the exact fraction of the mid 2010 population this sample represents
+pop.fraction <- n / population.actual[, sum(pop)] # 53107200 is the total mid 2011 population of England (52642600 for 2010)
+
 # Import (or create) Synthetic Population
 if (length(list.files("./SynthPop")) == 0) {
   cat("Building synthetic population...\nThis might take some time...\nThank you for your patience :)\n\n")

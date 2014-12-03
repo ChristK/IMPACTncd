@@ -1,3 +1,8 @@
 line profiling: sample.interval=20000
-#File 1: 
-"cat" "<Anonymous>" "notifyUndefVar" "cmpSym" "cmp" "genCode" "<Anonymous>" "cmpCallArgs" "cmpCallSymFun" "cmpCall" "cmp" "h" "tryInline" "cmpCall" "cmp" "genCode" "cmpfun" "doTryCatch" "tryCatchOne" "tryCatchList" "tryCatch" "<Anonymous>" 1#1 "FUN" "lapply" 
+"system" "newPSOCKnode" "makePSOCKcluster" "makeCluster" 
+"c" "structure" "make.toplevelContext" "make.functionContext" "cmpfun" "doTryCatch" "tryCatchOne" "tryCatchList" "tryCatch" "<Anonymous>" 
+"match" "%in%" "getFoldFun" "constantFoldCall" "constantFold" "cmp" "cmpCallExprFun" "cmpCall" "cmp" "h" "tryInline" "cmpCall" "cmp" "h" "tryInline" "cmpCall" "cmp" "genCode" "<Anonymous>" "comp" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
+"serialize" "sendData.SOCKnode" "sendData" "postNode" "sendCall" "clusterCall" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
+"tryCatch" "as.list.iter" "as.list" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
+"socketSelect" "recvOneData.SOCKcluster" "recvOneData" "recvOneResult" "dynamicClusterApply" "clusterApplyLB" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
+"unserialize" "recvOneData.SOCKcluster" "recvOneData" "recvOneResult" "dynamicClusterApply" "clusterApplyLB" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 

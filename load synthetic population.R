@@ -47,20 +47,12 @@ SPOP2011[age > 99, age := 99] # for combatibility with lifetables
 # SPOP2011[id %in% (sample_frac(SPOP2011[age==97 & sex=="1",.(id)], 0.3)[, id]), age := 98] 
 SPOP2011[id %in% (sample_frac(SPOP2011[age==97 & sex=="1",.(id)], 0.3)[, id]), age := 99] 
 
-# Match the sex and age structure of the initial year
-temp <- fread("./Population/population.struct.csv",  header = T)[, c("age", "sex", paste0(init.year)), with = F]
-setnames(temp, paste0(init.year), "pop")
-temp[, pct := round(as.numeric(n) * pop / sum(pop))]
-
 # Stratified sampling
 SPOP2011[, age2 := age]
 SPOP2011[age2>90, age2 := 90]
-POP = copy(SPOP2011[, sample_n(.SD, temp[age==.BY[1] & sex==.BY[2], pct]), by = .(age2, sex)])
+POP = copy(SPOP2011[, sample_n(.SD, population.actual[age==.BY[1] & sex==.BY[2], pct]), by = .(age2, sex)])
 SPOP2011[, age2 := NULL]
 POP[, age2 := NULL]
-
-# Calculate the exact fraction of the mid 2010 population this sample represents
-pop.fraction <- POP[,.N] / temp[, sum(pop)] # 53107200 is the total mid 2011 population of England (52642600 for 2010)
 
 POP <- POP[age > 0,] # Delete all newborns from the population (an overestimation, probably because data collection lasted more than a year)
 
