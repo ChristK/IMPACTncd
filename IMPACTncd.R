@@ -58,7 +58,7 @@ options(warn = 1)
 if (Sys.info()[1] == "Linux") {
     if (system("whoami", T )== "mdxasck2") {
         setwd("~/IMPACTncd/")
-        ifelse (clusternumber<70, 70, clusternumber)  # overwrites previous if <60
+        clusternumber <- ifelse (clusternumber<70, 70, clusternumber)  # overwrites previous if <60
     } else {
     setwd(paste("/home/", 
                 system("whoami", T), 
@@ -104,10 +104,10 @@ foreach(iterations = 1 : it,
                       "dplyr",
                       "randtoolbox", 
                       "truncnorm", 
-                      "reshape2", 
+                      # "reshape2", 
                       "compiler"),
         .export = ls(),
-        .noexport = c("scenarios.list")) %dorng% {
+        .noexport = c("scenarios.list", "time.mark")) %dorng% {
         
         my.env <- environment(function(){}) # trick to get environment of this branch
             

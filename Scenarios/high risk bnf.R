@@ -74,7 +74,7 @@ if (i == (init.year - 2011)) {
       
       
       
-      assign("highrisk.rds", rbindlist(output, fill = T, my.env))
+      assign("highrisk.rds", rbindlist(output, fill = T), my.env)
       
       rm(output)
       

@@ -1,3 +1,66 @@
+# User input
+init.year <- 2011
+
+n <- 1000000  # Define the sample size
+
+yearstoproject <- 30  # NEED TO force >=1 and up to 50
+
+numberofiterations <- 50
+
+ageL <- 30  # Define lower age limit to diseases-model simulation (min = 30)
+
+ageH <- 84  # Define lower age limit to diseases-model simulation (max = 84)
+
+alignment <- F # T or F (apply correction factor to counterpoise levin's and exposure error)
+
+Fertility.Assumption <- "N"  # Select (N)ormal, (H)igh or (L)ow fertility rate asumptions based on ONS scenarios. They do matter for accurate population statistics
+
+cvd.lag <- 5 # Avoid 0
+fatality.annual.improvement.chd <- 3 # 3 means 3% annual improvement in fatality
+fatality.annual.improvement.stroke <- 3 # 3 means 3% annual improvement in fatality
+
+fatality.sec.gradient.chd <-40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+fatality.sec.gradient.stroke <-40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+
+cancer.lag <- 10 # Needs to be longer than cvd.lag to work properly (smoking histories)
+
+clusternumber <- 4 # Change to your number of CPU cores 
+
+cleardirectories <- F # If T delete auxiliary output directories when simulation finish
+
+diseasestoexclude <- c("CHD", "stroke")  # Define disease to be excluded from lifetables
+
+# *************************************************************************************************
+
+cat("Initialising IMPACTncd...\n\n")
+options(warn = 1)
+
+if (Sys.info()[1] == "Linux") {
+  if (system("whoami", T )== "mdxasck2") {
+    setwd("~/IMPACTncd/")
+    clusternumber <- ifelse (clusternumber<70, 70, clusternumber)  # overwrites previous if <60
+  } else {
+    setwd(paste("/home/", 
+                system("whoami", T), 
+                "/Dropbox/PhD/Models/IMPACTncd/", 
+                sep = "", 
+                collapse = ""))
+  }
+} else {
+  get.dropbox.folder <- function() {
+    if (!require(RCurl)) 
+      stop("You need to install RCurl package.")
+    if (Sys.info()["sysname"] != "Windows") 
+      stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry.")
+    db.file <- paste(Sys.getenv("APPDATA"), "\\Dropbox\\host.db", sep = "")
+    base64coded <- readLines(db.file, warn = F)[2]
+    base64(base64coded, encode = F)
+  }
+  setwd(paste0(get.dropbox.folder(), "/PhD/Models/IMPACTncd/"))
+}
+
+source(file = "./post simulation functions.R")
+
 source(file = "./initialisation.R")
 dir.create(
   path = "./Output/RF/", 
@@ -815,34 +878,3 @@ if ("stroke" %in% diseasestoexclude) {
 
 
 
-# Clear intermediate files
-if (cleardirectories == T) {
-  scenarios.list <- list.files(
-    path = "./Scenarios",
-    pattern = glob2rx("*.R"),
-    full.names = F,
-    recursive = F
-  )
-  
-  scenario.dirs <- as.list(
-    paste0(
-      "./Output/",
-      gsub(".R", "", scenarios.list
-      )
-    )
-  )
-  
-  lapply(
-    scenario.dirs,
-    unlink,
-    recursive =T,
-    force = T
-  )
-}
-
-rm(
-  list = setdiff(
-    ls(),
-    lsf.str()
-  )
-) # remove everything but functions

@@ -954,19 +954,19 @@ for (type in c("S", "SQ", "SA", "SAQ")) {
     
     Graphs.fn[[paste0("le0.SII.", type)]] <- closure.graph.le.SII(life.exp0[group == "SQ"],
                                                                   mean,
-                                                                  "Life expectancy at birth")
+                                                                  "life expectancy at birth")
     
     Graphs.fn[[paste0("le0.RII.", type)]] <- closure.graph.le.RII(life.exp0[group == "SQ"],
                                                                   mean,
-                                                                  "Life expectancy at birth")
+                                                                  "life expectancy at birth")
     
     Graphs.fn[[paste0("le65.SII.", type)]] <- closure.graph.le.SII(life.exp65[group == "SQ"],
                                                                    mean,
-                                                                   "Life expectancy at 65")
+                                                                   "life expectancy at 65")
     
     Graphs.fn[[paste0("le65.RII.", type)]] <- closure.graph.le.RII(life.exp65[group == "SQ"],
                                                                    mean,
-                                                                   "Life expectancy at 65")
+                                                                   "life expectancy at 65")
     
   }
   
@@ -985,11 +985,11 @@ for (type in c("S", "SQ", "SA", "SAQ")) {
       
       Graphs.fn[[paste0("hle.SII.", type)]] <- closure.graph.le.SII(hlife.exp[group == "SQ"],
                                                                     mean,
-                                                                    "Healthy life expectancy at birth")
+                                                                    "healthy life expectancy at birth")
       
       Graphs.fn[[paste0("hle.RII.", type)]] <- closure.graph.le.RII(hlife.exp[group == "SQ"],
                                                                     mean,
-                                                                    "Healthy life xpectancy at birth")
+                                                                    "healthy life xpectancy at birth")
       
     }
   }

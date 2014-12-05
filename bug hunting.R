@@ -85,3 +85,8 @@ load(file="./Lagtimes/smok.cess.success.rda")
 load(file="./Lagtimes/smok.start.svylr.rda")
 load(file="./Lagtimes/fv.svylr.rda")
 load(file="./Lagtimes/fvrate.svylr.rda")
+
+POP[, stroke.incidence := chd.incidence]
+my.env <- new.env()
+iterations <- 1
+sys.source(file = "./cluster functions.R", my.env)
