@@ -104,10 +104,10 @@ foreach(iterations = 1 : it,
                       "dplyr",
                       "randtoolbox", 
                       "truncnorm", 
-                      "reshape2", 
+                      # "reshape2", 
                       "compiler"),
         .export = ls(),
-        .noexport = c("scenarios.list")) %dorng% {
+        .noexport = c("scenarios.list", "time.mark")) %dorng% {
         
         my.env <- environment(function(){}) # trick to get environment of this branch
             

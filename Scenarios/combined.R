@@ -57,7 +57,7 @@ if (i == (init.year - 2011)) {
                                               cigst1.cvdlag == "4",
                                               diabtotr.cvdlag == "2")]
       POP[between(age, ageL, ageH) &
-               (age >=75 | 
+            (age >=75 | 
                chd.incidence > 0 |
                stroke.incidence > 0 |
                (diabtotr.cvdlag == "2" &
@@ -93,7 +93,7 @@ if (i == (init.year - 2011)) {
       
       
       
-      assign("highrisk.rds", rbindlist(output, fill = T, my.env))
+      assign("highrisk.rds", rbindlist(output, fill = T), my.env)
       
       rm(output)
       
@@ -106,4 +106,9 @@ if (i == (init.year - 2011)) {
       return()
     }
   }
+}
+
+if (i >= intervention.year - 2011) {
+  fatality.sec.gradient.chd <- fatality.sec.gradient.chd * 0.90
+  fatality.sec.gradient.stroke <- fatality.sec.gradient.stroke * 0.90
 }
