@@ -183,7 +183,7 @@ chd.burden.rds <- rbindlist(output, fill = T)
 
 if (i == yearstoproject + init.year - 2012) {
   saveRDS(chd.burden.rds, file = paste0(output.dir(), "chd.burden.rds"))
-  )
+}
 
 cat("Export CHD burden individuals...\n\n")
 output <- vector("list", 2)

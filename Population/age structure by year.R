@@ -27,4 +27,49 @@ population.proj <- fread("./Population/pop projections from ONS.csv",  header = 
 population.proj[, Area := NULL]
 population <- merge(population, population.proj, by=c("Age", "sex"), all=T)
 setnames(population, "Age", "age")
+
+population <- fread("./Population/population.struct.csv",  header = T)
+population <- melt(population, c("sex", "age"), variable.name = "year", value.name = "pop")
+population[, `:=` (year = as.numeric(as.character(year)))]
+breaks                   <- c(0, 1, seq(5, 85, 5), 90,Inf)
+labels                   <- c("<1", "01-04", "05-09",
+                              "10-14", "15-19", "20-24", 
+                              "25-29", "30-34", "35-39", 
+                              "40-44", "45-49", "50-54",
+                              "55-59", "60-64", "65-69",
+                              "70-74", "75-79", "80-84", 
+                              "85-89", "90+")
+
+# stratify by qimd
+population[, agegroup := cut(age, 
+                                    breaks = breaks, 
+                                    labels = labels, 
+                                    include.lowest = T, 
+                                    right = F, 
+                                    ordered_result = T)]
+
+
+xx <- fread("./Population/popullation by qimd.csv",  header = T)[, lapply(.SD, function(x) x/sum(x)), by = .(year, sex)][, qimd := qimd * 15]
+xx <- melt(xx, c("year", "sex", "qimd"), variable.name = "agegroup", value.name = "pct")
+levels(xx$agegroup) <- gsub("\\s","", levels(xx$agegroup))
+
+
+
+
+population <- rbind(copy(population[, qimd := 1]),
+                           copy(population[, qimd := 2]),
+                           copy(population[, qimd := 3]),
+                           copy(population[, qimd := 4]),
+                           copy(population[, qimd := 5]))
+
+setkey(xx, agegroup, sex, qimd, year)
+setkey(population, agegroup, sex, qimd, year)
+
+
+
+population <- xx[population, roll = "nearest"]
+population[, pop := round(pop * pct)] 
+population[, agegroup := NULL] 
+
+
 write.csv(population, file = "./Population/population.struct.csv", row.names = F)
