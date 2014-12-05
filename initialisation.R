@@ -23,6 +23,7 @@ dependencies(c("data.table",
                "ggplot2",
                "randtoolbox",
                "doParallel",
+               #"doSNOW",
                "doRNG",
                "foreach"))
 
@@ -496,8 +497,8 @@ pop.summ <-  function(N, ...) {
 
 cont.summ <- function(rf, name, ...) {
   mylist <- list()
-  mylist[[paste0(name, ".mean")]] <- mean(rf, na.rm=T)
-  mylist[[paste0(name, ".sd")]] <- sd(rf, na.rm=T)
+  mylist[[paste0(name, ".mean")]] <- mean(rf, na.rm = T)
+  mylist[[paste0(name, ".sd")]] <- sd(rf, na.rm = T)
   #mylist[[paste0(name, ".median")]] <- median(rf, na.rm=T) # disabled to improve spead
   #mylist[[paste0(name, ".mad")]] <- mad(rf, na.rm=T)
   #mylist[[paste0(name, ".iqr")]] <- IQR(rf, na.rm=T)
@@ -524,14 +525,21 @@ output.rf  <- function(x, ...) {
                    cont.summ(omsysval.cvdlag, "sbp.cvd"),
                    cont.summ(cholval, "tc"),
                    cont.summ(cholval.cvdlag, "tc.cvd"),
-                   cat.summ(cigst1.cvdlag, "smok.cvd", levels = 1:4, labels = c("never", "ex.2", "ex.3", "active")),
-                   cat.summ(cigst1.calag, "smok.ca", levels = 1:4, labels = c("never", "ex.2", "ex.3", "active")),
+                   cat.summ(cigst1.cvdlag, "smok.cvd",
+                            levels = 1:4, 
+                            labels = c("never", "ex.2", "ex.3", "active")),
+                   cat.summ(cigst1.calag, "smok.ca", 
+                            levels = 1:4, 
+                            labels = c("never", "ex.2", "ex.3", "active")),
                    cat.summ(porftvg.cvdlag, "fv.cvd", levels = 0:9),
                    cat.summ(porftvg.calag, "fv.ca", levels = 0:9),
                    cat.summ(frtpor.cvdlag, "fruit.cvd", levels = 0:9),
                    cat.summ(frtpor.calag, "fruit.ca", levels = 0:9),
-                   cat.summ(diabtotr.cvdlag, "diab.cvd", levels = 1:2, labels = c("no", "yes")),
-                   cat.summ(expsmokCat, "ets", levels = 0:1))))
+                   cat.summ(diabtotr.cvdlag, "diab.cvd",
+                            levels = 1:2, 
+                            labels = c("no", "yes")),
+                   cat.summ(expsmokCat, "ets",
+                            levels = 0:1))))
 }
 
 output.chd  <- function(x, ...) {
@@ -579,7 +587,9 @@ setnames(Fertility, c("age", 2000:2061))
 setkey(Fertility, age)
 
 # Function to apply after ageing
-scenario.fn <- function() {}
+# post.ageing.scenario.fn <- function() {
+#   cat("Post ageing scenario function")
+# }
 
 # Find and load scenarios
 if (!exists("scenarios.list")) {
@@ -611,12 +621,23 @@ writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n
 close(fileOut)
 
 # Match the sex and age structure of the initial year
-population.actual <- fread("./Population/population.struct.csv",  header = T)[, c("age", "sex", paste0(init.year)), with = F]
-setnames(population.actual, paste0(init.year), "pop")
-population.ac
+population.actual <- fread("./Population/population.struct.csv",  header = T)[year == init.year, ]
+population.actual[, pct := round(as.numeric(n) * pop / sum(pop))]
 
 # Calculate the exact fraction of the mid 2010 population this sample represents
 pop.fraction <- n / population.actual[, sum(pop)] # 53107200 is the total mid 2011 population of England (52642600 for 2010)
+
+# Load baseline trajectories
+load(file="./Lagtimes/bmi.svylm.rda")
+load(file="./Lagtimes/chol.svylm.rda")
+load(file="./Lagtimes/sbp.svylm.rda")
+load(file="./Lagtimes/diab.svylr.rda")
+load(file="./Lagtimes/smok.active.svylr.rda")
+load(file="./Lagtimes/smok.cess.svylr.rda")
+load(file="./Lagtimes/smok.cess.success.rda")
+load(file="./Lagtimes/smok.start.svylr.rda")
+load(file="./Lagtimes/fv.svylr.rda")
+load(file="./Lagtimes/fvrate.svylr.rda")
 
 # Import (or create) Synthetic Population
 if (length(list.files("./SynthPop")) == 0) {

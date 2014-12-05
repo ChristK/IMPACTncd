@@ -10,6 +10,18 @@ dir.create(
   showWarnings = F
 )
 
+dir.create(
+  path = "./Output/Tables/", 
+  recursive = T, 
+  showWarnings = F
+)
+
+dir.create(
+  path = "./Output/Graphs/", 
+  recursive = T, 
+  showWarnings = F
+)
+
 cat(
   "Collecting risk factors output...\n"
 )
@@ -68,6 +80,51 @@ riskfactors[,
 save(
   riskfactors,
   file="./Output/RF/riskfactors.RData"
+)
+
+cat(
+  "Collecting high risk output...\n"
+)
+
+all.files <- as.list(
+  list.files(
+    path = "./Output", 
+    pattern = "highrisk.rds", 
+    full.names = T, 
+    recursive = T
+  )
+) 
+
+highrisk <- rbindlist(
+  lapply(
+    all.files,
+    readRDS
+  ),
+  fill = T
+)
+
+highrisk [
+  is.na(qimd) == F & is.na(agegroup) == F,
+  group := "SAQ"
+  ]
+
+highrisk [
+  sex == "1", 
+  sex := "Men"
+  ]
+
+highrisk [
+  sex == "2", 
+  sex := "Women"
+  ]
+
+highrisk [,
+          sex := factor(sex)
+          ]
+
+save(
+  highrisk,
+  file="./Output/RF/highrisk.RData"
 )
 
 cat(
@@ -612,13 +669,31 @@ save(
   file="./Output/Other/hlife.exp.RData"
 )
 
-# Export graphs
-dir.create(
-  path = "./Output/Graphs/", 
-  recursive = T, 
-  showWarnings = F
-  )
+# Export tables
+Tables <- mclapply(
+  Tables.fn, 
+  function(f) f(),
+  mc.preschedule = T,
+  mc.cores = clusternumber) # run all functions in the list
 
+save(
+  Tables,
+  file="./Output/Tables/Tables.rda"
+)
+
+lapply(
+  names(
+    Tables
+  ), 
+  function(x) write.csv(
+    Tables[[x]],
+    file = paste0("./Output/Tables/", x,".csv"),
+    quote = T,
+    row.names = F
+  )
+)
+
+# Export graphs
 Graphs <- mclapply(
   Graphs.fn,
   function(f) f(),
@@ -674,35 +749,7 @@ mclapply(names(Graphs),
 # to extract data from graph use
 # ggplot_build(Graphs$smoking.S)$data[[1]]
 
-# Export tables
-dir.create(
-  path = "./Output/Tables/", 
-  recursive = T, 
-  showWarnings = F
-)
 
-Tables <- mclapply(
-  Tables.fn, 
-  function(f) f(),
-  mc.preschedule = T,
-  mc.cores = clusternumber) # run all functions in the list
-
-save(
-  Tables,
-  file="./Output/Tables/Tables.rda"
-)
-
-lapply(
-  names(
-    Tables
-  ), 
-  function(x) write.csv(
-    Tables[[x]],
-    file = paste0("./Output/Tables/", x,".csv"),
-    quote = T,
-    row.names = F
-  )
-)
 
 # Calculate DPP 
 pop.abs <- riskfactors[group=="S",
@@ -765,9 +812,7 @@ if ("stroke" %in% diseasestoexclude) {
 }
 
 # Calculate inequality
-Tables$chdincid.SAQ[agegroup == "esp.pop", glm(mean ~ sex + year + as.numeric(qimd),
-                                               family = "quasibinomial")$coefficients[4], 
-                    by = .(scenario)]
+
 
 # Clear intermediate files
 if (cleardirectories == T) {

@@ -8,25 +8,29 @@ intervention.year <- 2016
 
 # Load prediction equations
 if (i == (init.year - 2011)) {
-  load(file="./Lagtimes/bmi.svylm.rda")
-  load(file="./Lagtimes/chol.svylm.rda")
-  load(file="./Lagtimes/sbp.svylm.rda")
-  load(file="./Lagtimes/diab.svylr.rda")
-  load(file="./Lagtimes/smok.active.svylr.rda")
-  load(file="./Lagtimes/smok.cess.svylr.rda")
-  load(file="./Lagtimes/smok.cess.success.rda")
-  load(file="./Lagtimes/smok.start.svylr.rda")
-  load(file="./Lagtimes/fv.svylr.rda")
-  load(file="./Lagtimes/fvrate.svylr.rda")
+#   load(file="./Lagtimes/bmi.svylm.rda")
+#   load(file="./Lagtimes/chol.svylm.rda")
+#   load(file="./Lagtimes/sbp.svylm.rda")
+#   load(file="./Lagtimes/diab.svylr.rda")
+#   load(file="./Lagtimes/smok.active.svylr.rda")
+#   load(file="./Lagtimes/smok.cess.svylr.rda")
+#   load(file="./Lagtimes/smok.cess.success.rda")
+#   load(file="./Lagtimes/smok.start.svylr.rda")
+#   load(file="./Lagtimes/fv.svylr.rda")
+#   load(file="./Lagtimes/fvrate.svylr.rda")
   
   # Function to apply after ageing
-  scenario.fn <- function() {
+  post.ageing.scenario.fn <- function() {
+    cat("Post ageing scenario function")
     if (i >= (intervention.year - 2011 + cvd.lag)) {
-      POP[, `:=` (bmival.cvdlag = bmival.cvdlag - 1,
-                  cholval.cvdlag = cholval.cvdlag - 0.3,
+      cat("pop intervention")
+      POP[, `:=` (bmival.cvdlag = bmival.cvdlag - 2,
+                  cholval.cvdlag = cholval.cvdlag - 0.4,
                   omsysval.cvdlag = omsysval.cvdlag - 10,
                   porftvg.cvdlag = porftvg.cvdlag + 1)]
-      POP[cigst1.cvdlag == "4", cigst1.cvdlag := ifelse(dice(.N) < 0.05, "3", "4")] 
+      
+      cat("smoking intervention")
+      POP[cigst1.cvdlag == "4", cigst1.cvdlag := ifelse(dice(.N) < 0.20, "3", "4")] 
     }
   }
 }

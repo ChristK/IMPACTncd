@@ -10,7 +10,7 @@ gc()
 # User input
 init.year <- 2011
 
-n <- 200000  # Define the sample size
+n <- 100000  # Define the sample size
 
 yearstoproject <- 2  # NEED TO force >=1 and up to 50
 
@@ -33,9 +33,9 @@ fatality.sec.gradient.stroke <-40 # Percentage of difference in fatality between
 
 cancer.lag <- 10 # Needs to be longer than cvd.lag to work properly (smoking histories)
 
-clusternumber <- 6 # Change to your number of CPU cores 
+clusternumber <- 4 # Change to your number of CPU cores 
 
-cleardirectories <- T # If T delete auxiliary output directories when simulation finish
+cleardirectories <- F # If T delete auxiliary output directories when simulation finish
 
 diseasestoexclude <- c("CHD", "stroke")  # Define disease to be excluded from lifetables
 {

@@ -81,8 +81,8 @@ POP[, cigst1.calag := factor(cigst1.calag)]
 # ETS 
 if (i > (init.year-2011)) {
   cat("Estimating ETS...\n")
-  smoking.preva.forets1 <- POP[between(age, ageL, ageH),
-                               list(new.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)]
+  smoking.preva.forets1 <- copy(POP[between(age, ageL, ageH),
+                               list(new.preval=prop.table(table(cigst1.cvdlag=="4"))[2]), by=.(qimd)])
   setkey(smoking.preva.forets1)
   # works for decreasing smoking prevelence
   smoking.preva.forets <- merge(
@@ -141,9 +141,9 @@ if (i > (init.year-2011)) {
   
 }
 
-smoking.preva.forets0 <- POP[between(age, ageL, ageH), 
+smoking.preva.forets0 <- copy(POP[between(age, ageL, ageH), 
                              list(old.preval = prop.table(table(cigst1.cvdlag == "4"))[2]), 
-                             by =.(qimd)] # to be used for ETS
+                             by =.(qimd)]) # to be used for ETS
 setkey(smoking.preva.forets0) # to be used as a baseline for new years calculation
 
 cat("DIAB estimation\n")
@@ -176,7 +176,7 @@ agegroup.fn(POP)
 agegroup.fn(SPOP2011)
 
 # Call scenario function
-scenario.fn()
+post.ageing.scenario.fn()
 
 setkey(POP, qimd, sex, agegroup)
 setkey(SPOP2011, qimd, sex, agegroup)

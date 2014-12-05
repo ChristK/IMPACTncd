@@ -48,7 +48,7 @@ other.ind.mortal.rds <- rbindlist(output, fill = T)
 rm(output)
 
 if (i == yearstoproject + init.year - 2012) {
-saveRDS(other.ind.mortal.rds, file = paste0(output.dir(), "other.ind.mortal.rds"))
+  saveRDS(other.ind.mortal.rds, file = paste0(output.dir(), "other.ind.mortal.rds"))
 }
 
    

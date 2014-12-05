@@ -50,11 +50,12 @@ SPOP2011[id %in% (sample_frac(SPOP2011[age==97 & sex=="1",.(id)], 0.3)[, id]), a
 # Stratified sampling
 SPOP2011[, age2 := age]
 SPOP2011[age2>90, age2 := 90]
-POP = copy(SPOP2011[, sample_n(.SD, population.actual[age==.BY[1] & sex==.BY[2], pct]), by = .(age2, sex)])
+POP = copy(SPOP2011[, sample_n(.SD, population.actual[age==.BY[1] & sex==.BY[2] & qimd==.BY[3], pct], T), by = .(age2, sex, qimd)])
 SPOP2011[, age2 := NULL]
 POP[, age2 := NULL]
 
 POP <- POP[age > 0,] # Delete all newborns from the population (an overestimation, probably because data collection lasted more than a year)
+POP[, id:= 1:.N]
 
-rm(random.pop.file, temp)
+rm(random.pop.file)
 sink() 
