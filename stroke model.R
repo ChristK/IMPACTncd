@@ -1,4 +1,6 @@
-cat("Loading stroke (I60-I69) model...\n\n")
+#cmpfile("./stroke model.R")
+cat("Loading stroke (I60-I69) model...\n")
+cat(paste0(Sys.time(), "\n\n"))
 if (i == init.year-2011) POP[, stroke.incidence := 0] # Only needs to run the very first time of each simulation
 length.of.POP <- length(POP)
 POP <- merge(POP, strokeincid, by = c("agegroup", "sex"), all.x = T)

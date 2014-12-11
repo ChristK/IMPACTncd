@@ -1,3 +1,4 @@
+#cmpfile("./life table engine.R")
 # Lifetable engine
 
 # q is the probability of dying by ANY CAUSE between ages x to x+1 Ndiseases is the number of deaths
@@ -77,4 +78,4 @@ smokriskofdeath <- smokriskofdeath[,sum(Current)/sum(Lifelong.non.smokers)]
 # Garbage cleaning
 rm(agegrouptoexclude, diseasestoexclude.ICD, 
    mortal.Men, mortal.Women, mortal.Men.sm, mortal.Women.sm, mortal.Men.sm.fdm, mortal.Women.sm.fdm,
-   LifetableM, LifetableW, life.table.Men, life.table.Women)
+   LifetableM, LifetableW, life.table.Men, life.table.Women, remove, deaths.by.cause)

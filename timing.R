@@ -1,10 +1,11 @@
 started.at <- proc.time()
-
-source('./Models/IMPACTncd/prototype 03.R')
-
+source(file = "./life table engine.R")
 
 
 cat(timetaken(started.at), "\n") 
 
-# compare <- microbenchmark(dice(100000), dice2(100000), times = 1000)
-# autoplot(compare)
+require(microbenchmark)
+compare <- microbenchmark(source(file = "./post simulation functions.R"),
+                          loadcmp(file = "./post simulation functions.Rc"), 
+                          times = 10)
+autoplot(compare)

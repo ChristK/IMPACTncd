@@ -1,4 +1,3 @@
-source(file = "./initialisation.R")
 dir.create(
   path = "./Output/RF/", 
   recursive = T, 
@@ -104,29 +103,31 @@ highrisk <- rbindlist(
   fill = T
 )
 
-highrisk [
-  is.na(qimd) == F & is.na(agegroup) == F,
-  group := "SAQ"
-  ]
-
-highrisk [
-  sex == "1", 
-  sex := "Men"
-  ]
-
-highrisk [
-  sex == "2", 
-  sex := "Women"
-  ]
-
-highrisk [,
-          sex := factor(sex)
-          ]
-
-save(
-  highrisk,
-  file="./Output/RF/highrisk.RData"
-)
+if (nrow(highrisk)>0) {
+  highrisk [
+    is.na(qimd) == F & is.na(agegroup) == F,
+    group := "SAQ"
+    ]
+  
+  highrisk [
+    sex == "1", 
+    sex := "Men"
+    ]
+  
+  highrisk [
+    sex == "2", 
+    sex := "Women"
+    ]
+  
+  highrisk [,
+            sex := factor(sex)
+            ]
+  
+  save(
+    highrisk,
+    file="./Output/RF/highrisk.RData"
+  )
+}
 
 cat(
   "Collecting other causes mortality output...\n"
@@ -698,9 +699,11 @@ lapply(
 Graphs <- mclapply(
   Graphs.fn,
   function(f) f(),
-  mc.preschedule = T,
+  mc.preschedule = F,
   mc.cores = clusternumber
   ) # run all functions in the list
+
+Graphs[sapply(Graphs, is.null)] <- NULL
 
 # To bypass ggplot bug that facet when operate within a function produce massive objects when saved
 for (uu in grep(glob2rx("*.S"), names(Graphs))) {
@@ -735,7 +738,6 @@ for (uu in grep(glob2rx("*.SAQ.ESP"), names(Graphs))) {
   Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ qimd)
 }
 
-Graphs[sapply(Graphs, is.null)] <- NULL
 
 save(Graphs, file="./Output/Graphs/Graphs.rda")
 

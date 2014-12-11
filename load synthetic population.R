@@ -1,3 +1,4 @@
+#cmpfile("./load synthetic population.R")
 # Define function for output dir
 sink(file = paste0(output.dir(), "log.txt"),
      append = T, 
@@ -35,6 +36,7 @@ SPOP2011[, `:=`(hsize = NULL,
 #                               ordered_result = T)]
 SPOP2011[cigst1 == "2", numsmok:= 0.5]
 SPOP2011[expsmokCat != "0", expsmokCat:= "1"][,expsmokCat := factor(expsmokCat)]
+SPOP2011[age<16, cigst1 := "1"]
 
 SPOP2011[age > 99, age := 99] # for combatibility with lifetables
 
@@ -54,7 +56,7 @@ POP = copy(SPOP2011[, sample_n(.SD, population.actual[age==.BY[1] & sex==.BY[2] 
 SPOP2011[, age2 := NULL]
 POP[, age2 := NULL]
 
-POP <- POP[age > 0,] # Delete all newborns from the population (an overestimation, probably because data collection lasted more than a year)
+POP = copy(POP[age > 0,]) # Delete all newborns from the population (an overestimation, probably because data collection lasted more than a year)
 POP[, id:= 1:.N]
 
 rm(random.pop.file)

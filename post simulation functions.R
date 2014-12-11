@@ -61,7 +61,7 @@ closure.table.cat <- function (dt, type, rf, ...) {
     
     
     if ("pop" %in% names(dt)) {
-      dt <-   dt[pop > cutoff, ]
+      dt <- dt[pop > cutoff, ]
     }
     
     dt1 <- dt[group == type,
@@ -1413,7 +1413,9 @@ for (type in c("S", "SQ", "SA", "SAQ")) {
                                                                           stroke.mortality)
     }
   }
-  
 }
 
+# delete empty functions
+Graphs.fn[sapply(Graphs.fn, function(x) length(formals(x)) == 0 && length(body(x)) == 1)] <- NULL
+Tables.fn[sapply(Tables.fn, function(x) length(formals(x)) == 0 && length(body(x)) == 1)] <- NULL
 

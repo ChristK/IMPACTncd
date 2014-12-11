@@ -1,35 +1,74 @@
+#!/opt/gridware/apps/gcc/R/3.1.0/bin/Rscript
+#!/usr/bin/Rscript
 # User input
-init.year <- 2011
 
-n <- 1000000  # Define the sample size
+require("RGtk2")
+# needs sudo apt-get install libgtk2.0-dev before install in linux
+require("RGtk2Extras")
 
-yearstoproject <- 30  # NEED TO force >=1 and up to 50
+input.fn <- function(yearstoproject=10,
+                     ageL= 30, 
+                     ageH = 84,
+                     diseasestoexclude, 
+                     init.year = 2011, 
+                     n = 1000,
+                     cvd.lag = 5, 
+                     cancer.lag = 10, 
+                     clusternumber = 4)
+ {
+  if (ageL > ageH) {
+    tt <- ageL
+    ageH <- ageL
+    ageH <- tt 
+  }
+  return(list(yearstoproject = yearstoproject, 
+              ageL = ageL, 
+              ageH = ageH, 
+              init.year = init.year,
+              diseasestoexclude = diseasestoexclude,
+              cvd.lag = cvd.lag,
+              cancer.lag = cancer.lag,
+              n = n,
+              clusternumber = clusternumber)
+  )
+}
 
-numberofiterations <- 50
 
-ageL <- 30  # Define lower age limit to diseases-model simulation (min = 30)
+.input.fn.dialog = list(
+  title = "IMPACTncd by Chris Kypridemos",
+  label = "Input Parameters for Existing Results",
+  yearstoproject.rangeItem = c(value=30, from=1, to=60, by=1), 
+  label = "Forecast horizon",
+  ageL.rangeItem = c(value=30, from=30, to=84, by=1), 
+  label = "Define lower age limit for the diseases-model simulation",
+  ageH.rangeItem = c(value=84, from=30, to=84, by=1), 
+  label = "Define upper age limit for the diseases-model simulation",
+  n.integerItem = c(value=1000000, from=100000, to=2000000, by=100000),
+  label = "Define the sample size",
+  cvd.lag.rangeItem = c(value=5, from=1, to=10, by=1),
+  label = "Define time lag for CHD and stroke (in years)",
+  cancer.lag.rangeItem = c(value=10, from=1, to=10, by=1),
+  label = "Define time lag for cancers (in years)",
+  
+  BREAK = T,
+  
+  diseasestoexclude.variableSelectorItem =  c("CHD", "stroke", "lung cancer"),
+  label = "Define diseases to be included in the simulation",
+  
 
-ageH <- 84  # Define lower age limit to diseases-model simulation (max = 84)
+  BREAK = T,
+  
+  init.year.integerItem = c(value=2011, from=2001, to=2020, by=1),
+  label = "Define year to start the simulation",
+  tooltip = "Use years other than 2011 with caution",
+  clusternumber.integerItem = c(value=70, from=1, to=80, by=1),
+  label = "Define number of cores", 
+  tooltip = "Each core needs about 3Gb of ram"
+)
 
-alignment <- F # T or F (apply correction factor to counterpoise levin's and exposure error)
+run.dialog(input.fn)   
 
-Fertility.Assumption <- "N"  # Select (N)ormal, (H)igh or (L)ow fertility rate asumptions based on ONS scenarios. They do matter for accurate population statistics
-
-cvd.lag <- 5 # Avoid 0
-fatality.annual.improvement.chd <- 3 # 3 means 3% annual improvement in fatality
-fatality.annual.improvement.stroke <- 3 # 3 means 3% annual improvement in fatality
-
-fatality.sec.gradient.chd <-40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
-fatality.sec.gradient.stroke <-40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
-
-cancer.lag <- 10 # Needs to be longer than cvd.lag to work properly (smoking histories)
-
-clusternumber <- 4 # Change to your number of CPU cores 
-
-cleardirectories <- F # If T delete auxiliary output directories when simulation finish
-
-diseasestoexclude <- c("CHD", "stroke")  # Define disease to be excluded from lifetables
-
+list2env(input_fn_output, envir = .GlobalEnv)
 # *************************************************************************************************
 
 cat("Initialising IMPACTncd...\n\n")
@@ -59,822 +98,310 @@ if (Sys.info()[1] == "Linux") {
   setwd(paste0(get.dropbox.folder(), "/PhD/Models/IMPACTncd/"))
 }
 
+# preample
+dependencies <- function(x) {
+  for (j in x) {
+    # require returns T invisibly if it was able to load package
+    if (!require(j, character.only = T)) {
+      # If package was not able to be loaded then re-install
+      install.packages(j, dependencies = T)
+      # Load package after installing
+      require(j, character.only = T)
+    }
+  }
+}
+
+# Then try/install packages...
+dependencies(c("data.table", 
+               "dplyr",
+               "demography", 
+               "truncnorm", 
+               "stringr", 
+               "reshape2", 
+               "compiler",
+               "survey",
+               "ggplot2",
+               "randtoolbox",
+               "doParallel",
+               "doRNG",
+               "foreach"))
+
+enableJIT(1) #set to 1,2 or 3 to enable different precompiling levels
+
+options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata around the sample grand mean rather than the stratum mean)
+#require(devtools)
+#install_github("Rdatatable/data.table",  build_vignettes = F)
+# OR install_local("~/R/data.table-master.zip") #after manually download from github
+
+# max projection horizon (limited by fertility)
+if (init.year + yearstoproject > 2061) yearstoproject <- 2061 - init.year
+
+# Define end() function to beep end print a message
+end <- function(...) {
+  cat("All done! \a\n")
+  sink(file = "./Output/simulation parameters.txt",
+       append = T, 
+       type = "output",
+       split = F)
+  cat(paste0("Simulation ended succesfuly at: ", Sys.time(), "\n"))
+  sink()
+  if (Sys.info()[1] == "Windows") {
+    system("rundll32 user32.dll,MessageBeep -1")
+    Sys.sleep(.5)
+  }
+}
+
+# Function for timing log
+time.mark <- function(x) {
+  sink(file = "./Output/simulation parameters.txt",
+       append = T, 
+       type = "output",
+       split = F)
+  cat(paste0(x, " at: ", Sys.time(), "\n"))
+  sink()
+}
+
+# # Create a vector of random numbers, using the SIMD-oriented Fast Mersenne Twister algorithms by
+# # Matsumoto & Saito (2008)
+# dice <- function(n = .N) {
+#     rand <- SFMT(n, dim = 1, mexp = 19937, usepset = T, withtorus = F, usetime = T)
+#     return(rand)
+# }
+
+# Define RNG for parallel use with doRNG
+RNGkind("L'Ecuyer-CMRG")
+dice <- function(n = .N) runif(n)
+
+# define function for stochastic RR
+stochRR <- function(n = .N, m, ci) { # lognormal
+  if (m < 1) {
+    a = -Inf
+    b = 0
+  } else {
+    a = 0
+    b = Inf
+  }
+  ifelse(m == ci, rr <- rep(log(m), n), rr <- rtruncnorm(n = n, a = a, b = b, mean = log(m), sd = abs(log(m) - log(ci))/1.96))
+  return(exp(rr))  
+}
+
+stochRRnorm <- function(n = .N, m, ci) { # normal distr
+  if (m < 1) {
+    a = 0
+    b = 1
+  } else {
+    a = 1
+    b = Inf
+  }
+  ifelse(m == ci, rr <- rep(m, n), rr <- rtruncnorm(n = n, a = a, b = b, mean = m, sd = abs(m - ci)/1.96))
+  return(rr)  
+}
+
+# function to calculate mortality based on 1st and 5th year survival
+hyperbola <- function(y1, y5, x) {
+  b = (5 * y5 - y1)/4
+  a = y1 - b
+  y = b + a/x
+  return(y)
+}
+hyperbola <- cmpfun(hyperbola) # compiled version
+
+# Define function for sampling. Taken from sample man pages 
+resample <- function(x, ...) {
+  x <- na.omit(x)
+  x[sample.int(length(x), ...)]
+}
+
+# Define operator %!in%, meaning !%in%
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+# Define outersect. Like setdiff but symmetrical. I.e. setdiff(a,b) is not the same as setdiff(b,a). outersect solve this by calculating both
+outersect <- function(x, y, ...) {
+  big.vec <- c(x, y, ...)
+  duplicates <- big.vec[duplicated(big.vec)]
+  setdiff(big.vec, unique(duplicates))
+}
+
+# Define function to split agegroups and create groups
+agegroup.fn <- function(x, lagtime = 0) {
+  breaks                   <- c(0, 1, seq(5, 85, 5), Inf)
+  labels                   <- c("<1   ", "01-04", "05-09",
+                                "10-14", "15-19", "20-24", 
+                                "25-29", "30-34", "35-39", 
+                                "40-44", "45-49", "50-54",
+                                "55-59", "60-64", "65-69",
+                                "70-74", "75-79", "80-84", 
+                                "85+")
+  if (is.numeric(x)) { 
+    agegroup = cut(x + lagtime, 
+                   breaks = breaks, 
+                   labels = labels, 
+                   include.lowest = T, 
+                   right = F, 
+                   ordered_result = T)
+    return(invisible(agegroup))    
+  } else {
+    if (is.data.table(x)) {
+      x[, agegroup := cut(age + lagtime, 
+                          breaks = breaks, 
+                          labels = labels, 
+                          include.lowest = T, 
+                          right = F, 
+                          ordered_result = T)]
+      x[, group := as.factor(paste0(qimd, sex, agegroup))]
+      return(invisible(x))
+    } else return(print("only datatables and vectors are eligible inputs"))
+  }
+}
+
+# Define function to split agegroups and create groups
+agegroup.part <- function(x, lagtime = 0) {
+  breaks                   <- c(seq(20, 85, 5), Inf)
+  labels                   <- c("20-24", "25-29", "30-34", 
+                                "35-39", "40-44", "45-49",
+                                "50-54", "55-59", "60-64",
+                                "65-69", "70-74", "75-79",
+                                "80-84", "85+")
+  if (is.numeric(x)) { 
+    agegroup = cut(x + lagtime, 
+                   breaks = breaks, 
+                   labels = labels, 
+                   include.lowest = T, 
+                   right = F, 
+                   ordered_result = T)
+    return(invisible(agegroup))    
+  } else {
+    if (is.data.table(x)) {
+      x[, agegroup := cut(age + lagtime, 
+                          breaks = breaks, 
+                          labels = labels, 
+                          include.lowest = T, 
+                          right = F, 
+                          ordered_result = T)]
+      return(invisible(x))
+    } else return(print("only datatables and vectors are eligible inputs"))
+  }
+}
+
+# Define function to clear labels form SPSS labelled imports
+clear.labels <- function(x) {
+  if(is.list(x)) {
+    for(i in 1 : length(x)) class(x[[i]]) <- setdiff(class(x[[i]]), 'labelled') 
+    for(i in 1 : length(x)) attr(x[[i]],"label") <- NULL
+  }
+  else {
+    class(x) <- setdiff(class(x), "labelled")
+    attr(x, "label") <- NULL
+  }
+  return(invisible(x))
+}
+
+# Define function for percentile rank (dplyr provides similar functions)
+perc.rank <- function(x) rank(x,  ties.method = "random")/length(x)
+
+# Define function to match continuous distributions of each group with the one in SPOP2011 to simulate ageing 
+ageing.distr <- function(risk.factor) {
+  temp <- SPOP2011[, c(risk.factor, "group"), with = F]
+  nam <- paste0(risk.factor, ".rank")
+  temp[, (nam) := percent_rank(get(risk.factor)), by = group]
+  setkeyv(temp, c("group", nam))
+  
+  POP[, (nam) := percent_rank(get(risk.factor)), by = group]
+  POP[, (risk.factor) := NULL]
+  setkeyv(POP, c("group", nam))
+  return(temp[POP, roll = "nearest"])
+}
+#example POP <- ageing.distr("bmival")
+
+
+# Define function to export annual summaries of RF
+pop.summ <-  function(N, ...) {
+  return(list("year" = 2011 + i,
+              "scenario" = gsub(".R", "", scenarios.list[[iterations]]),
+              "mc" = haha,
+              "pop" = N))
+}
+
+cont.summ <- function(rf, name, ...) {
+  mylist <- list()
+  mylist[[paste0(name, ".mean")]] <- mean(rf, na.rm = T)
+  mylist[[paste0(name, ".sd")]] <- sd(rf, na.rm = T)
+  #mylist[[paste0(name, ".median")]] <- median(rf, na.rm=T) # disabled to improve spead
+  #mylist[[paste0(name, ".mad")]] <- mad(rf, na.rm=T)
+  #mylist[[paste0(name, ".iqr")]] <- IQR(rf, na.rm=T)
+  return(mylist)
+}
+
+cat.summ <- function(rf, name, ...) {
+  absol <-summary(factor(rf, exclude = c(NA, NaN, "99"), ...))
+  #pct <- prop.table(absol)
+  absol <- absol[names(absol)!="NA's"]
+  #ct <- pct[names(pct)!="NA's"]
+  names(absol) <- paste0(name, ".", names(absol))
+  #names(pct) <- paste0(name, ".", names(pct), ".pct")
+  #return(as.list(c(absol, pct)))
+  return(as.list(absol))
+}
+
+output.rf  <- function(x, ...) {
+  with(x, return(c(pop.summ(nrow(x)),
+                   cont.summ(bmival, "bmi"),
+                   cont.summ(bmival.cvdlag, "bmi.cvd"),
+                   cont.summ(bmival.calag, "bmi.ca"),
+                   cont.summ(omsysval, "sbp"),
+                   cont.summ(omsysval.cvdlag, "sbp.cvd"),
+                   cont.summ(cholval, "tc"),
+                   cont.summ(cholval.cvdlag, "tc.cvd"),
+                   cat.summ(cigst1.cvdlag, "smok.cvd",
+                            levels = 1:4, 
+                            labels = c("never", "ex.2", "ex.3", "active")),
+                   cat.summ(cigst1.calag, "smok.ca", 
+                            levels = 1:4, 
+                            labels = c("never", "ex.2", "ex.3", "active")),
+                   cat.summ(porftvg.cvdlag, "fv.cvd", levels = 0:9),
+                   cat.summ(porftvg.calag, "fv.ca", levels = 0:9),
+                   cat.summ(frtpor.cvdlag, "fruit.cvd", levels = 0:9),
+                   cat.summ(frtpor.calag, "fruit.ca", levels = 0:9),
+                   cat.summ(diabtotr.cvdlag, "diab.cvd",
+                            levels = 1:2, 
+                            labels = c("no", "yes")),
+                   cat.summ(expsmokCat, "ets",
+                            levels = 0:1))))
+}
+
+output.chd  <- function(x, ...) {
+  O1 <- pop.summ(nrow(x))
+  O2 <- with(x, cat.summ(chd.incidence, "chd",levels = init.year + i, labels="incidence"))
+  O3 <- with(x, sum(table(factor(chd.incidence, exclude = c(0, NA)))))
+  names(O3) <- "chd.prevalence"
+  O4 <- with(x, sum(table(dead, exclude=c(F, NA, NaN))))
+  names(O4) <- "chd.mortality"
+  return(c(O1, O2, O3, O4))
+}
+
+output.stroke  <- function(x, ...) {
+  O1 <- pop.summ(nrow(x))
+  O2 <- with(x, cat.summ(stroke.incidence, "stroke",levels = 2011 + i, labels="incidence"))
+  O3 <- with(x, sum(table(factor(stroke.incidence, exclude = c(0, NA)))))
+  names(O3) <- "stroke.prevalence"
+  O4 <- with(x, sum(table(dead, exclude=c(F, NA, NaN))))
+  names(O4) <- "stroke.mortality"
+  return(c(O1, O2, O3, O4))
+}
+
+output.other  <- function(x, ...) {
+  O1 <- pop.summ(nrow(x))
+  O2 <- with(x, sum(table(dead, exclude=c(F, NA, NaN))))
+  names(O2) <- "other.mortality"
+  return(c(O1, O2))
+}
+
+# Match the sex and age structure of the initial year
+population.actual <- fread("./Population/population.struct.csv",  header = T)[year == init.year, ]
+population.actual[, pct := round(as.numeric(n) * pop / sum(pop))]
+
+# Calculate the exact fraction of the mid 2010 population this sample represents
+pop.fraction <- n / population.actual[, sum(pop)] # 53107200 is the total mid 2011 population of England (52642600 for 2010)
+
 source(file = "./post simulation functions.R")
-
-source(file = "./initialisation.R")
-dir.create(
-  path = "./Output/RF/", 
-  recursive = T, 
-  showWarnings = F
-)
-
-dir.create(
-  path = "./Output/Other/",
-  recursive = T, 
-  showWarnings = F
-)
-
-dir.create(
-  path = "./Output/Tables/", 
-  recursive = T, 
-  showWarnings = F
-)
-
-dir.create(
-  path = "./Output/Graphs/", 
-  recursive = T, 
-  showWarnings = F
-)
-
-cat(
-  "Collecting risk factors output...\n"
-)
-
-all.files <- as.list(
-  list.files(
-    path = "./Output", 
-    pattern = "riskfactors.rds", 
-    full.names = T, 
-    recursive = T
-  )
-) 
-
-riskfactors <- rbindlist(
-  lapply(
-    all.files,
-    readRDS
-  ),
-  fill = T
-)
-
-riskfactors[
-  is.na(qimd) == T &  is.na(agegroup) == T,
-  group := "S"
-  ]
-
-riskfactors[
-  is.na(qimd) == T & is.na(agegroup) == F,
-  group := "SA"
-  ]
-
-riskfactors[
-  is.na(qimd) == F & is.na(agegroup) == T,
-  group := "SQ"
-  ]
-
-riskfactors[
-  is.na(qimd) == F & is.na(agegroup) == F,
-  group := "SAQ"
-  ]
-
-riskfactors[
-  sex == "1", 
-  sex := "Men"
-  ]
-
-riskfactors[
-  sex == "2", 
-  sex := "Women"
-  ]
-
-riskfactors[,
-  sex := factor(sex)
-  ]
-
-save(
-  riskfactors,
-  file="./Output/RF/riskfactors.RData"
-)
-
-cat(
-  "Collecting high risk output...\n"
-)
-
-all.files <- as.list(
-  list.files(
-    path = "./Output", 
-    pattern = "highrisk.rds", 
-    full.names = T, 
-    recursive = T
-  )
-) 
-
-highrisk <- rbindlist(
-  lapply(
-    all.files,
-    readRDS
-  ),
-  fill = T
-)
-
-highrisk [
-  is.na(qimd) == F & is.na(agegroup) == F,
-  group := "SAQ"
-  ]
-
-highrisk [
-  sex == "1", 
-  sex := "Men"
-  ]
-
-highrisk [
-  sex == "2", 
-  sex := "Women"
-  ]
-
-highrisk [,
-          sex := factor(sex)
-          ]
-
-save(
-  highrisk,
-  file="./Output/RF/highrisk.RData"
-)
-
-cat(
-  "Collecting other causes mortality output...\n"
-)
-
-all.files <- as.list(
-  list.files(
-    path = "./Output",
-    pattern = "other.mortal.rds",
-    full.names = T,
-    recursive = T
-  )
-) 
-
-other.mortality <- rbindlist(
-  lapply(
-    all.files,
-    readRDS
-  ),
-  fill = T
-)
-
-other.mortality[
-  is.na(qimd) == T & is.na(agegroup) == T,
-  group := "S"
-  ]
-
-other.mortality[
-  is.na(qimd) == T & is.na(agegroup) == F,
-  group := "SA"
-  ]
-
-other.mortality[
-  is.na(qimd) == F & is.na(agegroup) == T,
-  group := "SQ"
-  ]
-
-other.mortality[
-  is.na(qimd) == F & is.na(agegroup) == F,
-  group := "SAQ"
-  ]
-
-other.mortality[
-  sex == "1", 
-  sex := "Men"
-  ]
-
-other.mortality[
-  sex == "2", 
-  sex := "Women"
-  ]
-
-other.mortality[,
-  sex := factor(sex)
-  ]
-
-save(
-  other.mortality,
-  file = "./Output/Other/other.mortality.RData"
-)
-
-cat(
-  "Calculating life expectancy...\n"
-)
-
-all.files <- as.list(
-  list.files(
-    path = "./Output",
-    pattern = ".ind.mortal.rds",
-    full.names = T,
-    recursive = T
-  )
-) 
-
-life.exp <- rbindlist(
-  lapply(
-    all.files,
-    readRDS
-  ), 
-  fill = T
-)
-
-life.exp[
-  sex == "1",
-  sex := "Men"
-  ]
-
-life.exp[
-  sex == "2", 
-  sex := "Women"
-  ]
-
-life.exp[,
-  sex := factor(sex)
-  ]
-
-# Life expectancy at birth
-output <- vector("list", 4)
-
-output[[1]] <- life.exp[
-  ,
-  .(
-    mean = mean(age),
-    sd = sd(age)
-  ),
-  by=.(
-    sex,
-    year.death,
-    scenario,
-    mc
-  )
-  ][
-    ,
-    group := "S"
-    ]
-
-output[[2]] <- life.exp[
-  ,
-  .(
-    mean = mean(age),
-    sd = sd(age)
-  ),
-  by = .(
-    sex,
-    agegroup,
-    year.death,
-    scenario,
-    mc
-  )
-  ][
-    ,
-    group := "SA"
-    ]
-
-output[[3]] <- life.exp[
-  ,
-  .(
-    mean = mean(age),
-    sd = sd(age)
-  ), 
-  by=.(
-    sex,
-    qimd,
-    year.death,
-    scenario,
-    mc)
-  ][,
-    group := "SQ"
-    ]
-
-output[[4]] <- life.exp[
-  ,
-  .(
-    mean = mean(age),
-    sd=sd(age)
-  ),
-  by=.(
-    sex,
-    agegroup,
-    qimd,
-    year.death,
-    scenario,
-    mc)
-  ][
-    ,
-    group := "SAQ"
-    ]
-
-life.exp0 <- rbindlist(
-  output,
-  fill = T
-)[
-  ,
-  year := year.death
-]
-
-life.exp0 <- merge(life.exp0, 
-                   riskfactors[, list(pop, qimd, sex, agegroup, scenario, mc, group, year)], 
-                   by= c("qimd", "sex", "agegroup", "scenario", "mc", "group", "year"), 
-                   all.x = T)
-save(life.exp0, file="./Output/Other/life.exp0.RData")
-
-# Life expectancy at 65
-output <- vector("list", 4)
-
-output[[1]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, year.death, scenario, mc)][, group := "S"]
-
-output[[2]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, year.death, scenario, mc)][, group := "SA"]
-
-output[[3]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, qimd, year.death, scenario, mc)][, group := "SQ"]
-
-output[[4]] <- life.exp[age > 65,.(mean=mean(age), sd=sd(age)), by=.(sex, agegroup, qimd, year.death, scenario, mc)][, group := "SAQ"]
-
-life.exp65 <- rbindlist(output, fill = T)[, `:=` (year = year.death, mean = mean - 65)]
-life.exp65 <- merge(life.exp65, 
-                    riskfactors[, list(pop, qimd, sex, agegroup, scenario, mc, group, year)], 
-                    by= c("qimd", "sex", "agegroup", "scenario", "mc", "group", "year"), 
-                    all.x = T)
-save(life.exp65, file="./Output/Other/life.exp65.RData")
-
-
-if ("CHD" %in% diseasestoexclude) {
-  cat(
-    "Collecting CHD burden output...\n"
-  )
-  
-  dir.create(
-    path = "./Output/CHD/",
-    recursive = T,
-    showWarnings = F
-  )
-  
-  all.files <- as.list(
-    list.files(
-      path = "./Output",
-      pattern = "chd.burden.rds",
-      full.names = T,
-      recursive = T
-    )
-  ) 
-  
-  chd.burden <- rbindlist(
-    lapply(
-      all.files,
-      readRDS
-    ),
-    fill = T
-  )
-  
-  chd.burden[
-    is.na(qimd) == T & is.na(agegroup) == T,
-    group := "S"
-    ]
-  
-  chd.burden[
-    is.na(qimd) == T & is.na(agegroup) == F,
-    group := "SA"
-    ]
-  
-  chd.burden[
-    is.na(qimd) == F & is.na(agegroup) == T,
-    group := "SQ"
-    ]
-  
-  chd.burden[
-    is.na(qimd) == F & is.na(agegroup) == F,
-    group := "SAQ"
-    ]
-  
-  chd.burden[
-    sex == "1",
-    sex := "Men"
-    ]
-  
-  chd.burden[
-    sex == "2",
-    sex := "Women"
-    ]
-  
-  chd.burden[,
-    sex := factor(sex)
-    ]
-  
-  save(
-    chd.burden,
-    file="./Output/CHD/chd.burden.RData"
-  )
-  
-  all.files <- as.list(
-    list.files(
-      path = "./Output",
-      pattern = "chd.ind.incid.rds",
-      full.names = T,
-      recursive = T
-    )
-  ) 
-  
-  healthylife.exp.chd <- rbindlist(
-    lapply(
-      all.files,
-      readRDS
-    ),
-    fill = T
-  )
-  
-  healthylife.exp.chd[
-    sex == "1",
-    sex := "Men"
-    ]
-  
-  healthylife.exp.chd[
-    sex == "2",
-    sex := "Women"
-    ]
-  
-  healthylife.exp.chd[,
-    sex := factor(sex)
-    ]
-  
-  healthylife.exp.chd[
-    ,
-    year := chd.incidence
-    ]
-  
-  #write.csv(healthylife.exp, file="./Output/CHD/healthylife.exp.csv", row.names = F)
-  #save(healthylife.exp.chd, file="./Output/CHD/indiv.incid.RData")
-}
-
-if ("stroke" %in% diseasestoexclude) {
-  cat(
-    "Collecting stroke burden output...\n"
-  )
-  dir.create(
-    path = "./Output/Stroke/",
-    recursive = T,
-    showWarnings = F
-  )
-  
-  all.files <- as.list(
-    list.files(
-      path = "./Output",
-      pattern = "stroke.burden.rds",
-      full.names = T,
-      recursive = T
-    )
-  )
-  
-  stroke.burden <- rbindlist(
-    lapply(
-      all.files,
-      readRDS
-    ),
-    fill = T
-  )
-  
-  stroke.burden[
-    is.na(qimd) == T & is.na(agegroup) == T, 
-    group := "S"
-    ]
-  
-  stroke.burden[
-    is.na(qimd) == T & is.na(agegroup) == F, 
-    group := "SA"
-    ]
-  
-  stroke.burden[
-    is.na(qimd) == F & is.na(agegroup) == T,
-    group := "SQ"
-    ]
-  
-  stroke.burden[
-    is.na(qimd) == F & is.na(agegroup) == F, 
-    group := "SAQ"
-    ]
-  
-  stroke.burden[
-    sex == "1",
-    sex := "Men"
-    ]
-  
-  stroke.burden[
-    sex == "2", 
-    sex := "Women"
-    ]
-  
-  stroke.burden[,
-    sex := factor(sex)
-    ]
-  
-  save(
-    stroke.burden, 
-    file="./Output/Stroke/stroke.burden.RData"
-  )
-  
-  all.files <- as.list(
-    list.files(
-      path = "./Output",
-      pattern = "stroke.ind.incid.rds",
-      full.names = T,
-      recursive = T
-    )
-  )
-  
-  healthylife.exp.stroke <- rbindlist(
-    lapply(
-      all.files, 
-      readRDS
-    ),
-    fill = T
-  )
-  
-  healthylife.exp.stroke[
-    sex == "1",
-    sex := "Men"
-    ]
-  
-  healthylife.exp.stroke[
-    sex == "2",
-    sex := "Women"
-    ]
-  
-  healthylife.exp.stroke[,
-    sex := factor(sex)
-    ]
-  
-  healthylife.exp.stroke[
-    ,
-    year := stroke.incidence
-    ]
-  
-  #write.csv(healthylife.exp, file="./Output/stroke/healthylife.exp.csv", row.names = F)
-  #save(healthylife.exp.stroke, file="./Output/Stroke/indiv.incid.RData")
-}
-
-if ("C34" %in% diseasestoexclude) {
-  dir.create(path = "./Output/Lung Cancer/", recursive = T, showWarnings = F)
-  
-}
-
-# Healthy life expectancy
-cat(
-  "Calculating healthy life expectancy...\n"
-)
-# Gather all objects starting with healthylife.exp.
-healthylife.exp <- rbindlist(
-  lapply(
-    as.list(
-      apropos(
-        "healthylife.exp."
-      )
-    ),
-    get),
-  fill = T
-)
-
-output <- vector("list", 4)
-
-output[[1]] <- healthylife.exp[
-  ,
-  .(
-    mean = mean(age),
-    sd = sd(age)
-  )
-  , by = .( 
-    sex,
-    year,
-    scenario,
-    mc
-  )
-  ][
-    ,
-    group := "S"
-    ]
-
-
-output[[2]] <- healthylife.exp[
-  ,.(
-    mean = mean(age),
-    sd = sd(age)
-  ), 
-  by = .(
-    sex,
-    agegroup,
-    year, 
-    scenario,
-    mc
-  )
-  ][
-    ,
-    group := "SA"
-    ]
-
-output[[3]] <- healthylife.exp[
-  ,.(
-    mean = mean(age),
-    sd = sd(age)
-  ), 
-  by =.(
-    sex,
-    qimd,
-    year,
-    scenario,
-    mc)
-  ][
-    ,
-    group := "SQ"
-    ]
-
-output[[4]] <- healthylife.exp[
-  ,.(
-    mean = mean(age),
-    sd = sd(age)
-  ),
-  by = .(
-    sex,
-    agegroup,
-    qimd,
-    year,
-    scenario,
-    mc
-  )
-  ][
-    ,
-    group := "SAQ"
-    ]
-
-hlife.exp <- rbindlist(
-  output,
-  fill = T
-)
-
-hlife.exp <- merge(
-  hlife.exp, 
-  riskfactors[
-    ,
-    list(
-      pop,
-      qimd,
-      sex,
-      agegroup,
-      scenario,
-      mc, 
-      group,
-      year
-    )
-    ], 
-  by = c(
-    "qimd",
-    "sex",
-    "agegroup",
-    "scenario",
-    "mc",
-    "group",
-    "year"
-  ), 
-  all.x = T
-)
-
-save(
-  hlife.exp, 
-  file="./Output/Other/hlife.exp.RData"
-)
-
-# Export tables
-Tables <- mclapply(
-  Tables.fn, 
-  function(f) f(),
-  mc.preschedule = T,
-  mc.cores = clusternumber) # run all functions in the list
-
-save(
-  Tables,
-  file="./Output/Tables/Tables.rda"
-)
-
-lapply(
-  names(
-    Tables
-  ), 
-  function(x) write.csv(
-    Tables[[x]],
-    file = paste0("./Output/Tables/", x,".csv"),
-    quote = T,
-    row.names = F
-  )
-)
-
-# Export graphs
-Graphs <- mclapply(
-  Graphs.fn,
-  function(f) f(),
-  mc.preschedule = T,
-  mc.cores = clusternumber
-  ) # run all functions in the list
-
-# To bypass ggplot bug that facet when operate within a function produce massive objects when saved
-for (uu in grep(glob2rx("*.S"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ .)
-} 
-
-for (uu in grep(glob2rx("*.SA"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ agegroup)
-} 
-
-for (uu in grep(glob2rx("*.SA.WHO"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ .)
-}
-
-for (uu in grep(glob2rx("*.SA.ESP"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ .)
-}
-
-for (uu in grep(glob2rx("*.SQ"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ qimd)
-} 
-
-for (uu in grep(glob2rx("*.SAQ"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex + qimd ~ agegroup)
-}
-
-for (uu in grep(glob2rx("*.SAQ.WHO"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ qimd)
-}
-
-for (uu in grep(glob2rx("*.SAQ.ESP"), names(Graphs))) {
-  Graphs[[uu]] <- Graphs[[uu]] + facet_grid(sex ~ qimd)
-}
-
-Graphs[sapply(Graphs, is.null)] <- NULL
-
-save(Graphs, file="./Output/Graphs/Graphs.rda")
-
-# Export pdfs
-mclapply(names(Graphs), 
-         function(x) ggsave(filename=paste0(x,".pdf"),
-                            plot=Graphs[[x]], 
-                            path = "./Output/Graphs", 
-                            width = 11.69,
-                            height = 8.27), mc.cores = clusternumber)
-
-# to extract data from graph use
-# ggplot_build(Graphs$smoking.S)$data[[1]]
-
-
-
-# Calculate DPP 
-pop.abs <- riskfactors[group=="S",
-                       sum(pop),
-                       by = .(year,scenario, mc, sex)][,
-                                                       list(pop = mean(V1) / pop.fraction),
-                                                       by = .(year, scenario, sex)]
-if ("CHD" %chin% diseasestoexclude) {
-  chd.dpp <- merge(Tables$chdmortal.S, pop.abs, by = c("year", "scenario", "sex"))
-  chd.dpp[, deaths := MC.mean( mean * pop, (uui-lui) * pop / (2 * 1.96), .N * 1000)[1], 
-          by = .(scenario, sex, year)]
-  chd.dpp <- chd.dpp[year>2015, 
-                     binom.confint(sum(deaths),
-                                   sum(pop),
-                                   method="agresti-coull"),
-                     by=.(scenario)]
-  
-  chd.dpp <- chd.dpp[,  list(dpp = round(mean * n),
-                             upper = round(upper * n),
-                             lower = round(lower * n),
-                             scenario = scenario)
-                     ][,
-                       `:=` (dpp = round(.SD[scenario == "current trends", dpp] - dpp),
-                             lower = round(.SD[scenario == "current trends", lower] - lower),
-                             upper = round(.SD[scenario == "current trends", upper] - upper))][]
-  
-  write.csv(
-    chd.dpp,
-    file = paste0("./Output/Tables/chd.dpp.csv"),
-    quote = T,
-    row.names = F
-  )
-}
-
-if ("stroke" %in% diseasestoexclude) {
-  stroke.dpp <- merge(Tables$strokemortal.S, pop.abs, by = c("year", "scenario", "sex"))
-  stroke.dpp[, deaths := MC.mean( mean * pop, (uui-lui) * pop / (2 * 1.96), .N * 1000)[1], 
-             by = .(scenario, sex, year)]
-  stroke.dpp <- stroke.dpp[year>2015, 
-                           binom.confint(sum(deaths), 
-                                         sum(pop), 
-                                         method="agresti-coull"), 
-                           by=.(scenario)]
-  stroke.dpp <- stroke.dpp[,  list(dpp = round(mean * n),
-                                   upper = round(upper * n),
-                                   lower = round(lower * n),
-                                   scenario = scenario)
-                           ][,
-                             `:=` (
-                               dpp = round(.SD[scenario == "current trends", dpp] - dpp),
-                               lower = round(.SD[scenario == "current trends", lower] - lower),
-                               upper = round(.SD[scenario == "current trends", upper] - upper))][]
-  
-  write.csv(
-    stroke.dpp,
-    file = paste0("./Output/Tables/stroke.dpp.csv"),
-    quote = T,
-    row.names = F
-  )
-}
-
-
-
-
+source(file = "./output.R")

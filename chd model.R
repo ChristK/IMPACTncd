@@ -1,4 +1,6 @@
-cat("Loading CHD (I20-I25) model...\n\n")
+#cmpfile("./chd model.R")
+cat("Loading CHD (I20-I25) model...\n")
+cat(paste0(Sys.time(), "\n\n"))
 if (i == init.year - 2011) POP[, chd.incidence := 0] # Only needs to run the very first time of each simulation
 length.of.POP <- length(POP)
 POP <- merge(POP, CHDincid, by = c("agegroup", "sex"), all.x = T)

@@ -86,12 +86,6 @@ source(file = "./initialisation.R")
 cat("Generating life table...\n\n")
 source(file = "./life table engine.R")
 
-
-# Generating Incidence tables
-cat("Generating incidence tables...\n\n")
-source(file = "./cancer statistics.R") # for cancer
-source(file = "./CVD statistics.R") # for cvd
-
 cl <- makeCluster(clusternumber) 
 registerDoParallel(cl)
 
@@ -104,12 +98,12 @@ foreach(iterations = 1 : it,
                       "dplyr",
                       "randtoolbox", 
                       "truncnorm", 
-                      # "reshape2", 
+                      "stringr",
                       "compiler"),
         .export = ls(),
         .noexport = c("scenarios.list", "time.mark")) %dorng% {
         
-        my.env <- environment(function(){}) # trick to get environment of this branch
+        my.env <- environment() # get environment of this branch
             
         # Define functions in foreach loop
         sys.source(file = "./cluster functions.R", my.env)
@@ -117,6 +111,10 @@ foreach(iterations = 1 : it,
         # Load synthetic population
         sys.source(file = "./load synthetic population.R", my.env)
             
+        # Generating Incidence tables
+        sys.source(file = "./cancer statistics.R", my.env) # for cancer
+        sys.source(file = "./CVD statistics.R", my.env) # for cvd
+        
         # Actual simulation
         sys.source(file = "./simulation.R", my.env)
         rm(my.env)

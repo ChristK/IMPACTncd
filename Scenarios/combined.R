@@ -9,17 +9,21 @@ risk.cutoff <- 0.10
 
 # Load prediction equations
 if (i == (init.year - 2011)) {
-  #   load(file="./Lagtimes/bmi.svylm.rda")
-  #   load(file="./Lagtimes/chol.svylm.rda")
-  #   load(file="./Lagtimes/sbp.svylm.rda")
-  #   load(file="./Lagtimes/diab.svylr.rda")
-  #   load(file="./Lagtimes/smok.active.svylr.rda")
-  #   load(file="./Lagtimes/smok.cess.svylr.rda")
-  #   load(file="./Lagtimes/smok.cess.success.rda")
-  #   load(file="./Lagtimes/smok.start.svylr.rda")
-  #   load(file="./Lagtimes/fv.svylr.rda")
-  #   load(file="./Lagtimes/fvrate.svylr.rda")
-  #   
+    load(file="./Lagtimes/bmi.svylm.rda")
+    load(file="./Lagtimes/chol.svylm.rda")
+    load(file="./Lagtimes/sbp.svylm.rda")
+    load(file="./Lagtimes/diab.svylr.rda")
+    load(file="./Lagtimes/smok.active.svylr.rda")
+    load(file="./Lagtimes/smok.cess.svylr.rda")
+    load(file="./Lagtimes/smok.cess.success.rda")
+    load(file="./Lagtimes/smok.start.svylr.rda")
+    load(file="./Lagtimes/fv.svylr.rda")
+    load(file="./Lagtimes/fvrate.svylr.rda")
+ 
+    
+    # Load RF trajectoy functions
+    sys.source(file = "./risk factor trajectories.R", my.env)
+    
   bnf.risk <- function(age, 
                        sex,
                        sbp,

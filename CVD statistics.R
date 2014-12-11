@@ -1,3 +1,4 @@
+#cmpfile("./CVD statistics.R")
 # CVD statistics
 if ("CHD" %in% diseasestoexclude) {
     CHDincid <- fread("./CVD Statistics/CHDincid.csv", 

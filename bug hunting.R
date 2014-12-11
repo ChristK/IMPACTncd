@@ -1,9 +1,9 @@
 # User input
 init.year <- 2011
 
-n <- 200000  # Define the sample size
+n <- 1000000  # Define the sample size
 
-yearstoproject <- 50  # NEED TO force >=1 and up to 50
+yearstoproject <- 30  # NEED TO force >=1 and up to 50
 
 numberofiterations <- 100
 
@@ -19,14 +19,14 @@ cvd.lag <- 5 # Avoid 0
 fatality.annual.improvement.chd <- 3 # 3 means 3% annual improvement in fatality
 fatality.annual.improvement.stroke <- 3 # 3 means 3% annual improvement in fatality
 
-fatality.sec.gradient.chd <-40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
-fatality.sec.gradient.stroke <-40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+fatality.sec.gradient.chd <- 40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+fatality.sec.gradient.stroke <- 40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
 
 cancer.lag <- 10 # Needs to be longer than cvd.lag to work properly (smoking histories)
 
 clusternumber <- 1 # Change to your number of CPU cores 
 
-cleardirectories <- T # If T delete auxiliary output directories when simulation finish
+cleardirectories <- F # If T delete auxiliary output directories when simulation finish
 
 diseasestoexclude <- c("CHD", "stroke")  # Define disease to be excluded from lifetables
 
@@ -59,6 +59,9 @@ if (Sys.info()[1] == "Linux") {
 
 source(file = "./initialisation.R")
 
+# Load RF trajectoy functions
+source(file = "./risk factor trajectories.R")
+
 # Create lifetable without the disease(s) to be modelled. Lifetables were calculated using data from
 # England and Wales not just England. Minimal bias since we use probabilities.
 cat("Generating life table...\n\n")
@@ -70,21 +73,11 @@ cat("Generating incidence tables...\n\n")
 source(file = "./cancer statistics.R") # for cancer
 source(file = "./CVD statistics.R") # for cvd
 
-i=0
+i = 0
 
 source(file = "./post simulation functions.R")
 load("./POP.RData")
 
-load(file="./Lagtimes/bmi.svylm.rda")
-load(file="./Lagtimes/chol.svylm.rda")
-load(file="./Lagtimes/sbp.svylm.rda")
-load(file="./Lagtimes/diab.svylr.rda")
-load(file="./Lagtimes/smok.active.svylr.rda")
-load(file="./Lagtimes/smok.cess.svylr.rda")
-load(file="./Lagtimes/smok.cess.success.rda")
-load(file="./Lagtimes/smok.start.svylr.rda")
-load(file="./Lagtimes/fv.svylr.rda")
-load(file="./Lagtimes/fvrate.svylr.rda")
 
 POP[, stroke.incidence := chd.incidence]
 my.env <- new.env()

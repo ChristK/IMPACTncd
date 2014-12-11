@@ -32,13 +32,14 @@ if (Sys.info()[1] == "Linux") {
 }
 
 source(file = "./GUI.R")
+#cmpfile(infile = "./initialisation.R")
 source(file = "./initialisation.R")
+#loadcmp(file = "./initialisation.Rc")
 
 # Create lifetable without the disease(s) to be modelled. Lifetables were calculated using data from
 # England and Wales not just England. Minimal bias since we use probabilities.
 cat("Generating life table...\n\n")
-source(file = "./life table engine.R")
-
+loadcmp("./life table engine.Rc")
 
 
 # cl <- makeCluster(clusternumber) # used for clustering. win compatible
@@ -60,17 +61,17 @@ foreach(iterations = 1 : it,
           my.env <- environment() # get environment of this branch
           
           #time.mark("Define functions in foreach loop")
-          sys.source(file = "./cluster functions.R", my.env)
+          loadcmp(file = "./cluster functions.Rc", my.env)
           
           #time.mark("Load synthetic population")
-          sys.source(file = "./load synthetic population.R", my.env)
+          loadcmp(file = "./load synthetic population.Rc", my.env)
           
           # Generating Incidence tables
-          sys.source(file = "./cancer statistics.R", my.env) # for cancer
-          sys.source(file = "./CVD statistics.R", my.env) # for cvd
+          loadcmp(file = "./cancer statistics.Rc", my.env) # for cancer
+          loadcmp(file = "./CVD statistics.Rc", my.env) # for cvd
           
           time.mark("start simulation")
-          sys.source(file = "./simulation.R", my.env)
+          loadcmp(file = "./simulation.Rc", my.env)
           rm(my.env)
         }
 
@@ -78,7 +79,14 @@ if (exists("cl")) stopCluster(cl)
 time.mark("End of parallelisation")
 
 # Output
-source(file = "./post simulation functions.R")
-source(file = "./output.R")
+#cmpfile("./post simulation functions.R")
+#source(file = "./post simulation functions.R")
+loadcmp(file = "./post simulation functions.Rc")
+
+#cmpfile("./output.R")
+#source(file = "./output.R")
+loadcmp(file = "./output.Rc")
 end()
 
+# compile scenarios
+#lapply(list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = T, recursive = F), cmpfile)

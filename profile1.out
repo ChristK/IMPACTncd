@@ -1,8 +1,0 @@
-line profiling: sample.interval=20000
-"system" "newPSOCKnode" "makePSOCKcluster" "makeCluster" 
-"c" "structure" "make.toplevelContext" "make.functionContext" "cmpfun" "doTryCatch" "tryCatchOne" "tryCatchList" "tryCatch" "<Anonymous>" 
-"match" "%in%" "getFoldFun" "constantFoldCall" "constantFold" "cmp" "cmpCallExprFun" "cmpCall" "cmp" "h" "tryInline" "cmpCall" "cmp" "h" "tryInline" "cmpCall" "cmp" "genCode" "<Anonymous>" "comp" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
-"serialize" "sendData.SOCKnode" "sendData" "postNode" "sendCall" "clusterCall" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
-"tryCatch" "as.list.iter" "as.list" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
-"socketSelect" "recvOneData.SOCKcluster" "recvOneData" "recvOneResult" "dynamicClusterApply" "clusterApplyLB" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 
-"unserialize" "recvOneData.SOCKcluster" "recvOneData" "recvOneResult" "dynamicClusterApply" "clusterApplyLB" "<Anonymous>" "%dopar%" "do.call" "%dorng%" 

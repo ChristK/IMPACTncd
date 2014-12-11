@@ -1,3 +1,4 @@
+#cmpfile("./cancer statistics.R") # for cancer
 # For year 2011
 Incidence2011 <- fread("./Cancer Statistics/2011 cases.csv", 
                        sep = ",", 
@@ -149,7 +150,7 @@ if ("C34" %in% diseasestoexclude) {
     C34surv[, `:=`(sex = as.factor(as.character(sex)), agegroup = as.ordered(as.character(agegroup)))]
 }
 
-rm(ONSpop2011, ONSpop2010, ONSpop2009, Incidence2011, Incidence2010, Incidence2009, Incidence)
+rm(ONSpop2011, ONSpop2010, ONSpop2009, Incidence2011, Incidence2010, Incidence2009, Incidence, j)
 
 
 

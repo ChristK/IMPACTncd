@@ -1,3 +1,4 @@
+#cmpfile("./Scenarios/high risk max.R")
 # This scenario is the high risk intervention one
 # Assumes that 80% of those with SBP above 140mmHg, TC above 5 mmol/l and BMI above 35 kgr/m2 have a
 # reduction of 30% on their estimated values
@@ -6,29 +7,24 @@ cat("highrisk scenario\n\n")
 intervention.year <- 2016
 
 risk.cutoff <- 0.10
+
 if (i == (init.year - 2011)) {
-#   load(file="./Lagtimes/bmi.svylm.rda")
-#   load(file="./Lagtimes/chol.svylm.rda")
-#   load(file="./Lagtimes/sbp.svylm.rda")
-#   load(file="./Lagtimes/diab.svylr.rda")
-#   load(file="./Lagtimes/smok.active.svylr.rda")
-#   load(file="./Lagtimes/smok.cess.svylr.rda")
-#   load(file="./Lagtimes/smok.cess.success.rda")
-#   load(file="./Lagtimes/smok.start.svylr.rda")
-#   load(file="./Lagtimes/fv.svylr.rda")
-#   load(file="./Lagtimes/fvrate.svylr.rda")
   
-  bnf.risk <- function(age, sex, sbp, tc, smoker, diabetes, period = 10, lvh = 0, hdl = 1.4) {
+  # Load RF trajectoy functions
+  loadcmp(file = "./risk factor trajectories.Rc", my.env)
+  
+  bnf.risk <- cmpfun(function(age, sex, sbp, tc, smoker, diabetes, period = 10, lvh = 0, hdl = 1.4) {
     cvdrisk <- 1-exp(-exp((log(period)-(15.5305+(28.4441*(1-sex))+(-1.4792*log(age))+(0*log(age)*log(age))+(-14.4588*log(age)*(1-sex))+(1.8515*log(age)*log(age)*(1-sex))+(-0.9119*log(sbp))+(-0.2767*smoker)+(-0.7181*log(tc/hdl))+(-0.1759*diabetes)+(-0.1999*diabetes*(1-sex))+(-0.5865*lvh)+(0*lvh*sex)))/(exp(0.9145)*exp(-0.2784*(15.5305+(28.4441*(1-sex))+(-1.4792*log(age))+(0*log(age)*log(age))+(-14.4588*log(age)*(1-sex))+(1.8515*log(age)*log(age)*(1-sex))+(-0.9119*log(sbp))+(-0.2767*smoker)+(-0.7181*log(tc/hdl))+(-0.1759*diabetes)+(-0.1999*diabetes*(1-sex))+(-0.5865*lvh)+(0*lvh*sex)))))) +
       1-exp(-exp((log(period)-(26.5116+(0.2019*(1-sex))+(-2.3741*log(age))+(0*log(age)*log(age))+(0*log(age)*(1-sex))+(0*log(age)*log(age)*(1-sex))+(-2.4643*log(sbp))+(-0.3914*smoker)+(-0.0229*log(tc/hdl))+(-0.3087*diabetes)+(-0.2627*diabetes*(1-sex))+(-0.2355*lvh)+(0*lvh*sex)))/(exp(-0.4312)*exp(0*(26.5116+(0.2019*(1-sex))+(-2.3741*log(age))+(0*log(age)*log(age))+(0*log(age)*(1-sex))+(0*log(age)*log(age)*(1-sex))+(-2.4643*log(sbp))+(-0.3914*smoker)+(-0.0229*log(tc/hdl))+(-0.3087*diabetes)+(-0.2627*diabetes*(1-sex))+(-0.2355*lvh)+(0*lvh*sex))))))
     
     return(cvdrisk)
   }
+  )
   
   # Function to apply after ageing
-  post.ageing.scenario.fn <- function() {
-    cat("Post ageing scenario function")
-    if (i >= intervention.year - 2011 + cvd.lag) {
+  post.ageing.scenario.fn <- function(i) {
+    cat("Post ageing scenario function\n")
+    if (i > intervention.year - 2011 + cvd.lag) {
       
       POP[, high.risk:=NULL]
       
@@ -39,6 +35,7 @@ if (i == (init.year - 2011)) {
                                               cholval.cvdlag,
                                               cigst1.cvdlag == "4",
                                               diabtotr.cvdlag == "2")]
+      
       POP[between(age, ageL, ageH) &
             (age >=75 | 
                chd.incidence > 0 |
@@ -47,17 +44,27 @@ if (i == (init.year - 2011)) {
           high.risk := T]
                   
       setkey(POP, id)
+      
       cat("apply treatment")
       POP[sample_frac(POP[ high.risk == T, .(id)], 0.8),
-          `:=` (bmival.cvdlag = bmival.cvdlag * 0.9,
+          `:=` (bmival.cvdlag = bmival.cvdlag * 0.99,
                 omsysval.cvdlag = omsysval.cvdlag * 0.7,
                 cholval.cvdlag = cholval.cvdlag * 0.7,
                 porftvg.cvdlag = porftvg.cvdlag + 1,
                 high.risk2 = T)]
       
+      # surgery for morbid obesity
+      POP[high.risk2 == T & bmival.cvdlag > 50, 
+          bmival.cvdlag := 25]
+      
+      
       cat("apply smoking treatment")
       POP[cigst1.cvdlag == "4" & high.risk2 == T, 
-          cigst1.cvdlag := ifelse(dice(.N) < 0.1, "3", "4")] 
+          cigst1.temp := ifelse(dice(.N) < 0.1, T, F)] 
+      
+      POP[cigst1.temp == T, `:=`(cigst1 = "3", endsmoke.curr = 0, numsmok.curr = cigdyalCat.curr)]
+      
+      POP[, cigst1.temp := NULL]
       
       output <- vector("list", 2)
       

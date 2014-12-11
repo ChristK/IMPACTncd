@@ -4,19 +4,14 @@ cat("current trends scenario\n\n")
 
 # Load prediction equations
 if (i == (init.year-2011)) {
-  #     load(file="./Lagtimes/bmi.svylm.rda")
-  #     load(file="./Lagtimes/chol.svylm.rda")
-  #     load(file="./Lagtimes/sbp.svylm.rda")
-  #     load(file="./Lagtimes/diab.svylr.rda")
-  #     load(file="./Lagtimes/smok.active.svylr.rda")
-  #     load(file="./Lagtimes/smok.cess.svylr.rda")
-  #     load(file="./Lagtimes/smok.cess.success.rda")
-  #     load(file="./Lagtimes/smok.start.svylr.rda")
-  #     load(file="./Lagtimes/fv.svylr.rda")
-  #     load(file="./Lagtimes/fvrate.svylr.rda")
-  # 	
+  
+  # Load RF trajectoy functions
+  #cmpfile("./risk factor trajectories.R")
+  #sys.source(file = "./risk factor trajectories.R", my.env)
+  loadcmp(file = "./risk factor trajectories.Rc", my.env)
+  
   # Function to apply after ageing
-  post.ageing.scenario.fn <- function() {
-    cat("Post ageing scenario function")
+  post.ageing.scenario.fn <- function(i) {
+    cat("Post ageing scenario function\n")
   }
 }

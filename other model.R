@@ -1,5 +1,7 @@
-# Estimating deaths from other causes
-cat("Estimating deaths from other causes...\n\n")
+#cmpfile("./other model.R")
+cat("Estimating deaths from other causes...\n")
+cat(paste0(Sys.time(), "\n\n"))
+
 POP <- merge(POP, setnames(Lifetable[, c("age", "sex", paste0(i + 2011)), with = F], paste0(i + 2011), "qx"), by = c("age", "sex"), all.x = T)
 
 cat("Inflate mortality for diabetics and smokers...\n\n")
