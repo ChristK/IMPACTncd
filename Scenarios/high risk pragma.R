@@ -1,8 +1,8 @@
-#cmpfile("./Scenarios/high risk max.R")
+#cmpfile("./Scenarios/high risk pragma.R")
 # This scenario is the high risk intervention one
 # Assumes that 80% of those with SBP above 140mmHg, TC above 5 mmol/l and BMI above 35 kgr/m2 have a
 # reduction of 30% on their estimated values
-cat("highrisk scenario\n\n")
+cat("highrisk pragmatic scenario\n\n")
 
 intervention.year <- 2016
 
@@ -25,7 +25,7 @@ if (i == (init.year - 2011)) {
   post.ageing.scenario.fn <- function(i) {
     cat("Post ageing scenario function\n")
     if (i > intervention.year - 2011) {
-      
+          
       POP[between(age, ageL, ageH),
           high.risk := risk.cutoff < bnf.risk(age, 
                                               sex == "1",
@@ -43,7 +43,16 @@ if (i == (init.year - 2011)) {
       
       setkey(POP, id)
       
-      POP[sample_frac(POP[ high.risk == T, .(id)], 0.8),
+      # Social gradient
+      POP[sample_frac(POP[ high.risk == T & qimd == "1", .(id)], 0.7),
+          `:=` (high.risk2 = T)]
+      POP[sample_frac(POP[ high.risk == T & qimd == "2", .(id)], 0.65),
+          `:=` (high.risk2 = T)]
+      POP[sample_frac(POP[ high.risk == T & qimd == "3", .(id)], 0.6),
+          `:=` (high.risk2 = T)]
+      POP[sample_frac(POP[ high.risk == T & qimd == "4", .(id)], 0.55),
+          `:=` (high.risk2 = T)]
+      POP[sample_frac(POP[ high.risk == T & qimd == "5", .(id)], 0.5),
           `:=` (high.risk2 = T)]
       
       cat("apply smoking treatment")

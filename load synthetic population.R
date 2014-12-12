@@ -5,7 +5,10 @@ sink(file = paste0(output.dir(), "log.txt"),
      type = "output",
      split = F)
 
-random.pop.file <- sample(list.files("./SynthPop", pattern = glob2rx("spop2011*.RData"), full.names = T), 1) # pick a random file from the available population files
+random.pop.file <- sample(list.files("./SynthPop", 
+                                     pattern = glob2rx("spop2011*.RData"), 
+                                     full.names = T), 
+                          1) # pick a random file from the available population files
 
 
 cat("Loading synthetic population...\n\n")
