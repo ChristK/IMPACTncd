@@ -13,11 +13,11 @@ gc()
 options(datatable.verbose = F)
 
 # User input
-init.year <- 2011
+init.year <- 2006
 
 n <- 2e5  # Define the sample size
 
-yearstoproject <- 5  # NEED TO force >=1 and up to 50
+yearstoproject <- 7  # NEED TO force >=1 and up to 50
 
 numberofiterations <- 1
 
@@ -116,7 +116,7 @@ sys.source(file = "./cancer statistics.R", my.env) # for cancer
 sys.source(file = "./CVD statistics.R", my.env) # for cvd
 
 # Actual simulation
-i = 0
+i = init.year - 2011
 loadcmp(file = paste0("./Scenarios/", scenarios.list[[iterations]],"c"), my.env)
 loadcmp(file = "./2dmc.Rc", my.env)
 loadcmp(file = "./birth engine.Rc", my.env)
@@ -124,7 +124,7 @@ loadcmp(file = "./ageing engine.Rc", my.env)
 
 
 # Estimating incidence and mortality of modelled NCDs
-indiv.mort <- vector("list", length(diseasestoexclude)+1) # to store individual deaths
+indiv.mort <- vector("list", length(diseasestoexclude) + 1) # to store individual deaths
 indiv.incid <- vector("list", length(diseasestoexclude))  # to store individual incidence
 diseases <- sample(diseases) # randomly change the order of diseases each year
 lapply(diseases, function(f) f()) # run all functions in the list
@@ -136,12 +136,21 @@ cat("Advance age\n")
 POP[, `:=`(age = age + 1)]  # make pop older
 agegroup.fn(POP)
 
-#rm(my.env)
-
-
-time.mark("End of parallelisation")
+for (i in (init.year - 2010) : (init.year - 2012 + yearstoproject)) {
+  loadcmp(file = "./birth engine.Rc", my.env)
+  loadcmp(file = "./ageing engine.Rc", my.env)
+  diseases <- sample(diseases) # randomly change the order of diseases each year
+  lapply(diseases, function(f) f()) # run all functions in the list
+  loadcmp(file = "./individual summary.Rc", my.env)
+  POP[, `:=`(age = age + 1)]  # make pop older
+  agegroup.fn(POP)
+}
 
 # Output
 source(file = "./post simulation functions.R")
 source(file = "./output.R")
 end()
+
+# compile scenarios
+#lapply(list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = T, recursive = F), cmpfile)
+#lapply(list.files(path = "./", pattern = glob2rx("*.R"), full.names = T, recursive = F), cmpfile)

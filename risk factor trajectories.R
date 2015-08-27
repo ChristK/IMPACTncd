@@ -469,6 +469,7 @@ pred.bmi <- cmpfun(function(year, age, sex, qimd, a30to06m, lag = cvd.lag) {
 # Salt prediction ---------------------------------------------------------
 # Returns a dataframe of 24h salt percentiles by year, age, sex, qimd 
 pred.salt <- cmpfun(function(year, lag = cancer.lag) {
+  if ((year - lag) < -13) year <- lag - 13 # otherwse log(0)
   tmp <- expand.grid(
     year = year-lag,
     age  = (19-lag):(ageH-lag),

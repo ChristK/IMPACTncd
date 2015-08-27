@@ -96,6 +96,8 @@ tt[, Mx.disease := (deaths - disease) / (pop - disease)]
 
 # Life tables loop --------------------------------------------------------
 
+hor <- yearstoproject - 2013 + init.year
+if (hor < 1) hor <- 1
 
 # Full mortality projections (no disease excluded)
 if (Sys.info()[1] == "Linux")
@@ -104,7 +106,12 @@ if (Sys.info()[1] == "Windows") {
   cl <- makeCluster(clusternumber)
   registerDoParallel(cl)
 }
-pp <- foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
+pp <- 
+  foreach(
+    k = 1:2,
+    .inorder = F, 
+    .combine = 'c'
+  ) %:% # sex
   foreach(
     l = 1:5,
     .inorder = F,
@@ -128,7 +135,7 @@ pp <- foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
         xx, age.grid = 0:100, weight = F, interpolate = T
       )
     temp <-
-      forecast.fdm(fdm(xx,  method = "M", max.age = 100), yearstoproject)
+      forecast.fdm(fdm(xx,  method = "M", max.age = 100), hor)
     xx <- combine.demogdata(xx, temp)
     xx <- lifetable(xx, type = "period")
     xx <-
@@ -156,7 +163,7 @@ pp <- foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
       )
     xxx <- xx$pop
     temp <-
-      forecast.fdm(fdm(xx,  method = "M", max.age = 100), yearstoproject)
+      forecast.fdm(fdm(xx,  method = "M", max.age = 100), hor)
     
     xx <- combine.demogdata(xx, temp)
     #plot(xx)

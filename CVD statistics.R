@@ -66,27 +66,12 @@ if ("CHD" %in% diseasestoexclude) {
   CHDpreval <- setnames(copy(xx[, c(15, 14, 7), with = F]), "Prevalence (rates)", "prevalence")[, prevalence := as.numeric(prevalence)]
   
   CHDsurv <- setnames(copy(xx[, c(15, 14, 9), with = F]), "Case fatality (rates)", "fatality")[, fatality := as.numeric(fatality)]
-  
-#   all.files <- list.files(path = "./CVD Statistics", 
-#                           pattern = glob2rx("chd*paf.csv"), 
-#                           full.names = T) # Create a list of files containing chd in their filenames
-#   readdata <- function(fn) {
-#     sex <- agegroup <- NULL
-#     nam <- gsub(".csv", "", fn)
-#     nam <- gsub("./CVD Statistics/", "", nam)
-#     assign(nam, fread(fn, sep=",", header = T, stringsAsFactors = F))
-#     dt <- get(nam)
-#     dt[, `:=` (sex = factor(sex), agegroup = ordered(agegroup))]
-#     setkeyv(dt, c("agegroup", "sex"))
-#     return(dt)
-#   }
-#   
-#   mylist <- sapply(all.files, readdata, simplify=F, USE.NAMES=T)
-#   names(mylist) <- gsub(".csv", "", names(mylist))
-#   names(mylist) <- gsub("./CVD Statistics/", "", names(mylist))
-#   
-#   list2env(mylist ,my.env) # copy each object of the list to my.env
-#   rm(all.files, readdata, mylist) # garbage cleaning
+
+  if (init.year < 2011) {
+    CHDsurv[, fatality := fatality * 
+               ((100 + fatality.annual.improvement.chd) / 100)^(2011 - init.year)
+             ]
+  }
 }
 
 # Do I have to separate between ischaemic and haemorrhagic? The risk factors seems more ore less the same.
@@ -180,25 +165,9 @@ if ("stroke" %in% diseasestoexclude) {
   
   strokesurv <- setnames(copy(xx[, c(15, 14, 9), with = F]), "Case fatality (rates)", "fatality")[, fatality := as.numeric(fatality)]
   
-#   all.files <- list.files(path = "./CVD Statistics", 
-#                           pattern = glob2rx("stroke*paf.csv"), 
-#                           full.names = T) 
-# 
-#   readdata <- function(fn) {
-#     sex <- agegroup <- NULL
-#     nam <- gsub(".csv", "", fn)
-#     nam <- gsub("./CVD Statistics/", "", nam)
-#     assign(nam, fread(fn, sep=",", header = T, stringsAsFactors = F))
-#     dt <- get(nam)
-#     dt[, `:=` (sex = factor(sex), agegroup = ordered(agegroup))]
-#     setkeyv(dt, c("agegroup", "sex"))
-#     return(dt)
-#   }
-#   
-#   mylist <- sapply(all.files, readdata, simplify = F, USE.NAMES = T)
-#   names(mylist) <- gsub(".csv", "", names(mylist))
-#   names(mylist) <- gsub("./CVD Statistics/", "", names(mylist))
-#   
-#   list2env(mylist , my.env) # copy each object of the list to the my.env
-#   rm(all.files, readdata, mylist) # garbage cleaning
+  if (init.year < 2011) {
+    strokesurv[, fatality := fatality * 
+              ((100 + fatality.annual.improvement.stroke) / 100)^(2011 - init.year)
+            ]
+  }
 }

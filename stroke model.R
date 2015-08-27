@@ -194,12 +194,12 @@ if (i == init.year-2011) {
   setnames(age.structure, "N", "population")
   
   id.stroke <- POP[age <= ageH, 
-              sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]], Nprev], 
-                       weight = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
-                         stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr *
-                         stroke.fv.rr * stroke.pa.rr, 
-                       replace = F), 
-              by = .(age, sex)][, id]
+                   sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]], Nprev], 
+                            weight = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
+                              stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr *
+                              stroke.fv.rr * stroke.pa.rr, 
+                            replace = F), 
+                   by = .(age, sex)][, id]
   POP[id %in% id.stroke, stroke.incidence := init.year - 1] # and then we assign
   # these ids to the population
   rm(id.stroke)
@@ -211,9 +211,9 @@ if (alignment == T) {
     corr.factor.stroke <- merge(
       POP[between(age, ageL, ageH) & stroke.incidence == 0, 
           mean(p0 * stroke.tob.rr * stroke.ets.rr * 
-                   stroke.sbp.rr * stroke.chol.rr * 
-                   stroke.bmi.rr * stroke.diab.rr * 
-                   stroke.fv.rr * stroke.pa.rr), 
+                 stroke.sbp.rr * stroke.chol.rr * 
+                 stroke.bmi.rr * stroke.diab.rr * 
+                 stroke.fv.rr * stroke.pa.rr), 
           by = .(age, sex)],
       strokeincid, 
       by = c("age", "sex"), all.x = T)
@@ -282,15 +282,20 @@ cat("Export stroke burden summary...\n\n")
 if (i == init.year - 2011) stroke.burden <- vector("list", yearstoproject * 5)
 
 #if (exists("stroke.burden.rds")) output[[1]] <- stroke.burden.rds
-stroke.burden[[i * 5 + 1]] <- output.stroke(POP, c("qimd", "sex", "agegroup"))
+stroke.burden[[(2011 - init.year + i) * 5 + 1]] <-
+  output.stroke(POP, c("qimd", "sex", "agegroup"))
 
-stroke.burden[[i * 5 + 2]] <- output.stroke(POP, c("sex", "agegroup"))
+stroke.burden[[(2011 - init.year + i) * 5 + 2]] <- 
+  output.stroke(POP, c("sex", "agegroup"))
 
-stroke.burden[[i * 5 + 3]] <- output.stroke(POP, c("qimd", "sex"))
+stroke.burden[[(2011 - init.year + i) * 5 + 3]] <- 
+  output.stroke(POP, c("qimd", "sex"))
 
-stroke.burden[[i * 5 + 4]] <- output.stroke(POP, c("sex"))
+stroke.burden[[(2011 - init.year + i) * 5 + 4]] <- 
+  output.stroke(POP, c("sex"))
 
-stroke.burden[[i * 5 + 5]] <- output.stroke(POP, c())
+stroke.burden[[(2011 - init.year + i) * 5 + 5]] <- 
+  output.stroke(POP, c())
 
 if (i == yearstoproject + init.year - 2012) {
   saveRDS(rbindlist(stroke.burden, T, T), 
@@ -298,9 +303,11 @@ if (i == yearstoproject + init.year - 2012) {
 }
 
 cat("Export stroke burden individuals...\n\n")
-indiv.incid[[which(diseasestoexclude=="stroke")]] <- POP[stroke.incidence == 2011 + i, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
-                                                         ][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), 
-                                                                  mc = haha, year = 2011+i, cause = "stroke")]
+indiv.incid[[which(diseasestoexclude=="stroke")]] <- 
+  POP[stroke.incidence == 2011 + i, 
+      .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
+      )][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), 
+                mc = haha, year = 2011+i, cause = "stroke")]
 
 
 # output <- vector("list", 2)

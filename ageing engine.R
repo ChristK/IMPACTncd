@@ -27,7 +27,7 @@ setkey(POP,     age, sex, qimd, percentile)
 
 if (scenarios.list[[iterations]] == "salt no intervention.R") {
   if (i < 2) {
-    tmp.cvd0 <- pred.salt(-8 + cvd.lag, cvd.lag) # salt exposure remains as of 2003
+    tmp.cvd0 <- pred.salt(cvd.lag - 8, cvd.lag) # salt exposure remains as of 2003
     tmp.cvd  <- pred.salt(i, cvd.lag) # alternative current policy
     tmp.ca0  <- pred.salt(i, cancer.lag) # as of 2003
     setkey(tmp.cvd0, age, sex, qimd, percentile)
@@ -351,28 +351,35 @@ cat("DIAB finished\n")
 agegroup.fn(POP)
 
 # Export ------------------------------------------------------------------
-
-
-cat(paste0("before export",Sys.time(), "\n\n"))
+cat(paste0("before export ",Sys.time(), "\n\n"))
 
 if (i == init.year - 2011) riskfactors <- vector("list", yearstoproject * 5)
 #if (exists("riskfactors.rds")) output[[1]] <- riskfactors.rds
 
-riskfactors[[i * 5 + 1]] <- output.rf(POP, c("qimd", "sex", "agegroup"), 20, 84)
+riskfactors[[(2011 - init.year + i) * 5 + 1]] <- 
+  output.rf(POP, c("qimd", "sex", "agegroup"), 20, 84)
 
-riskfactors[[i * 5 + 2]] <- output.rf(POP, c("sex", "agegroup"), 20, 84)
+riskfactors[[(2011 - init.year + i) * 5 + 2]] <-
+  output.rf(POP, c("sex", "agegroup"), 20, 84)
 
-riskfactors[[i * 5 + 3]] <- output.rf(POP, c("qimd", "sex"), ageL, ageH) 
+riskfactors[[(2011 - init.year + i) * 5 + 3]] <- 
+  output.rf(POP, c("qimd", "sex"), ageL, ageH) 
 
-riskfactors[[i * 5 + 4]] <- output.rf(POP, c("sex"), ageL, ageH)
+riskfactors[[(2011 - init.year + i) * 5 + 4]] <- 
+  output.rf(POP, c("sex"), ageL, ageH)
 
-riskfactors[[i * 5 + 5]] <- output.rf(POP, c(), ageL, ageH)
+riskfactors[[(2011 - init.year + i) * 5 + 5]] <- 
+  output.rf(POP, c(), ageL, ageH)
 
 # when not stratified by agegroup only ageL to ageH is considered
 
 if (i == yearstoproject + init.year - 2012) {
   lapply(riskfactors,
-         function (x) setnames(x, paste0("V", 1:50), output.rf.names))
+         function (x) setnames(x,
+                               paste0("V", 1:50),
+                               output.rf.names)
+         )
+  
   saveRDS(rbindlist(riskfactors, T, T) ,
           file = paste0(output.dir(), "riskfactors.rds"))
 }

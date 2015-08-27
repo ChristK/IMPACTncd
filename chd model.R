@@ -193,14 +193,14 @@ if (i == init.year - 2011) {
   setnames(age.structure, "N", "population")
   
   id.chd <- POP[age <=  ageH, 
-              sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]],
-                                          Nprev], 
-                       weight = chd.tob.rr * chd.ets.rr * 
-                         chd.sbp.rr * chd.chol.rr * chd.bmi.rr * 
-                         chd.diab.rr * chd.fv.rr * chd.pa.rr, 
-                       replace = F), 
-              by = .(age, sex)][, id]
-              
+                sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]],
+                                            Nprev], 
+                         weight = chd.tob.rr * chd.ets.rr * 
+                           chd.sbp.rr * chd.chol.rr * chd.bmi.rr * 
+                           chd.diab.rr * chd.fv.rr * chd.pa.rr, 
+                         replace = F), 
+                by = .(age, sex)][, id]
+  
   POP[id %in% id.chd, chd.incidence := init.year - 1] # and then we assign
   # these ids to the population
   rm(id.chd)
@@ -285,25 +285,32 @@ cat("Export CHD burden summary...\n\n")
 cat(paste0(Sys.time(), "\n\n"))
 if (i == init.year-2011) chd.burden <- vector("list", yearstoproject * 5)
 
-chd.burden[[i * 5 + 1]] <- output.chd(POP, c("qimd", "sex", "agegroup"))
+chd.burden[[(2011 - init.year + i) * 5 + 1]] <-
+  output.chd(POP, c("qimd", "sex", "agegroup"))
 
-chd.burden[[i * 5 + 2]] <- output.chd(POP, c("sex", "agegroup"))
+chd.burden[[(2011 - init.year + i) * 5 + 2]] <- 
+  output.chd(POP, c("sex", "agegroup"))
 
-chd.burden[[i * 5 + 3]] <- output.chd(POP, c("qimd", "sex"))
+chd.burden[[(2011 - init.year + i) * 5 + 3]] <- 
+  output.chd(POP, c("qimd", "sex"))
 
-chd.burden[[i * 5 + 4]] <- output.chd(POP, c("sex"))
+chd.burden[[(2011 - init.year + i) * 5 + 4]] <- 
+  output.chd(POP, c("sex"))
 
-chd.burden[[i * 5 + 5]] <- output.chd(POP, c())
+chd.burden[[(2011 - init.year + i) * 5 + 5]] <- 
+  output.chd(POP, c())
 
 if (i == yearstoproject + init.year - 2012) {
   saveRDS(rbindlist(chd.burden, T, T), file = paste0(output.dir(), "chd.burden.rds"))
 }
 
 cat("Export CHD burden individuals...\n\n")
-indiv.incid[[which(diseasestoexclude=="CHD")]] <- POP[chd.incidence == 2011 + i,
-                                                      .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
-                                                      ][, `:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]),
-                                                                mc = haha, year = 2011 + i, cause = "chd")]
+indiv.incid[[which(diseasestoexclude=="CHD")]] <- 
+  POP[chd.incidence == 2011 + i,
+      .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
+      )][ , `:=` (
+        scenario = gsub(".R", "", scenarios.list[[iterations]]),
+        mc = haha, year = 2011 + i, cause = "chd")]
 
 # output <- vector("list", 2)
 # 

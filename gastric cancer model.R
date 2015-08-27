@@ -195,15 +195,20 @@ cat("Export gastric cancer burden summary...\n\n")
 cat(paste0(Sys.time(), "\n\n"))
 if (i == init.year-2011) c16.burden <- vector("list", yearstoproject * 5)
 
-c16.burden[[i * 5 + 1]] <- output.c16(POP, c("qimd", "sex", "agegroup"))
+c16.burden[[(2011 - init.year + i) * 5 + 1]] <-
+  output.c16(POP, c("qimd", "sex", "agegroup"))
 
-c16.burden[[i * 5 + 2]] <- output.c16(POP, c("sex", "agegroup"))
+c16.burden[[(2011 - init.year + i) * 5 + 2]] <- 
+  output.c16(POP, c("sex", "agegroup"))
 
-c16.burden[[i * 5 + 3]] <- output.c16(POP, c("qimd", "sex"))
+c16.burden[[(2011 - init.year + i) * 5 + 3]] <-
+  output.c16(POP, c("qimd", "sex"))
 
-c16.burden[[i * 5 + 4]] <- output.c16(POP, c("sex"))
+c16.burden[[(2011 - init.year + i) * 5 + 4]] <- 
+  output.c16(POP, c("sex"))
 
-c16.burden[[i * 5 + 5]] <- output.c16(POP, c())
+c16.burden[[(2011 - init.year + i) * 5 + 5]] <- 
+  output.c16(POP, c())
 
 if (i == yearstoproject + init.year - 2012) {
   saveRDS(rbindlist(c16.burden, T, T)

@@ -6,18 +6,18 @@ if ("C16" %in% diseasestoexclude) {
                 skip = 3, nrows = 100)[, sex := 1],
           fread("./Cancer Statistics/C16 DISMOD Females.csv", sep = ",", header = T, stringsAsFactors = F, 
                 skip = 3, nrows = 100)[, sex := 2]
-          )[, `:=` (sex = factor(sex), age = as.integer(Age))]
+    )[, `:=` (sex = factor(sex), age = as.integer(Age))]
   )
   
   
   C16incid  <- setnames(copy(xx[, c(15, 14, 6), with = F]), "Incidence (rates)", "incidence")[, incidence := as.numeric(incidence)]
-
+  
   C16preval <- setnames(copy(xx[, c(15, 14, 7), with = F]), "Prevalence (rates)", "prevalence")[, prevalence := as.numeric(prevalence)]
-
+  
   C16remis  <- setnames(copy(xx[, c(15, 14, 8), with = F]), "Remission (rates)", "remission")[, remission := as.numeric(remission)]
-
+  
   C16fatal  <- setnames(copy(xx[, c(15, 14, 9), with = F]), "Case fatality (rates)", "fatality")[, fatality := as.numeric(fatality)]
-
+  
   C16surv <- fread("./Cancer Statistics/c16survival.csv", sep = ",", header = T, stringsAsFactors = F)  # Estimate survival
   for (j in c(4L, 5L, 6L, 8L:22L)) C16surv[, (j) := survival.fn(X1, X5, j - 2)]  # X1, X2,... X20 denote the percentage of survivors in years 1, 2,... 20
   
@@ -40,29 +40,15 @@ if ("C16" %in% diseasestoexclude) {
                  agegroup = as.ordered(as.character(agegroup)),
                  duration = as.numeric(as.character(duration)))]
   
-#   C16tobpaf <- fread("./Cancer Statistics/c16tobpaf.csv", 
-#                      sep = ",", 
-#                      header = T, 
-#                      stringsAsFactors = F)
-#   C16tobpaf[, `:=`(sex = as.factor(as.character(sex)), 
-#                    agegroup = as.ordered(as.character(agegroup)))]
-#   setkey(C16tobpaf, agegroup, sex)
-#   
-#   C16fvpaf <- fread("./Cancer Statistics/c16fvpaf.csv", 
-#                     sep = ",", 
-#                     header = T, 
-#                     stringsAsFactors = F)
-#   C16fvpaf[, `:=`(sex = as.factor(as.character(sex)), 
-#                   agegroup = as.ordered(as.character(agegroup)))]
-#   setkey(C16fvpaf, agegroup, sex)
-#   
-#   C16saltpaf <- fread("./Cancer Statistics/c16saltpaf.csv", 
-#                       sep = ",", 
-#                       header = T, 
-#                       stringsAsFactors = F)
-#   C16saltpaf[, `:=`(sex = as.factor(as.character(sex)), 
-#                     agegroup = as.ordered(as.character(agegroup)))]
-#   setkey(C16saltpaf, agegroup, sex)
+  if (init.year < 2011) {
+    C16fatal[, fatality := fatality * 
+               ((100 + fatality.annual.improvement.c16) / 100)^(2011 - init.year)
+             ]
+    
+    C16remis[, remission := remission * 
+               ((100 - fatality.annual.improvement.c16) / 100)^(2011 - init.year)
+             ]
+  }
 }
 
 # Lung cancer
