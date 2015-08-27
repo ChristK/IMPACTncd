@@ -1,7 +1,7 @@
-#!/opt/gridware/apps/gcc/R/3.1.0/lib64/R/bin/Rscript
+#!/opt/gridware/apps/gcc/R/3.2.0/lib64/R/bin/Rscript
 # ************************************************************************************************
 #
-# IMPACT NCD Prototype 06
+# IMPACT NCD Prototype 07
 #
 # ************************************************************************************************
 
@@ -11,6 +11,12 @@ options(warn = 1)
 if (Sys.info()[1] == "Linux") {
   if (system("whoami", T )== "mdxasck2") {
     setwd("~/IMPACTncd/")
+#     all.files <- list.files("./SynthPop", 
+#                             pattern = glob2rx("spop2011*.rds"), 
+#                             full.names = T)
+#     
+#     spop.l <- lapply(all.files, readRDS)
+#     rm(all.files)
   } else {
     setwd(paste("/home/", 
                 system("whoami", T), 
@@ -31,10 +37,13 @@ if (Sys.info()[1] == "Linux") {
   setwd(paste0(get.dropbox.folder(), "/PhD/Models/IMPACTncd/"))
 }
 
-source(file = "./GUI.R")
+require(compiler)
+
+loadcmp("./GUI.Rc")
 #cmpfile(infile = "./initialisation.R")
-source(file = "./initialisation.R")
+loadcmp("./initialisation.Rc")
 #loadcmp(file = "./initialisation.Rc")
+
 
 # Create lifetable without the disease(s) to be modelled. Lifetables were calculated using data from
 # England and Wales not just England. Minimal bias since we use probabilities.
@@ -54,7 +63,8 @@ foreach(iterations = 1 : it,
                       "randtoolbox", 
                       "truncnorm", 
                       "stringr",
-                      "compiler"),
+                      "compiler",
+                      "quantreg"),
         .export = ls(),
         .noexport = c("scenarios.list", "time.mark")) %dorng% {
           
@@ -79,14 +89,13 @@ if (exists("cl")) stopCluster(cl)
 time.mark("End of parallelisation")
 
 # Output
-#cmpfile("./post simulation functions.R")
-#source(file = "./post simulation functions.R")
+file.rename("./Output/simulation parameters temp.txt", "./Output/simulation parameters.txt")
 loadcmp(file = "./post simulation functions.Rc")
-
-#cmpfile("./output.R")
-#source(file = "./output.R")
-loadcmp(file = "./output.Rc")
+if (process.output == T) {
+  loadcmp(file = "./output.Rc")
+}
 end()
 
 # compile scenarios
 #lapply(list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = T, recursive = F), cmpfile)
+#lapply(list.files(path = "./", pattern = glob2rx("*.R"), full.names = T, recursive = F), cmpfile)

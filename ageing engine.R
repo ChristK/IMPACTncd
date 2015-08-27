@@ -1,260 +1,378 @@
 #cmpfile("./ageing engine.R")
+#************************* Lagtimes/Ageing implementation *******************#
+
+# salt estimation ---------------------------------------------------------
+
 cat("Initiating lag/ageing engine...\n")
 cat(paste0(Sys.time(), "\n\n"))
+
+cat("salt estimation\n")
+if (i == init.year - 2011) {
+  POP[between(age, 19, ageH),
+      percentile := (frank(salt.intersalt,
+                           na.last = F,
+                           ties.method = "random") - 1)/(.N - 1), 
+      by = .(age, sex, qimd)]
+  
+  POP[, `:=`(salt.intersalt = NULL)]
+} else {
+  POP[between(age, 19, ageH),
+      percentile := (frank(salt24h.calag,
+                           na.last = F, 
+                           ties.method = "random") - 1)/(.N - 1), 
+      by = .(age, sex, qimd)]
+}
+
+setkey(POP,     age, sex, qimd, percentile)
+
+if (scenarios.list[[iterations]] == "salt no intervention.R") {
+  if (i < 2) {
+    tmp.cvd0 <- pred.salt(-8 + cvd.lag, cvd.lag) # salt exposure remains as of 2003
+    tmp.cvd  <- pred.salt(i, cvd.lag) # alternative current policy
+    tmp.ca0  <- pred.salt(i, cancer.lag) # as of 2003
+    setkey(tmp.cvd0, age, sex, qimd, percentile)
+    setkey(tmp.cvd,  age, sex, qimd, percentile)
+    setkey(tmp.ca0,  age, sex, qimd, percentile)
+    
+    POP <- tmp.cvd0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.cvd[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag.alt := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.ca0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
+    rm(tmp.ca0, tmp.cvd0, tmp.cvd)
+  } else {
+    tmp.cvd0 <- pred.salt(-8 + cvd.lag, cvd.lag) # salt exposure remains as of 2003
+    tmp.cvd <- pred.salt(i, cvd.lag) # alternative current policy
+    tmp.ca0  <- pred.salt(-8 + cancer.lag, cancer.lag) # as of 2003
+    setkey(tmp.cvd0, age, sex, qimd, percentile)
+    setkey(tmp.cvd, age, sex, qimd, percentile)
+    setkey(tmp.ca0,  age, sex, qimd, percentile)
+    
+    POP <- tmp.cvd0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.cvd[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag.alt := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.ca0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
+    rm(tmp.ca0, tmp.cvd0, tmp.cvd)
+  }
+} else {
+  tmp.cvd <- pred.salt(i, cvd.lag) # alternative current policy
+  tmp.ca  <- pred.salt(i, cancer.lag)
+  setkey(tmp.cvd, age, sex, qimd, percentile)
+  setkey(tmp.ca,  age, sex, qimd, percentile)
+  
+  POP <- tmp.cvd[POP, roll = "nearest"]
+  POP[between(age, 19, ageH), salt24h.cvdlag := runif(.N, salt.l, salt.u)]
+  POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+  
+  POP <- tmp.ca[POP, roll = "nearest"]
+  POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
+  POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
+  rm(tmp.ca, tmp.cvd)
+}
+#qplot(percentile, salt.u, col = age, data = tmp.ca, facets = sex~qimd)
+
+# PA estimation -----------------------------------------------------------
+cat("PA estimation\n")
 setkey(POP, age, sex, qimd)
 
-#****************************************** Lagtimes/Ageing implementation **********************************#
+POP[between(age, 20, 84), a30to06m.cvdlag := pred.pa(i, age, sex, qimd, cvd.lag)]
 
+POP[between(age, ageL, ageH), a30to06m.calag := pred.pa(i, age, sex, qimd, cancer.lag)]
 
+# F&V estimation ----------------------------------------------------------
 cat("F&V estimation\n")
 POP[between(age, ageL, ageH), porftvg.cvdlag := pred.fv(i, age, sex, qimd,  cvd.lag)]
-POP[between(age, ageL, ageH), frtpor.cvdlag := pred.fvrate(i, age, sex, qimd, porftvg.cvdlag, cvd.lag)]
+POP[between(age, ageL, ageH), frtpor.cvdlag := pred.fvrate(age, sex, qimd, porftvg.cvdlag, cvd.lag)]
 
 POP[between(age, ageL, ageH), porftvg.calag := pred.fv(i, age, sex, qimd, cancer.lag)]
-POP[between(age, ageL, ageH), frtpor.calag := pred.fvrate(i, age, sex, qimd, porftvg.calag, cancer.lag)]
+POP[between(age, ageL, ageH), frtpor.calag := pred.fvrate(age, sex, qimd, porftvg.calag, cancer.lag)]
 
+# Smoking -----------------------------------------------------------------
 cat("Smoking initiation/cessation simulation\n")
-if (i == (init.year-2011)) {
-  POP[, `:=`(endsmoke.curr = endsmoke, # .curr means current
+if (i == init.year - 2011) {
+  POP[, `:=`(endsmoke.curr   = endsmoke, # .curr means current
              cigdyalCat.curr = cigdyalCat,
-             numsmok.curr = numsmok,
-             packyears.curr = packyears)]
+             numsmok.curr    = numsmok,
+             packyears.curr  = packyears)]
 }
 
 cat("Smoking lag\n")
-POP[, cigst1.cvdlag := NULL]
+if (i > init.year - 2011) {
+  POP[, cigst1.cvdlag := NULL]
+}
 POP[cigst1 == "1", cigst1.cvdlag := "1"]
 
 POP[cigst1 %in% c("2", "3"), 
-    cigst1.cvdlag := ifelse(endsmoke.curr < cvd.lag,
-                            "4",
-                            cigst1)] # slightly wrong.could also be a never smoker 
+    cigst1.cvdlag := cigst1] 
+POP[cigst1 %in% c("2", "3") & endsmoke.curr < cvd.lag, 
+    cigst1.cvdlag := "4"] # slightly wrong.could also be a never
+# smoker. see below for correction 
 
 POP[cigst1.cvdlag %in% c("2", "3"),
-    endsmoke := endsmoke.curr - cvd.lag]
+    endsmoke := endsmoke.curr - as.integer(cvd.lag)]
 
 POP[cigst1.cvdlag == "4",
-    `:=` (cigdyalCat = numsmok.curr, endsmoke = 0)]
+    `:=`(cigdyalCat = numsmok.curr, endsmoke = 0L)]
 
-POP[cigst1.cvdlag == "4",
-    cigst1.cvdlag := ifelse((packyears.curr * 20 /numsmok.curr) <= cvd.lag,
-                            "1", 
-                            cigst1.cvdlag)] # correction of above error
+POP[cigst1.cvdlag == "4" & (packyears.curr * 20 /numsmok.curr) <= cvd.lag,
+    cigst1.cvdlag := "1"] # correction of above error
 
 POP[cigst1 == "4", 
-    cigst1.cvdlag := ifelse((packyears.curr * 20 /cigdyalCat.curr) <= cvd.lag ,
-                            "1", 
-                            cigst1)]
+    cigst1.cvdlag := "4"]
+
+POP[cigst1 == "4" & (packyears.curr * 20 /cigdyalCat.curr) <= cvd.lag, 
+    cigst1.cvdlag := "1"]
 
 POP[cigst1.cvdlag == "4",
-    packyears := packyears.curr - cvd.lag * cigdyalCat.curr/20]
+    packyears := packyears.curr - cvd.lag * cigdyalCat.curr/20] # packyears are for cvdlag
 
 POP[, cigst1.cvdlag := factor(cigst1.cvdlag)]
 
-POP[age < 16, cigst1.cvdlag :="1"]
+POP[age < 15, cigst1.cvdlag := "1"]
 
-POP[cigst1.cvdlag =="1", `:=` (cigdyalCat = 0, packyears = 0)]
+POP[cigst1.cvdlag == "1", `:=`(cigdyalCat = 0, packyears = 0)]
 
 
 if (i > init.year - 2011) {
-  POP[cigst1 %in% c("2", "3"), endsmoke.curr := endsmoke.curr + 1]
+  POP[cigst1 %in% c("2", "3"), endsmoke.curr := endsmoke.curr + 1L]
   POP[cigst1 == "4", packyears.curr := packyears.curr + cigdyalCat.curr/20]
   
-  POP[age <= 16, cigst1 := "1"]
-  POP[age == 16, cigst1.temp := dice(.N) < pred.sm0prev(i, 16, sex, qimd)]
-  POP[cigst1.temp == T,
-      `:=` (cigdyalCat.curr = resample(POP[qimd == .BY[[1L]] & cigst1 == "4", cigdyalCat.curr], .N, replace=T)),
+  POP[age <= 15, cigst1 := "1"]
+  POP[age == 15, cigst1.temp := pred.sm0prev(i, 15, sex, qimd)]
+  POP[cigst1.temp == 1,
+      `:=`(cigdyalCat.curr = resample(POP[qimd == .BY[[1L]] & cigst1 == "4",
+                                          cigdyalCat.curr], .N, replace = T)),
       by = qimd] 
-  POP[cigst1.temp == T, cigst1 := "4"]
+  POP[cigst1.temp == 1, cigst1 := "4"]
   POP[,cigst1.temp := NULL]
   
-  POP[between(age, 17, 50) & cigst1 == "1", 
-      cigst1.temp1 := dice(.N) < pred.nev0sm1(i, age, qimd, 0)] 
-  POP[cigst1.temp1 == T, `:=` 
-      (cigdyalCat.curr = resample(POP[qimd == .BY[[1L]] & cigst1 == "4", cigdyalCat.curr], .N, replace=T)), 
-      by=qimd]  
+  POP[between(age, 16, 50) & cigst1 == "1", 
+      cigst1.temp1 := pred.nev0sm1(i, age, sex, qimd)] 
+  POP[cigst1.temp1 == 1, `:=` 
+      (cigdyalCat.curr = resample(POP[qimd == .BY[[1L]] & cigst1 == "4",
+                                      cigdyalCat.curr], .N, replace = T)), 
+      by = qimd]  
   
-  POP[between(age, 17, ageH) & cigst1 == "4", 
-      cigst1.temp2 := dice(.N) < pred.sm0ex1(i , age , sex, qimd, 0)]
+  POP[between(age, 16, ageH) & cigst1 == "4", 
+      cigst1.temp2 := pred.sm0ex1(i , age , sex, qimd)]
   
-  POP[between(age, 17, 75) & between(endsmoke.curr, 1, 10), 
+  POP[between(age, 16, 75) & between(endsmoke.curr, 1, 10), 
       cigst1.temp3 :=  dice(.N) < pred.ex0sm1(endsmoke.curr, sex, qimd)]
   POP[cigst1.temp3 == T, cigdyalCat.curr := numsmok.curr] 
   
-  POP[cigst1.temp1 == T, `:=` (cigst1 = "4", packyears.curr = cigdyalCat.curr/20)]
-  POP[,cigst1.temp1 := NULL]
-  POP[cigst1.temp2 == T, `:=`(cigst1 = "3", endsmoke.curr = 0, numsmok.curr = cigdyalCat.curr)]
-  POP[,cigst1.temp2 := NULL]
-  POP[cigst1.temp3 == T, `:=` (cigst1 = "4", packyears.curr = packyears.curr + cigdyalCat.curr/20)]
-  POP[,cigst1.temp3 := NULL]
+  POP[cigst1.temp1 == 1, `:=`(cigst1 = "4", packyears.curr = cigdyalCat.curr/20)]
+  POP[, cigst1.temp1 := NULL]
+  POP[cigst1.temp2 == 1, `:=`(cigst1 = "3",
+                              endsmoke.curr = 0, 
+                              numsmok.curr = cigdyalCat.curr)]
+  POP[, cigst1.temp2 := NULL]
+  POP[cigst1.temp3 == T, `:=`(cigst1 = "4",
+                              packyears.curr = packyears.curr + cigdyalCat.curr/20)]
+  POP[, cigst1.temp3 := NULL]
 }
 
 # needs fixing for cancers lag
-POP[cigst1.cvdlag =="1", cigst1.calag := "1"]
-POP[cigst1.cvdlag %in% c("2", "3"), cigst1.calag := ifelse(endsmoke < cancer.lag, "4", cigst1.cvdlag)]
-POP[cigst1.calag == "4", cigst1.calag := ifelse((packyears * 20 /numsmok) < cancer.lag,  "1", "4")]
-POP[cigst1.cvdlag == "4", cigst1.calag := ifelse((packyears * 20 /cigdyalCat) < cancer.lag,  "1", "4")]
+POP[cigst1.cvdlag == "1", cigst1.calag := "1"]
+POP[cigst1.cvdlag %in% c("2", "3"),
+    cigst1.calag := cigst1.cvdlag]
+POP[cigst1.cvdlag %in% c("2", "3") & endsmoke < cancer.lag,
+    cigst1.calag := "4"]
+POP[cigst1.calag == "4" & (packyears * 20 /numsmok) < cancer.lag,
+    cigst1.calag := "1"]
+POP[cigst1.cvdlag == "4",
+    cigst1.calag := "4"]
+POP[cigst1.cvdlag == "4" & (packyears * 20 /cigdyalCat) < cancer.lag,
+    cigst1.calag := "1"]
 POP[, cigst1.calag := factor(cigst1.calag)]
+
+# BMI estimation ----------------------------------------------------------
 
 
 cat("BMI estimation\n")
-if (i > (init.year-2011)) POP <- ageing.distr("bmival") # to match distribution shape to that of SPOP2011
-POP[between(age, ageL, ageH), 
-    bmival.cvdlag := scale(bmival, scale = F) + 
-      pred.bmi(i, age, sex, qimd, porftvg.cvdlag, cvd.lag), 
+if (i > (init.year - 2011)) ageing.distr(bmi.rank, bmival) # to match distribution shape to that of SPOP2011
+POP[between(age, 20, 84), 
+    bmival.cvdlag := scale(bmival, scale = F), 
+    by = group]
+POP[between(age, 20, 84), 
+    bmival.cvdlag := bmival.cvdlag + 
+      pred.bmi(i, age, sex, qimd, a30to06m.cvdlag, cvd.lag)]
+
+POP[between(age, ageL, ageH),
+    bmival.calag := scale(bmival, scale = F),
     by = group]
 POP[between(age, ageL, ageH),
-    bmival.calag := scale(bmival, scale = F) + 
-      pred.bmi(i, age, sex, qimd, porftvg.calag, cancer.lag),
-    by = group]
+    bmival.calag := bmival.calag + 
+      pred.bmi(i, age, sex, qimd, a30to06m.calag, cancer.lag)]
+POP[bmival.cvdlag < 16, bmival.cvdlag := 16]
+POP[bmival.calag  < 16, bmival.calag  := 16]
 
+
+# SBP estimation ----------------------------------------------------------
 cat("SBP estimation\n")
-if (i > (init.year-2011)) POP <- ageing.distr("omsysval")
+if (i > (init.year - 2011)) ageing.distr(sbp.rank, omsysval)
 POP[between(age, ageL, ageH), 
-    omsysval.cvdlag := scale(omsysval, scale=F) + 
-      pred.sbp(i, age, sex, qimd, bmival.cvdlag, cigst1.cvdlag, porftvg, cvd.lag), 
-    by= group] 
+    omsysval.cvdlag := scale(omsysval, scale = F),
+    by = group] 
+POP[between(age, ageL, ageH), 
+    omsysval.cvdlag := omsysval.cvdlag + 
+      pred.sbp(i, age, sex, qimd, bmival.cvdlag, cigst1, a30to06m.cvdlag, cvd.lag)]
+POP[omsysval.cvdlag < 70, omsysval.cvdlag := 70]
+
+
+# TC estimation -----------------------------------------------------------
+
 
 cat("CHOL estimation\n")
-if (i > (init.year-2011)) POP <- ageing.distr("cholval")
-POP[between(age, ageL, ageH), cholval.cvdlag := scale(cholval, scale=F) + pred.chol(i, age, sex, qimd, bmival.cvdlag, porftvg.cvdlag, cvd.lag), by= group] 
+if (i > (init.year - 2011)) ageing.distr(chol.rank, cholval)
+POP[between(age, ageL, ageH), 
+    cholval.cvdlag := scale(cholval, scale = F),
+    by = group] 
+POP[between(age, ageL, ageH), 
+    cholval.cvdlag := 
+      cholval.cvdlag + 
+      pred.chol(i, age, sex, qimd, bmival.cvdlag, porftvg.cvdlag, a30to06m.cvdlag, cvd.lag)] 
+POP[cholval.cvdlag < 2.2, cholval.cvdlag := 2.2]
 
-# ETS (start 2 years after init.year to avoid artefactects from cigst1 estimatin)
-if (i > (init.year-2011 + 1)) {
+# ETS ---------------------------------------------------------------------
+# ETS (start 3 years after init.year to avoid artefactects from cigst1 estimatin)
+if (i == init.year - 2011 + 1) {
+  smoking.preva.forets0 <-
+    POP[between(age, ageL, ageH),
+        list(old.preval = .SD[cigst1.cvdlag == "4", .N]/ .N),
+        by = .(qimd)] # to be used for ETS
+  setkey(smoking.preva.forets0, qimd)
+}
+
+if (i > (init.year - 2011 + 1)) {
   cat("Estimating ETS...\n")
-  smoking.preva.forets1 <- copy(POP[between(age, ageL, ageH),
-                               list(new.preval=prop.table(table(cigst1=="4"))[2]), by=.(qimd)])
+  smoking.preva.forets1 <-
+    POP[between(age, ageL, ageH),
+        list(new.preval = .SD[cigst1.cvdlag == "4", .N]/ .N),
+        by = .(qimd)]
   setkey(smoking.preva.forets1, qimd)
   # works for decreasing smoking prevelence
-  smoking.preva.forets <- merge(
-    smoking.preva.forets1, 
-    smoking.preva.forets0,
-    by="qimd"
-  )[,
-    change := (old.preval - new.preval) / old.preval][
-      change<0, change:=0][
-        is.na(change), change:=0]
+  smoking.preva.forets1[smoking.preva.forets0,
+                        change := 1 - new.preval / old.preval][
+                          change < 0, change := 0][
+                            is.na(change), change := 0]
   
-  # Avoid crashes when a QIMD disappears due to scenarios
-  for (ll in levels(POP$qimd)) {
-    
-    if (length(smoking.preva.forets[qimd == ll,change]) == 0) {
-      smoking.preva.forets <- rbind(smoking.preva.forets, 
-                                    data.table(qimd = ll, 
-                                               new.preval = 0, 
-                                               old.preval = 0, 
-                                               change = 0))
-   
-    }
-  }
-  
-  POP[id %in% POP[expsmokCat=="1", 
-                  sample_frac(.SD, smoking.preva.forets[qimd == .BY, change]),
+  POP[id %in% POP[expsmokCat == "1", 
+                  sample_frac(.SD,
+                              smoking.preva.forets1[qimd == .BY[1],
+                                                    change])[, id],
                   by = qimd,
-                  .SDcols="id"][,id],
-      expsmokCat :="0"]
+                  .SDcols = "id"][, V1],
+      expsmokCat := "0"]
   
-  # works for increasing smoking prevelence
-  smoking.preva.forets <- merge(
-    smoking.preva.forets1, smoking.preva.forets0, by="qimd"
-  )[,change := (new.preval - old.preval) / new.preval][
-    change<0,change:=0][
-      is.na(change), change:=0]
+  # works for increasing smoking prevelence (the change apply to ets==1)
+  smoking.preva.forets1[smoking.preva.forets0,
+                        change := 1 - old.preval / new.preval][
+                          change < 0, change := 0][
+                            is.na(change), change := 0]
   
-  # Avoid crashes when a QIMD disappears due to scenarios
-  for (ll in levels(POP$qimd)) {
-    
-    if (length(smoking.preva.forets[qimd == ll,change]) == 0) {
-      smoking.preva.forets <- rbind(smoking.preva.forets, 
-                                    data.table(qimd = ll, 
-                                               new.preval = 0, 
-                                               old.preval = 0, 
-                                               change = 0))
-   
-    }
-  }
-  
-  POP[id %in% POP[expsmokCat=="0",
-                  sample_frac(.SD, smoking.preva.forets[qimd == .BY, change]), 
+  POP[id %in% POP[expsmokCat == "0",
+                  sample_n(.SD,
+                           smoking.preva.forets1[qimd == .BY[1], change] * 
+                             POP[expsmokCat == "1" & qimd == .BY[1], .N])[, id], 
                   by = qimd,
-                  .SDcols="id"][,id], 
+                  .SDcols = "id"][,V1], 
       expsmokCat := "1"]
   
-}
-
-if (exists("smoking.preva.forets1")) {
-  smoking.preva.forets0 = copy(smoking.preva.forets1)
+  smoking.preva.forets0 = copy(smoking.preva.forets1[, change := NULL])
   setnames(smoking.preva.forets0, "new.preval", "old.preval")
-} else {
-  smoking.preva.forets0 <- copy(POP[between(age, ageL, ageH), 
-                                    list(old.preval = prop.table(table(cigst1 == "4"))[2]), 
-                                    by =.(qimd)]) # to be used for ETS
-  setkey(smoking.preva.forets0, qimd) # to be used as a baseline for new years calculation
 }
 
+# Scenario fn -------------------------------------------------------------
+cat(paste0("before scenario.fn",Sys.time(), "\n\n"))
+post.ageing.scenario.fn(i)# placed here so bmi intervensions affect diabetes
 
-cat("DIAB estimation\n")
-# to predict diabetics that where healthy x years ago you need to apply current.prevalence-x*(diab.incid - mortality)
-# Diabetes incidence from Holden SE, Barnett AH, Peters JR, et al. The incidence of type 2 diabetes in the United Kingdom from 1991 to 2010. Diabetes Obes Metab 2013;15:844–52. doi:10.1111/dom.12123
-# NOTE: this is for type 2 diabetes only. For this ages I am concerned with this is absolutely fine. very few new diabetes I patients older than 35 
-if (i == (init.year - 2011)) { # will need special case when cvd.lag = 0
+# Diabetes estimation ---------------------------------------------------------
+
+
+cat("Diabetes estimation\n")
+# to predict diabetics that where healthy x years ago you need to apply
+# current.prevalence-x*(diab.incid - mortality) Diabetes incidence from Holden
+# SE, Barnett AH, Peters JR, et al. The incidence of type 2 diabetes in the
+# United Kingdom from 1991 to 2010. Diabetes Obes Metab 2013;15:844–52.
+# doi:10.1111/dom.12123 NOTE: this is for type 2 diabetes only. For this ages I
+# am concerned with this is absolutely fine. very few new diabetes I patients
+# older than 35
+
+if (qdrisk == F) {
+  # between(age, 20, 84) IS ALSO INCLUDED IN THE FUNCTION!!! DON'T CHANGE IT
+  if (i > (init.year - 2011)) {
+    POP[between(age, 20, 84) & diabtotr == "1", 
+        diabtotr := pred.diab.incid(i, age, sex, qimd, 
+                                    bmival.cvdlag, a30to06m.cvdlag)]
+  } 
+  
   POP[, diabtotr.cvdlag := diabtotr]
-  POP[between(age, 20, 70) & diabtotr == "2", 
-      diabtotr.cvdlag := pred.diab.incid.lag(i, age, sex, qimd, bmival, cvd.lag, cvd.lag, .N)]
+  POP[between(age, ageL, ageH) & diabtotr == "2", 
+      diabtotr.cvdlag := pred.diab.incid.lag(age,
+                                             sex,
+                                             qimd,
+                                             bmival.cvdlag,
+                                             a30to06m.cvdlag,
+                                             cvd.lag)]
 } 
 
-if (i > (init.year - 2011) & i < (init.year - 2011 + cvd.lag)) {
-  POP[between(age, 20, 70) & diabtotr == "2" & diabtotr.cvdlag == "1", 
-      diabtotr.cvdlag := as.factor(ifelse(dice(.N) < 1/(cvd.lag + 1-i), 2, 1))]
-} 
-
-if (i == (init.year - 2011 + cvd.lag)) {
-  POP[, diabtotr.cvdlag := diabtotr]
-} 
-
-if (i > (init.year - 2011 + cvd.lag)) {
-  POP[between(age, ageL, ageH) & diabtotr.cvdlag == "1", 
-      diabtotr.cvdlag := ifelse(pred.diab.incid(i, age, sex, qimd, bmival.cvdlag, cvd.lag), 2L, 1L)]
-} 
-
+if (qdrisk == T) {
+  if (i < (init.year - 2011 + cvd.lag)) {
+    POP[, diabtotr.cvdlag := diabtotr]
+    POP[between(age, 25, ageH) & diabtotr == "2", 
+        diabtotr.cvdlag := pred.diab.incid.lag(age,
+                                               sex,
+                                               qimd,
+                                               bmival.cvdlag,
+                                               a30to06m.cvdlag,
+                                               cvd.lag - i)]
+  } else if (i == (init.year - 2011 + cvd.lag)) {
+    POP[, diabtotr.cvdlag := diabtotr]
+  } else {
+    POP[between(age, 25, ageH) & diabtotr.cvdlag == "1",
+        diabtotr.cvdlag := pred.diab.qdrisk(.SD)]
+  }
+}
 cat("DIAB finished\n")
 
 agegroup.fn(POP)
-agegroup.fn(SPOP2011)
 
-# Call scenario function
-post.ageing.scenario.fn(i)
+# Export ------------------------------------------------------------------
 
-setkey(POP, qimd, sex, agegroup)
-setkey(SPOP2011, qimd, sex, agegroup)
 
-output <- vector("list", 5)
-if (exists("riskfactors.rds")) output[[1]] <- riskfactors.rds
+cat(paste0("before export",Sys.time(), "\n\n"))
 
-output[[2]] <- POP[, output.rf(.SD), 
-                   by=.(qimd, sex, agegroup)]
+if (i == init.year - 2011) riskfactors <- vector("list", yearstoproject * 5)
+#if (exists("riskfactors.rds")) output[[1]] <- riskfactors.rds
 
-output[[3]] <- POP[, output.rf(.SD), by=.(sex, agegroup)]
+riskfactors[[i * 5 + 1]] <- output.rf(POP, c("qimd", "sex", "agegroup"), 20, 84)
 
-output[[4]] <- POP[between(age, ageL, ageH), output.rf(.SD), by=.(qimd, sex)]
+riskfactors[[i * 5 + 2]] <- output.rf(POP, c("sex", "agegroup"), 20, 84)
 
-output[[5]] <- POP[between(age, ageL, ageH), output.rf(.SD), by=.(sex)]
+riskfactors[[i * 5 + 3]] <- output.rf(POP, c("qimd", "sex"), ageL, ageH) 
 
-riskfactors.rds <- rbindlist(output, fill = T)
+riskfactors[[i * 5 + 4]] <- output.rf(POP, c("sex"), ageL, ageH)
 
-rm(output)
+riskfactors[[i * 5 + 5]] <- output.rf(POP, c(), ageL, ageH)
+
+# when not stratified by agegroup only ageL to ageH is considered
 
 if (i == yearstoproject + init.year - 2012) {
-  saveRDS(riskfactors.rds, file = paste0(output.dir(), "riskfactors.rds"))
+  lapply(riskfactors,
+         function (x) setnames(x, paste0("V", 1:50), output.rf.names))
+  saveRDS(rbindlist(riskfactors, T, T) ,
+          file = paste0(output.dir(), "riskfactors.rds"))
 }
-
-
-
-
-
-
-
-
-
-
-

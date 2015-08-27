@@ -1,3 +1,4 @@
+#cmpfile("./initialisation.R")
 # preample
 dependencies <- function(x) {
   for (j in x) {
@@ -12,9 +13,7 @@ dependencies <- function(x) {
 }
 
 # Then try/install packages...
-dependencies(c("data.table", 
-               "dplyr",
-               "demography", 
+dependencies(c("demography", 
                "truncnorm", 
                "stringr", 
                "reshape2", 
@@ -24,14 +23,17 @@ dependencies(c("data.table",
                "randtoolbox",
                "doParallel",
                "doRNG",
-               "foreach"))
+               "foreach",
+               "quantreg",
+               "Rcpp",
+               "data.table", 
+               "dplyr"))
 
 enableJIT(0) #set to 1,2 or 3 to enable different precompiling levels
 
 options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata around the sample grand mean rather than the stratum mean)
-#require(devtools)
-#install_github("Rdatatable/data.table",  build_vignettes = F)
-# OR install_local("~/R/data.table-master.zip") #after manually download from github
+# require(devtools)
+# install_github("Rdatatable/data.table",  build_vignettes = F)
 
 # max projection horizon (limited by fertility)
 if (init.year + yearstoproject > 2061) yearstoproject <- 2061 - init.year
@@ -43,7 +45,7 @@ end <- function(...) {
        append = T, 
        type = "output",
        split = F)
-  cat(paste0("Simulation ended succesfuly at: ", Sys.time(), "\n"))
+  cat(paste0("Simulation ended successfully at: ", Sys.time(), "\n"))
   sink()
   if (Sys.info()[1] == "Windows") {
     system("rundll32 user32.dll,MessageBeep -1")
@@ -53,7 +55,7 @@ end <- function(...) {
 
 # Function for timing log
 time.mark <- function(x) {
-  sink(file = "./Output/simulation parameters.txt",
+  sink(file = "./Output/times.txt",
        append = T, 
        type = "output",
        split = F)
@@ -73,16 +75,15 @@ RNGkind("L'Ecuyer-CMRG")
 dice <- cmpfun(function(n = .N) runif(n))
 
 # define function for stochastic RR
-stochRR <- cmpfun(function(n = .N, m, ci) { # lognormal
-  if (m < 1) {
-    a = -Inf
-    b = 0
-  } else {
-    a = 0
-    b = Inf
-  }
-  ifelse(m == ci, rr <- rep(log(m), n), rr <- rtruncnorm(n = n, a = a, b = b, mean = log(m), sd = abs(log(m) - log(ci))/1.96))
-  return(exp(rr))  
+stochRRabov1 <- cmpfun(function(n = .N, m, ci) { # lognormal
+  rr <- exp(rtruncnorm(n, 0, Inf, log(m), abs(log(m) - log(ci))/1.96))
+  return(rr)  
+}
+)
+
+stochRRbelow1 <- cmpfun(function(n = .N, m, ci) { # lognormal
+  rr <- exp(rtruncnorm(n, -Inf, 0, log(m), abs(log(m) - log(ci))/1.96))
+  return(rr)  
 }
 )
 
@@ -108,6 +109,30 @@ hyperbola <- cmpfun(function(y1, y5, x) {
 }
 )
 
+# function to calculate mortality based on 1st and 5th year survival based on Weibull distribution
+# hazard h(t) = l*g*t^(g-1)
+# cummulative hazard H(t) = l*t^g
+# survival function S(t) = exp(-l*t^g)
+# from ! and 5 year net survival rates I solve S(t) to find l and g
+survival.fn <- cmpfun(function(y1, y5, t) {
+  l = -log(y1)
+  g = log(-log(y5)/l ,5)
+  return(exp(-l*t^g)) # returns pct of survivors at time t
+  #return(l*g*t^(g-1)) # returns the rate of death at time t
+  #return(l*t^g) # returns the cumulative hazard of death at time t
+}
+)
+
+fatality.rt <- cmpfun(function(y1, y5, t=1) {
+  l = -log(y1)
+  g = log(-log(y5)/l ,5)
+  #return(exp(-l*t^g)) # returns pct of survivors at time t
+  return(l*g*t^(g-1)) # returns the rate of death at time t
+  #return(l*t^g) # returns the cumulative hazard of death at time t
+}
+)
+#plot(survival.fn(0.55675983428955, 0.35348030090332, 0:20), x=0:20, ylim=c(0,1))
+
 # Define function for sampling. Taken from sample man pages 
 resample <- cmpfun(function(x, ...) {
   x <- na.omit(x)
@@ -127,36 +152,38 @@ outersect <- cmpfun(function(x, y, ...) {
 )
 
 # Define function to split agegroups and create groups
-agegroup.fn <- cmpfun(function(x, lagtime = 0) {
-  breaks                   <- c(0, 1, seq(5, 85, 5), Inf)
-  labels                   <- c("<1   ", "01-04", "05-09",
-                                "10-14", "15-19", "20-24", 
-                                "25-29", "30-34", "35-39", 
-                                "40-44", "45-49", "50-54",
-                                "55-59", "60-64", "65-69",
-                                "70-74", "75-79", "80-84", 
-                                "85+")
-  if (is.numeric(x)) { 
-    agegroup = cut(x + lagtime, 
-                   breaks = breaks, 
-                   labels = labels, 
-                   include.lowest = T, 
-                   right = F, 
-                   ordered_result = T)
-    return(invisible(agegroup))    
-  } else {
-    if (is.data.table(x)) {
-      x[, agegroup := cut(age + lagtime, 
-                          breaks = breaks, 
-                          labels = labels, 
-                          include.lowest = T, 
-                          right = F, 
-                          ordered_result = T)]
-      x[, group := as.factor(paste0(qimd, sex, agegroup))]
-      return(invisible(x))
-    } else return(print("only datatables and vectors are eligible inputs"))
+agegroup.fn <- cmpfun(
+  function(x, lagtime = 0) {
+    breaks                   <- c(0, 1, seq(5, 85, 5), Inf)
+    labels                   <- c("<1   ", "01-04", "05-09",
+                                  "10-14", "15-19", "20-24", 
+                                  "25-29", "30-34", "35-39", 
+                                  "40-44", "45-49", "50-54",
+                                  "55-59", "60-64", "65-69",
+                                  "70-74", "75-79", "80-84", 
+                                  "85+")
+    if (is.numeric(x)) { 
+      agegroup = cut(x + lagtime, 
+                     breaks = breaks, 
+                     labels = labels, 
+                     include.lowest = T, 
+                     right = F, 
+                     ordered_result = T)
+      return(invisible(agegroup))    
+    } else {
+      if (is.data.table(x)) {
+        x[, agegroup := cut(age + lagtime, 
+                            breaks = breaks, 
+                            labels = labels, 
+                            include.lowest = T, 
+                            right = F, 
+                            ordered_result = T)]
+        setorder(x, qimd, sex, agegroup)
+        x[, group := rleid(qimd, sex, agegroup)]
+        return(invisible(x))
+      } else return(print("only datatables and vectors are eligible inputs"))
+    }
   }
-}
 )
 
 # Define function to split agegroups and create groups
@@ -202,21 +229,72 @@ clear.labels <- function(x) {
   return(invisible(x))
 }
 
+# truncate a distr (from mc2d)
+rtrunc <- function (distr = runif, n, linf = -Inf, lsup = Inf, ...) 
+{
+  # linf <- as.vector(linf)
+  # lsup <- as.vector(lsup)
+  if (!is.character(distr)) 
+    distr <- as.character(match.call()$distr)
+  distr <- substr(distr, 2, 1000)
+  if (any(linf >= lsup)) 
+    stop("linf should be < lsup")
+  pfun <- get(paste("p", distr, sep = ""), mode = "function")
+  pinf <- as.vector(pfun(q = linf, ...))
+  psup <- as.vector(pfun(q = lsup, ...))
+  p <- runif(n, min = pinf, max = psup)
+  qfun <- get(paste("q", distr, sep = ""), mode = "function")
+  res <- as.vector(qfun(p, ...))
+  res[pinf <= 0 & res > lsup] <- NaN
+  res[psup >= 1 & res < linf] <- NaN
+  res[is.na(linf) | is.na(lsup)] <- NaN
+  if (any(res <= linf | res > lsup, na.rm = TRUE)) 
+    stop("Error in rtrunc: some values are not in the expected range (maybe due to rounding errors)")
+  if (isTRUE(all.equal(pinf, 1)) | isTRUE(all.equal(psup, 0))) 
+    warning("Warning: check the results from rtrunc. It may have reached rounding errors")
+  return(res)
+}
+
+# from plyr. relevel vector
+mapvalues <- function (x, from, to, warn_missing = TRUE) 
+{
+  if (length(from) != length(to)) {
+    stop("`from` and `to` vectors are not the same length.")
+  }
+  if (!is.atomic(x)) {
+    stop("`x` must be an atomic vector.")
+  }
+  if (is.factor(x)) {
+    levels(x) <- mapvalues(levels(x), from, to, warn_missing)
+    return(x)
+  }
+  mapidx <- match(x, from)
+  mapidxNA <- is.na(mapidx)
+  from_found <- sort(unique(mapidx))
+  if (warn_missing && length(from_found) != length(from)) {
+    message("The following `from` values were not present in `x`: ", 
+            paste(from[!(1:length(from) %in% from_found)], collapse = ", "))
+  }
+  x[!mapidxNA] <- to[mapidx[!mapidxNA]]
+  x
+}
+# hist(rtrunc(rnorm, 1000, mean=0, sd=1, -10, 10))
+
 # Define function for percentile rank (dplyr provides similar functions)
-perc.rank <- function(x) rank(x,  ties.method = "random")/length(x)
+# perc.rank <- function(x) rank(x,  ties.method = "random")/length(x)
 
 
 
 # ASFR for 2010 is the observed from ONS(same for all fertility projections), for 2011 is copy of 2012
 if (Fertility.Assumption == "N") {
   Fertility <- fread("./Fertility/Principal fertility ONS projections.csv", header = T, 
-                        colClasses = "numeric")
+                     colClasses = "numeric")
 } else if (Fertility.Assumption == "H") {
   Fertility <- fread("./Fertility/High fertility ONS projections.csv", header = T, 
-                        colClasses = "numeric")
+                     colClasses = "numeric")
 } else if (Fertility.Assumption == "L") {
   Fertility <- fread("./Fertility/Low fertility ONS projections.csv", header = T, 
-                        colClasses = "numeric")
+                     colClasses = "numeric")
 } else stop("Fertility.Assumption was set incorrectly. Please specify fertility scenario")
 
 setnames(Fertility, c("age", 2000:2061))
@@ -235,7 +313,7 @@ it <- numberofiterations * n.scenarios
 
 # specify output.txt file for simulation parameters
 dir.create(path = "./Output/", recursive = T, showWarnings = F)
-fileOut <- file(paste0("./Output/simulation parameters.txt"))
+fileOut <- file(paste0("./Output/simulation parameters temp.txt"))
 writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n", 
              paste0("Simulation started at: ", Sys.time(), "\n"),
              "Simulation parameters:\n",
@@ -247,23 +325,21 @@ writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n
              paste0("cvd.lag = ", cvd.lag),
              paste0("cancer.lag = ", cancer.lag),
              paste0("diseases = ", diseasestoexclude),
+             paste0("CHD annual fatality improvement = ", fatality.annual.improvement.chd/100),
+             paste0("Stroke annual fatality improvement = ", fatality.annual.improvement.stroke/100),
+             paste0("Gastric cancer annual fatality improvement = ", fatality.annual.improvement.c16/100),
+             paste0("CHD fatality gradient = ", fatality.sec.gradient.chd /100),
+             paste0("Stroke fatality gradient = ", fatality.sec.gradient.stroke/100),
+             paste0("Gastric cancer fatality gradient = ", fatality.sec.gradient.c16/100),
              paste0("Sample size = ", format(n, scientific = F)),
              paste0("Number of iterations = ", numberofiterations),
-             paste0("Number of scenarios = ", n.scenarios), "\n"), fileOut)
+             paste0("Number of scenarios = ", n.scenarios) 
+             ), 
+           fileOut)
 close(fileOut)
+# Load C++ function to summarise riskfactors
+sourceCpp("functions.cpp")
 
-# Match the sex and age structure of the initial year
-population.actual <- fread("./Population/population.struct.csv",  header = T)[year == init.year, ]
-population.actual[, pct := round(as.numeric(n) * pop / sum(pop))]
+rm(Fertility.Assumption, n.scenarios)
 
-# Calculate the exact fraction of the mid 2010 population this sample represents
-pop.fraction <- n / population.actual[, sum(pop)] # 53107200 is the total mid 2011 population of England (52642600 for 2010)
-
-rm(Fertility.Assumption)
-
-# Import (or create) Synthetic Population
-if (length(list.files("./SynthPop")) == 0) {
-  cat("Building synthetic population...\nThis might take some time...\nThank you for your patience :)\n\n")
-  source(file = paste0(get.dropbox.folder(), "/PhD/Models/SynthPop/Synthetic Population Script.R"))
-}
 

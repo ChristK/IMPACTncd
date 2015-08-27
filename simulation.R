@@ -5,33 +5,35 @@ sink(file = paste0(output.dir(), "log.txt"),
      type = "output",
      split = F)
 
+loadcmp(file = "./2dmc.Rc", my.env) # sample a value for each parameter 
+
 for (i in (init.year-2011):(yearstoproject + init.year - 2012)) {
-    cat(paste0(rep("* ", 20)), "\n\n")
-    cat(paste("Simulating mid ", 2011 + i, " to mid ", 2012 + i, "...\n", sep="")) 
-    cat(paste0(Sys.time(), "\n\n"))
-    cat(paste0(rep("* ", 20)), "\n\n")    
-        
-    # Load scenario
-    loadcmp(file = paste0("./Scenarios/", scenarios.list[[iterations]],"c"), my.env)
-    
-    # Start births engine
-    #cmpfile("./birth engine.R")
-    #sys.source(file = "./birth engine.R", my.env)
-    loadcmp(file = "./birth engine.Rc", my.env)
-    
-    # Start ageing engine
-    #cmpfile("./ageing engine.R")
-    #sys.source(file = "./ageing engine.R", my.env)
-    loadcmp(file = "./ageing engine.Rc", my.env)
-    
-    # Estimating incidence and mortality of modelled NCDs
-    diseases <- sample(diseases) # randomly change the order of diseases each year
-    lapply(diseases, function(f) f()) # run all functions in the list
-    #cat(paste0(POP[,.N], " population\n"))
-   
-    cat("Advance age\n")
-    POP[, `:=`(age = age + 1)]  # make pop older
-    agegroup.fn(POP)
+  cat(paste0(rep("* ", 20)), "\n\n")
+  cat(paste("Simulating mid ", 2011 + i, " to mid ", 2012 + i, "...\n", sep="")) 
+  cat(paste0(Sys.time(), "\n\n"))
+  cat(paste0(rep("* ", 20)), "\n\n")    
+  
+  # Load scenario
+  loadcmp(file = paste0("./Scenarios/", scenarios.list[[iterations]],"c"), my.env)
+  
+  # Start births engine
+  #sys.source(file = "./birth engine.R", my.env)
+  loadcmp(file = "./birth engine.Rc", my.env)
+  
+  # Start ageing engine
+  loadcmp(file = "./ageing engine.Rc", my.env)
+  
+  # Estimating incidence and mortality of modelled NCDs
+  indiv.mort <- vector("list", length(diseasestoexclude)+1) # to store individual deaths
+  indiv.incid <- vector("list", length(diseasestoexclude))  # to store individual incidence
+  lapply(sample(diseases), function(f) f()) # randomly change the order of diseases each year and run all functions in the list
+  
+  # Summarising individual outputs
+  loadcmp(file = "./individual summary.Rc", my.env)
+  
+  cat("Advance age\n")
+  POP[, `:=`(age = age + 1)]  # make pop older
+  agegroup.fn(POP)
 }
 
 sink()

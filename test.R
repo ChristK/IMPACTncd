@@ -1,39 +1,42 @@
-POP[between(age, 16, ageH) & cigst1 == "4", 
-    cigst1.temp := pred.xsmok(i, age, sex, qimd)]
-POP[between(age, 16, ageH) & cigst1 == "4", summary(cigst1.temp)]
-POP[between(age, 16, ageH) & cigst1 == "4", 
-    cigst1.temp2 :=  dice(.N)]
-POP[between(age, 16, ageH) & cigst1 == "4", summary(cigst1.temp2)]
-POP[between(age, 16, ageH) & cigst1 == "4" & cigst1.temp2<cigst1.temp,  .N]
-POP[between(age, 16, ageH) & cigst1 == "4" & cigst1.temp2<cigst1.temp,  .N]+
-POP[between(age, 16, ageH) & cigst1 == "4" & cigst1.temp2>cigst1.temp,  .N]
-POP[between(age, 16, ageH) & cigst1 == "4",  .N]
-
-load("G:/Dropbox/PhD/Models/IMPACTncd/POPtest.RData")
-
-POP[between(age, 16, ageH) & cigst1 == "4", 
-    cigst1.temp := dice(.N) < pred.xsmok(i, age, sex, qimd)]
-POP[cigst1.temp == T, .N]
-POP[,summary(cigst1.temp)]
-POP[,cigst1.temp := NULL]
+xx <-  suppressWarnings(
+  rbind(fread("./Cancer Statistics/C16 DISMOD Males.csv", sep = ",", header = T, stringsAsFactors = F,
+              skip = 3, nrow = 100)[, sex := 1],
+        fread("./Cancer Statistics/C16 DISMOD Females.csv", sep = ",", header = T, stringsAsFactors = F, 
+              skip = 3, nrow = 100)[, sex := 2]
+  )[, `:=` (sex = factor(sex), age = as.integer(Age))]
+)
 
 
-library(data.table)
-DT <- data.table(A=rep(0.3,100))
-DT[, B := runif(.N) < A]
+C16incid <- setnames(copy(xx[, c(15, 14, 6), with = F]), "Incidence (rates)", "incidence")[, incidence := as.numeric(incidence)]
+C16incid[, agegroup := agegroup.fn(age)]
+setkey(C16incid, agegroup, sex)
+#C16incid[C16tobpaf[C16fvpaf[C16saltpaf]], 
+#         p0 := incidence * (1 - tobpaf) * (1 - fvpaf) * (1 - saltpaf)]
 
-DT[B == T, .N]
-DT[, summary(B)]
+C16incid[C16fvpaf, 
+         p0 := incidence * (1 - fvpaf)]
+C16incid[is.na(p0), p0 := incidence]
+C16incid[, agegroup := NULL]
+setkey(C16incid, NULL)
 
-DT[, B := runif(.N) < A]
 
-DT[B == T, .N]
-DT[, summary(B)]
+POP[C16incid, p0 := p0]
+POP[C16incid, inc := incidence]
 
-DT <- data.table(A=sample(1:2, 100, replace = T))
-DT[A==1, .N]
-DT[, summary(factor(A))]
 
-DT[,A:=sample(1:2, 100, replace = T)]
-DT[A==1, .N]
-DT[, summary(factor(A))]
+POP[between(age, ageL, ageH) &
+      c16.incidence == 0 &
+      dice(.N) < p0 * c16.fv.rr,# * c16.fv.rr * c16.salt.rr *b, 
+    c16.incidence := init.year + i] # b is the correction factor
+
+POP[between(age, ageL, ageH) &
+      c16.incidence < 2011 &
+      dice(.N) < inc, 
+    c17.incidence := init.year + i] 
+POP[, table(c16.incidence)]
+POP[, table(c17.incidence)]
+
+POP[, c16.incidence := 0]
+POP[, c17.incidence := 0]
+POP[, p0 := NULL]
+POP[, inc := NULL]

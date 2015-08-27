@@ -1,24 +1,17 @@
 #cmpfile("./stroke model.R")
 cat("Loading stroke (I60-I69) model...\n")
 cat(paste0(Sys.time(), "\n\n"))
-if (i == init.year-2011) POP[, stroke.incidence := 0] # Only needs to run the very first time of each simulation
-length.of.POP <- length(POP)
-POP <- merge(POP, strokeincid, by = c("agegroup", "sex"), all.x = T)
-setkey(POP, age, sex, agegroup)
+if (i == init.year-2011) set(POP, NULL, "stroke.incidence",  0L) # Only needs to run the very first time of each simulation
+POP[age==0, stroke.incidence := 0]
 
 
 # RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. Role of Smoking in Global and Regional 
 # Cardiovascular Mortality. Circulation. 2005 Jul 26;112(4):489–97.
 # Table 1 Model B
 cat("smoking RR\n")
-POP[, stroke.tob.rr := 1]
-POP[cigst1 == "4" & age < 60 & sex == "1", stroke.tob.rr := stochRR(.N, 3.12, 4.64)]
-POP[cigst1 == "4" & between(age, 60, 69) & sex == "1", stroke.tob.rr := stochRR(.N, 1.87, 2.44)]
-POP[cigst1 == "4" & between(age, 70, 79) & sex == "1", stroke.tob.rr := stochRR(.N, 1.39, 1.77)]
-#POP[cigst1 == "4" & age >79 & sex == "1", stroke.tob.rr := stochRR(.N, 1.05, 1.43)] not significant
-POP[cigst1 == "4" & age < 60 & sex == "2", stroke.tob.rr := stochRR(.N, 4.61, 6.37)]
-POP[cigst1 == "4" & between(age, 60, 69) & sex == "2", stroke.tob.rr := stochRR(.N, 2.81, 3.58)]
-POP[cigst1 == "4" & between(age, 70, 79) & sex == "2", stroke.tob.rr := stochRR(.N, 1.95, 2.45)]
+set(POP, NULL, "stroke.tob.rr",  1)
+setkey(POP, agegroup, sex, cigst1.cvdlag)
+POP[tobacco.rr.stroke, stroke.tob.rr := rr]
 
 #ex-smokers
 # Stroke risk decreased significantly by two years and was at the level of nonsmokers
@@ -28,8 +21,8 @@ POP[cigst1 == "4" & between(age, 70, 79) & sex == "2", stroke.tob.rr := stochRR(
 # Calculate PAF of ETS for stroke
 # RR from Oono IP, Mackay DF, Pell JP. Meta-analysis of the association between secondhand smoke exposure and stroke. 
 # J Public Health 2011;33:496–502. doi:10.1093/pubmed/fdr025
-POP[, stroke.ets.rr := 1]
-POP[cigst1 %!in% c("4") & expsmokCat == "1", stroke.ets.rr := stochRR(.N, 1.25, 1.38)]
+set(POP, NULL, "stroke.ets.rr",  1)
+POP[cigst1 %!in% c("4") & expsmokCat == "1", stroke.ets.rr := stroke.ets.rr.mc]
 
 # Calculate RR for stroke. Optimal SBP level at 115mmHg and RR(HR) of dying from
 # stroke was taken from "Age-specific relevance of usual blood pressure to 
@@ -37,32 +30,20 @@ POP[cigst1 %!in% c("4") & expsmokCat == "1", stroke.ets.rr := stochRR(.N, 1.25, 
 # The Lancet. 2002 Dec 14;360(9349):1903–1913" 
 # Figure 3
 cat("sbp RR\n")
-POP[, omsysval.usual := round(omsysval.cvdlag, 1)]
-POP[omsysval.usual > 200, omsysval.usual := 200]# calculate usual sbp. NEED TO improve for t>1
-POP[, stroke.sbp.rr := 1]
-POP[between(age, ageL, 49) & sex == "1", stroke.sbp.rr := stochRR(.N, 0.33^((115 - omsysval.usual)/20), 0.38^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, ageL, 49) & sex == "2", stroke.sbp.rr := stochRR(.N, 0.41^((115 - omsysval.usual)/20), 0.49^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 50, 59) & sex == "1", stroke.sbp.rr := stochRR(.N, 0.34^((115 - omsysval.usual)/20), 0.37^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 50, 59) & sex == "2", stroke.sbp.rr := stochRR(.N, 0.45^((115 - omsysval.usual)/20), 0.50^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 60, 69) & sex == "1", stroke.sbp.rr := stochRR(.N, 0.41^((115 - omsysval.usual)/20), 0.44^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 60, 69) & sex == "2", stroke.sbp.rr := stochRR(.N, 0.47^((115 - omsysval.usual)/20), 0.51^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 70, 79) & sex == "1", stroke.sbp.rr := stochRR(.N, 0.48^((115 - omsysval.usual)/20), 0.51^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 70, 79) & sex == "2", stroke.sbp.rr := stochRR(.N, 0.53^((115 - omsysval.usual)/20), 0.56^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 80, ageH) & sex == "1", stroke.sbp.rr := stochRR(.N, 0.68^((115 - omsysval.usual)/20), 0.75^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[between(age, 80, ageH) & sex == "2", stroke.sbp.rr := stochRR(.N, 0.65^((115 - omsysval.usual)/20), 0.71^((115 - omsysval.usual)/20)), by = omsysval.usual]
-POP[stroke.sbp.rr<1, stroke.sbp.rr := 1]
-
+set(POP, NULL, "stroke.sbp.rr",  1)
+setkey(POP, agegroup, sex)
+POP[sbp.rr.stroke, stroke.sbp.rr := rr^((115 - omsysval.cvdlag)/20)]
+POP[stroke.sbp.rr < 1, stroke.sbp.rr := 1]
 
 # Calculate RR for stroke. Optimal chol level at 3.8 mmol/L and RR(HR) of dying from stroke was taken from "Blood cholesterol and 
 # vascular mortality by age, sex, and blood pressure: a meta-analysis of individual data from 61 prospective studies 
 # with 55.000 vascular deaths. The Lancet. 2007 Dec 7;370(9602):1829–39. 
 # Figure 4 (for total stroke. I used only significant HR's). Didn't use non significant 
 cat("chol RR\n")
-POP[, cholval1.usual := round(cholval.cvdlag, 2)] # calculate usual chol. 
-POP[cholval1.usual>12, cholval1.usual := 12]
-POP[, stroke.chol.rr := 1]
-POP[between(age, ageL, 59), stroke.chol.rr := stochRR(.N, 0.90^(3.8 - cholval1.usual), 0.97^(3.8 - cholval1.usual)), by = cholval1.usual]
-POP[stroke.chol.rr < 1, stroke.chol.rr := 1]
+set(POP, NULL, "stroke.chol.rr",  1)
+setkey(POP, agegroup)
+POP[chol.rr.stroke, stroke.chol.rr := rr^(3.8 - cholval.cvdlag)]
+POP[stroke.chol.rr<1, stroke.chol.rr := 1]
 
 # RR for BMI from "The Emerging Risk Factors Collaboration.
 # Separate and combined associations of body-mass index and abdominal adiposity with cardiovascular disease:
@@ -72,9 +53,8 @@ POP[stroke.chol.rr < 1, stroke.chol.rr := 1]
 # BMI not significant for ischaemic stroke but other obesity metrics are. 
 #!! NEED TO decide if I want to use it
 cat("bmi RR\n")
-POP[, stroke.bmi.rr := 1]
-POP[, bmival.cvdlag.round := round(bmival.cvdlag,1)]
-POP[between(age, ageL, ageH), stroke.bmi.rr := stochRR(.N, 1.06^((bmival.cvdlag.round - 20) / 4.56), 1.13^((bmival.cvdlag.round - 20) / 4.56)), by = bmival.cvdlag.round]
+set(POP, NULL, "stroke.bmi.rr",  1)
+POP[stroke.bmi.rr.mc, stroke.bmi.rr := rr^((bmival.cvdlag - 20) / 4.56)]
 POP[stroke.bmi.rr < 1, stroke.bmi.rr := 1]
 
 # RR for BMI from The Emerging Risk Factors Collaboration. Diabetes mellitus, fasting blood glucose concentration, 
@@ -82,62 +62,178 @@ POP[stroke.bmi.rr < 1, stroke.bmi.rr := 1]
 # meta-analysis of 102 prospective studies. The Lancet 2010;375:2215–22. doi:10.1016/S0140-6736(10)60484-9
 # figure 2 (HRs were adjusted for age, smoking status, body-mass index, and  systolic blood pressure)
 cat("diab RR\n")
-POP[, stroke.diab.rr := 1]
-POP[diabtotr.cvdlag == "2" & age < 60, stroke.diab.rr := stochRR(.N, 3.74, 4.58)]
-POP[diabtotr.cvdlag == "2" & between(age, 60, 69), stroke.diab.rr := stochRR(.N, 2.06, 2.58)]
-POP[diabtotr.cvdlag == "2" & age > 69, stroke.diab.rr := stochRR(.N, 1.8, 2.27)]
+set(POP, NULL, "stroke.diab.rr",  1)
+setkey(POP, agegroup, diabtotr.cvdlag)
+POP[stroke.diab.rr.mc, stroke.diab.rr := rr]
 
 # Calculate RR for stroke. From Dauchet L, Amouyel P, Dallongeville J. Fruit and vegetable consumption and risk of stroke A meta-analysis of cohort studies. Neurology. 2005 Oct 25;65(8):1193–7. 
-# To avoid negative PAF an optimal level of F&V has to be set arbitrarily. I set it to 10 
+# To avoid negative PAF an optimal level of F&V has to be set arbitrarily. I set it to 8 
 # when convert porftvg from categorical to numeric I create bias. eg 1=less than 1 portion
 cat("fv RR\n")
-POP[, stroke.fv.rr := 1]
-POP[porftvg.cvdlag < 97, stroke.fv.rr := stochRR(.N, 0.95^(porftvg.cvdlag), 0.97^(porftvg.cvdlag)), by = porftvg.cvdlag] 
+set(POP, NULL, "stroke.fv.rr",  1)
+POP[porftvg.cvdlag > 0, stroke.fv.rr := stroke.fv.rr.mc^(porftvg.cvdlag)] 
+
+# RR for PA 1. WHO | Comparative Quantification of Health Risks [Internet]. 
+# WHO [cited 2014 Jan 30];Available from: http://www.who.int/publications/cra/en/
+# Table 10.20 (with adjustment for measurement error)
+cat("pa RR\n")
+set(POP, NULL, "stroke.pa.rr",  1)
+setkey(POP, agegroup, a30to06m.cvdlag)
+POP[pa.rr.stroke, stroke.pa.rr := rr]
+
+# Estimate PAF ------------------------------------------------------------
+cat("Estimating stroke PAF...\n")
+if (i == init.year - 2011) {
+  stroketobpaf <- 
+    POP[between(age, ageL, ageH), 
+        .(tobpaf = 
+            (sum(stroke.tob.rr - 1, na.rm = T) / .N) / 
+            ((sum(stroke.tob.rr - 1, na.rm = T) / .N) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(stroketobpaf, agegroup, sex)
+  
+  strokeetspaf <- 
+    POP[between(age, ageL, ageH), 
+        .(etspaf = 
+            (sum(stroke.ets.rr - 1, na.rm = T) / .N) / 
+            ((sum(stroke.ets.rr - 1, na.rm = T) / .N) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(strokeetspaf, agegroup, sex)
+  
+  strokesbppaf <- 
+    POP[between(age, ageL, ageH), 
+        .(sbppaf = 
+            (sum(stroke.sbp.rr - 1, na.rm = T) / .N) / 
+            ((sum(stroke.sbp.rr - 1, na.rm = T) / .N) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(strokesbppaf, agegroup, sex)
+  
+  strokecholpaf <- 
+    POP[between(age, ageL, ageH), 
+        .(cholpaf = 
+            (sum(stroke.chol.rr - 1, na.rm = T) / .N) / 
+            ((sum(stroke.chol.rr - 1, na.rm = T) / .N) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(strokecholpaf, agegroup, sex)
+  
+  strokebmipaf <- 
+    POP[between(age, ageL, ageH), 
+        .(bmipaf = 
+            (sum(stroke.bmi.rr - 1, na.rm = T) / .N) / 
+            ((sum(stroke.bmi.rr - 1, na.rm = T) / .N) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(strokebmipaf, agegroup, sex)
+  
+  strokediabpaf <- 
+    POP[between(age, ageL, ageH), 
+        .(diabpaf = 
+            (sum(stroke.diab.rr - 1, na.rm = T) / .N) / 
+            ((sum(stroke.diab.rr - 1, na.rm = T) /.N) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(strokediabpaf, agegroup, sex)
+  
+  strokefvpaf <- 
+    POP[between(age, ageL, ageH), 
+        .(fvpaf = 
+            (sum((stroke.fv.rr^-1) - 1, na.rm = T) / .N) / 
+            ((sum((stroke.fv.rr^-1) - 1, na.rm = T) /.N ) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(strokefvpaf, agegroup, sex)
+  
+  strokepapaf <- 
+    POP[between(age, ageL, ageH), 
+        .(papaf = 
+            (sum(stroke.pa.rr - 1, na.rm = T) / .N) / 
+            ((sum(stroke.pa.rr - 1, na.rm = T) /.N ) + 1)
+        ), 
+        by = .(agegroup, sex)
+        ]
+  setkey(strokepapaf, agegroup, sex)
+  
+  strokeincid[, agegroup := agegroup.fn(age)]
+  setkey(strokeincid, agegroup, sex)
+  strokeincid[strokebmipaf[strokecholpaf[strokediabpaf[strokeetspaf[strokefvpaf[strokesbppaf[stroketobpaf[strokepapaf]]]]]]], 
+              p0 := incidence * (1 - bmipaf) * 
+                (1 - cholpaf) * (1 - diabpaf) * 
+                (1 - etspaf)  * (1 - fvpaf) * 
+                (1 - sbppaf)  * (1 - tobpaf) *
+                (1 - papaf)]
+  strokeincid[is.na(p0), p0 := incidence]
+  strokeincid[, agegroup := NULL]
+  setkey(strokeincid, NULL)
+  rm(strokebmipaf,strokecholpaf,strokediabpaf,strokeetspaf,
+     strokefvpaf,strokesbppaf,stroketobpaf,strokepapaf)
+}
+
+setkey(POP, age, sex)
+POP[strokeincid, p0 := p0]
 
 # Estimate prevalence of stroke only in first run when i does not exist yet
 if (i == init.year-2011) {
   cat(paste0("Estimating stroke prevalence in ", init.year, " ...\n\n"))
+  age.structure <- setkey(POP[age <= ageH, .N, by = .(age, sex)], age, sex)
+  age.structure[strokepreval[age <= ageH], Nprev := rbinom(.N, N, prevalence)]
+  age.structure[strokeincid[age <= ageH],  Nprev := Nprev - rbinom(.N, N, incidence)]
+  age.structure[Nprev < 0, Nprev := 0]
   
-  age.structure <- data.table(table(POP[, sex, by = agegroup]), key = c("sex", "agegroup"))
-  age.structure[strokepreval, "Nprev" := as.integer(N * prevalence)]
+  #age.structure[strokesurv, Nprev := round(Nprev * (1 - fatality * 1.03))]
   setnames(age.structure, "N", "population")
-  setkey(POP, id)
   
-  Temp <- POP[between(age, ageL, ageH), 
-              sample_n(.SD, age.structure[sex == .BY[[2]] & agegroup == .BY[[1]], Nprev], 
-                       weight = p0 * stroke.tob.rr * stroke.ets.rr * 
-                         stroke.sbp.rr * stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr, 
+  id.stroke <- POP[age <= ageH, 
+              sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]], Nprev], 
+                       weight = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
+                         stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr *
+                         stroke.fv.rr * stroke.pa.rr, 
                        replace = F), 
-              by = list(agegroup, sex)]
-  setkey(Temp, id) # Temp is only used to select id for people with prevalent stroke
-  POP[Temp, stroke.incidence := init.year-1] # and then we assign these ids to the population
+              by = .(age, sex)][, id]
+  POP[id %in% id.stroke, stroke.incidence := init.year - 1] # and then we assign
+  # these ids to the population
+  rm(id.stroke)
 }
 
 # correction factor NEED TO make it work only for i==0
 if (alignment == T) {
   if (i == init.year-2011) {
-    corr.factor.stroke <- merge(POP[, mean(p0* stroke.tob.rr * stroke.ets.rr * 
-                                             stroke.sbp.rr * stroke.chol.rr * 
-                                             stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr), by = c("agegroup", "sex")], strokeincid, by = c("agegroup", "sex"), all.x = T)
-    corr.factor.stroke[,b := incidence/V1]
-    corr.factor.stroke[, `:=` (p0=NULL, incidence=NULL, V1=NULL)]
+    corr.factor.stroke <- merge(
+      POP[between(age, ageL, ageH) & stroke.incidence == 0, 
+          mean(p0 * stroke.tob.rr * stroke.ets.rr * 
+                   stroke.sbp.rr * stroke.chol.rr * 
+                   stroke.bmi.rr * stroke.diab.rr * 
+                   stroke.fv.rr * stroke.pa.rr), 
+          by = .(age, sex)],
+      strokeincid, 
+      by = c("age", "sex"), all.x = T)
+    corr.factor.stroke[, b := incidence/V1]
+    corr.factor.stroke[, `:=` (p0 = NULL, incidence = NULL, V1 = NULL)]
+    POP <- merge(POP, corr.factor.stroke, by = c("age", "sex"), all.x = T)
   } else {
-    POP <- merge(POP, corr.factor, by = c("agegroup", "sex"), all.x = T)
+    POP <- merge(POP, corr.factor.stroke, by = c("age", "sex"), all.x = T)
   }
-} else {POP[, b:=1]}
+} else set(POP, NULL, "b", 1)
 
-# P= p0 * stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr
 cat("Estimating stroke incidence...\n\n")
 if (alignment == T) cat("Alignment will be performed\n\n")
-POP[between(age, ageL, ageH) & stroke.incidence == 0, v := dice(.N) <= (p0 * stroke.tob.rr * stroke.ets.rr * 
-                                                                          stroke.sbp.rr * stroke.chol.rr * 
-                                                                          stroke.bmi.rr * stroke.diab.rr * stroke.fv.rr * b)] # b is the correction factor
-#POP[,summary(as.factor(v))]
-
-POP[v == T, stroke.incidence := 2011 + i]  
-
-POP[, v := NULL]
-
+POP[between(age, ageL, ageH) & 
+      stroke.incidence == 0 & 
+      dice(.N) < p0 * stroke.tob.rr * stroke.ets.rr *
+      stroke.sbp.rr * stroke.chol.rr * 
+      stroke.bmi.rr * stroke.diab.rr * 
+      stroke.fv.rr * stroke.pa.rr * b, 
+    stroke.incidence := init.year + i]
 #setkey(Out.Inc.stroke, agegroup, sex)
 
 # Estimate stroke mortality 
@@ -145,83 +241,91 @@ cat("Estimating stroke mortality...\n\n")
 
 # Apply assumptions about improvement of fatality by year
 # ie 3% improvemnt by year (as supportet by BHF)
-strokesurv[, fatality := fatality * (100 - fatality.annual.improvement.stroke)/100]
 
-POP <- merge(POP, strokesurv, by = c("agegroup", "sex"), all.x = T)
-setkey(POP, agegroup, sex)
+if (i > init.year - 2011) strokesurv[, fatality := fatality * (100 - fatality.annual.improvement.stroke)/100]
+setkey(POP, age, sex)
+POP[strokesurv, fatality := fatality]
+
+Temp <- POP[stroke.incidence > 0, .N, by = .(age, sex) #expected number of deaths
+            ][strokesurv, sum(fatality * N, na.rm = T)]
 
 # Fatality SEC gradient and healthcare improvement (supported by table 1.13 BHF2012)
-fatality.sec.gradient.stroke/4
-POP[qimd=="1", fatality := (100 - fatality.sec.gradient.stroke/2) * fatality/100]
-POP[qimd=="2", fatality := (100 - fatality.sec.gradient.stroke/4) * fatality/100]
-POP[qimd=="4", fatality := (100 + fatality.sec.gradient.stroke/4) * fatality/100]
-POP[qimd=="5", fatality := (100 + fatality.sec.gradient.stroke/2) * fatality/100]
+POP[qimd == "1", fatality := (100 - fatality.sec.gradient.stroke / 2) * fatality/100]
+POP[qimd == "2", fatality := (100 - fatality.sec.gradient.stroke / 4) * fatality/100]
+POP[qimd == "4", fatality := (100 + fatality.sec.gradient.stroke / 4) * fatality/100]
+POP[qimd == "5", fatality := (100 + fatality.sec.gradient.stroke / 2) * fatality/100]
 
-POP[stroke.incidence > 0, dead:= dice(.N) <= fatality] # T = dead, F = alive 
+#expected number of deaths after gradient and needs to be corrected by Temp/Temp1
+Temp1 <- POP[stroke.incidence>0, mean(fatality)*.N, by = .(age, sex, qimd) 
+             ][, sum(V1, na.rm = T)]
+
+POP[, fatality := fatality * Temp / Temp1]
+
+# 30 day fatality from OXVASC (see 30 days fatality.xlsx for the adjustments)
+setkey(POP, agegroup, sex)
+POP[fatality30stroke, fatality30 := fatality30]
+
+POP[between(age, ageL, ageH),
+    fatality2 := (.SD[stroke.incidence > 0, .N * mean(fatality)] - .SD[stroke.incidence == 2011 + i, .N * mean(fatality30)])/.SD[stroke.incidence > 0, .N],
+    by = group] # mean is used instaed of unique to maintain groups with no events in the result
+
+POP[ fatality2 < 0, fatality2 := 0]
+
+POP[between(age, ageL, ageH) & is.na(fatality2), fatality2 := fatality]
+
+POP[stroke.incidence > 0, dead := F]
+POP[stroke.incidence == 2011 + i, dead:= dice(.N) < fatality30] # 30 days mortality T = dead, F = alive 
+
+POP[stroke.incidence > 0 & dead == F, dead:= dice(.N) < fatality2] # T = dead, F = alive 
 
 cat("Export stroke burden summary...\n\n")
-output <- vector("list", 5)
+if (i == init.year - 2011) stroke.burden <- vector("list", yearstoproject * 5)
 
-if (exists("stroke.burden.rds")) output[[1]] <- stroke.burden.rds
+#if (exists("stroke.burden.rds")) output[[1]] <- stroke.burden.rds
+stroke.burden[[i * 5 + 1]] <- output.stroke(POP, c("qimd", "sex", "agegroup"))
 
-output[[2]] <- POP[between(age, ageL, ageH), output.stroke(.SD), by=.(qimd, sex, agegroup)]
+stroke.burden[[i * 5 + 2]] <- output.stroke(POP, c("sex", "agegroup"))
 
-output[[3]] <- POP[between(age, ageL, ageH), output.stroke(.SD), by=.(sex, agegroup)]
+stroke.burden[[i * 5 + 3]] <- output.stroke(POP, c("qimd", "sex"))
 
-output[[4]] <- POP[between(age, ageL, ageH), output.stroke(.SD), by=.(qimd, sex)]
+stroke.burden[[i * 5 + 4]] <- output.stroke(POP, c("sex"))
 
-output[[5]] <- POP[between(age, ageL, ageH), output.stroke(.SD), by=.(sex)]
-
-stroke.burden.rds <- rbindlist(output, fill = T)
+stroke.burden[[i * 5 + 5]] <- output.stroke(POP, c())
 
 if (i == yearstoproject + init.year - 2012) {
-  saveRDS(stroke.burden.rds, file = paste0(output.dir(), "stroke.burden.rds"))
+  saveRDS(rbindlist(stroke.burden, T, T), 
+          file = paste0(output.dir(), "stroke.burden.rds"))
 }
 
 cat("Export stroke burden individuals...\n\n")
-output <- vector("list", 2)
-
-if (exists("stroke.ind.incid.rds")) output[[1]] <- stroke.ind.incid.rds
-
-output[[2]] <- POP[stroke.incidence == 2011+i, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-
-stroke.ind.incid.rds <- rbindlist(output, fill = T)
-
-if (i == yearstoproject + init.year - 2012) {
-  saveRDS(stroke.ind.incid.rds, file = paste0(output.dir(), "stroke.ind.incid.rds"))
-}
-
-output <- vector("list", 2)
-
-if (exists("stroke.ind.preval.rds")) output[[1]] <- stroke.ind.preval.rds
-
-output[[2]] <- POP[stroke.incidence > 0, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
+indiv.incid[[which(diseasestoexclude=="stroke")]] <- POP[stroke.incidence == 2011 + i, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
+                                                         ][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), 
+                                                                  mc = haha, year = 2011+i, cause = "stroke")]
 
 
-stroke.ind.preval.rds <- rbindlist(output, fill = T)
+# output <- vector("list", 2)
+# 
+# if (exists("stroke.ind.preval.rds")) output[[1]] <- stroke.ind.preval.rds
+# 
+# output[[2]] <- POP[stroke.incidence > 0, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
+# 
+# 
+# stroke.ind.preval.rds <- rbindlist(output, fill = T)
+# 
+# if (i == yearstoproject + init.year - 2012) {
+#   saveRDS(stroke.ind.preval.rds, file = paste0(output.dir(), "stroke.ind.preval.rds"))
+# }
 
-if (i == yearstoproject + init.year - 2012) {
-  saveRDS(stroke.ind.preval.rds, file = paste0(output.dir(), "stroke.ind.preval.rds"))
-}
-
-output <- vector("list", 2)
-
-if (exists("stroke.ind.mortal.rds")) output[[1]] <- stroke.ind.mortal.rds
-
-output[[2]] <- POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha, stroke.incidence)][,`:=` (year.death = 2011+i, cause.death = "stroke", scenario = gsub(".R", "", scenarios.list[[iterations]]), mc = haha)]
-
-stroke.ind.mortal.rds <- rbindlist(output, fill = T)
-
-rm(output)
-
-if (i == yearstoproject + init.year - 2012) {
-  saveRDS(stroke.ind.mortal.rds, file = paste0(output.dir(), "stroke.ind.mortal.rds"))
-}
+indiv.mort[[which(diseasestoexclude=="stroke")+1]] <-  POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
+                                                           ][,`:=` (year = 2011 + i, cause = "stroke", scenario = gsub(".R", "", scenarios.list[[iterations]]),
+                                                                    mc = haha)]
 
 POP = copy(POP[dead == F | is.na(dead)== T,])
 
-rm(length.of.POP)
-POP[, `:=` (incidence = NULL, stroke.tob.rr = NULL, p0 = NULL,
-            stroke.ets.rr = NULL, omsysval.usual = NULL, stroke.sbp.rr = NULL, cholval1.usual = NULL,
+rm(Temp, Temp1)
+
+POP[, `:=` (stroke.tob.rr = NULL, p0 = NULL,
+            stroke.ets.rr = NULL, stroke.sbp.rr = NULL, 
+            fatality30 = NULL, b = NULL, stroke.pa.rr = NULL,
             stroke.chol.rr = NULL, stroke.bmi.rr = NULL, stroke.diab.rr = NULL,
-            stroke.fv.rr = NULL, dead = NULL, fatality = NULL, b = NULL)] 
+            stroke.fv.rr = NULL, dead = NULL, fatality = NULL, fatality2 = NULL)] 
