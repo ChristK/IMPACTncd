@@ -3,7 +3,7 @@ require("ggplot2")
 require("binom")
 require("scales")
 
-weighted.var.se <- function(x, w, na.rm=FALSE)
+weighted.var.se <- function(x, w, na.rm = F)
   #  Computes the variance of a weighted mean following Cochran 1977 definition
 {
   if (na.rm) { w <- w[i <- !is.na(x)]; x <- x[i] }
@@ -824,14 +824,14 @@ for (type in c("S", "SQ", "SA", "SAQ", "P")) {
                                                                        1,
                                                                        "European")
   
-  Graphs.fn[[paste0("fv.cvd", type)]] <- closure.graph.cat(riskfactors,
+  Graphs.fn[[paste0("fv.cvd.", type)]] <- closure.graph.cat(riskfactors,
                                                         type,
                                                         fv.cvd.5+fv.cvd.6+fv.cvd.7+fv.cvd.8, 
                                                         cvd.lag,
                                                         "Prevalence",
                                                         "Five or more F&V portions a day")
   
-  Graphs.fn[[paste0("fv.cvd", type, ".WHO" )]] <- closure.graph.std(riskfactors,
+  Graphs.fn[[paste0("fv.cvd.", type, ".WHO" )]] <- closure.graph.std(riskfactors,
                                                                  type,
                                                                  fv.cvd.5+fv.cvd.6+fv.cvd.7+fv.cvd.8, 
                                                                  cvd.lag,
@@ -840,7 +840,7 @@ for (type in c("S", "SQ", "SA", "SAQ", "P")) {
                                                                  1,
                                                                  "WHO")
   
-  Graphs.fn[[paste0("fv.cvd", type, ".ESP" )]] <- closure.graph.std(riskfactors,
+  Graphs.fn[[paste0("fv.cvd.", type, ".ESP" )]] <- closure.graph.std(riskfactors,
                                                                  type,
                                                                  fv.cvd.5+fv.cvd.6+fv.cvd.7+fv.cvd.8, 
                                                                  cvd.lag,
@@ -850,14 +850,14 @@ for (type in c("S", "SQ", "SA", "SAQ", "P")) {
                                                                  "European")
   
   
-  Graphs.fn[[paste0("fv.ca", type)]] <- closure.graph.cat(riskfactors,
+  Graphs.fn[[paste0("fv.ca.", type)]] <- closure.graph.cat(riskfactors,
                                                         type,
                                                         fv.ca.5+fv.ca.6+fv.ca.7+fv.ca.8, 
                                                         ca.lag,
                                                         "Prevalence",
                                                         "Five or more F&V portions a day")
   
-  Graphs.fn[[paste0("fv.ca", type, ".WHO" )]] <- closure.graph.std(riskfactors,
+  Graphs.fn[[paste0("fv.ca.", type, ".WHO" )]] <- closure.graph.std(riskfactors,
                                                                  type,
                                                                  fv.ca.5+fv.ca.6+fv.ca.7+fv.ca.8, 
                                                                  ca.lag,
@@ -866,7 +866,7 @@ for (type in c("S", "SQ", "SA", "SAQ", "P")) {
                                                                  1,
                                                                  "WHO")
   
-  Graphs.fn[[paste0("fv.ca", type, ".ESP" )]] <- closure.graph.std(riskfactors,
+  Graphs.fn[[paste0("fv.ca.", type, ".ESP" )]] <- closure.graph.std(riskfactors,
                                                                  type,
                                                                  fv.ca.5+fv.ca.6+fv.ca.7+fv.ca.8, 
                                                                  ca.lag,
@@ -1560,7 +1560,7 @@ for (type in c("S", "SQ", "SA", "SAQ", "P")) {
                                                               "Prevalence",
                                                               "Diabetes Prevalence")
   
-  Tables.fn[[paste0("fv.cvd", type)]] <- closure.table.cat(riskfactors,
+  Tables.fn[[paste0("fv.cvd.", type)]] <- closure.table.cat(riskfactors,
                                                         type,
                                                         fv.cvd.5+fv.cvd.6+fv.cvd.7+fv.cvd.8, 
                                                         0,
@@ -2401,9 +2401,9 @@ GraphsfromTables <- cmpfun(function(x) {
                   width = .05,
                   position = pd,
                   alpha = 3/5) +
-    #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
+    geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
     geom_point(position = pd, size = 1, alpha = 4/5) +
-    geom_smooth(position = pd, size = 0.5, alpha = 4/4, se = F, method="loess", span = 0.4) +
+    #eom_smooth(position = pd, size = 0.5, alpha = 4/4, se = F, method="loess", span = 0.4) +
     #geom_point(size = 2, stat = "identity") +
     ylab(ifelse(yscale == 1, yaxis, paste0(yaxis, " per ", format(yscale, scientific = F)))) +
     scale_x_continuous(name="Year") +

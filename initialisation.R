@@ -21,6 +21,7 @@ dependencies(c("demography",
                "survey",
                "ggplot2",
                "randtoolbox",
+               "mc2d",
                "doParallel",
                "doRNG",
                "foreach",
@@ -107,6 +108,15 @@ hyperbola <- cmpfun(function(y1, y5, x) {
   y = b + a/x
   return(y)
 }
+)
+
+# function to clone dt for 2dmc
+clonedt <- cmpfun(
+  function(DT) {
+    xx <- key(DT)
+    l <- sample(list(DT), ifelse(paired, numberofiterations, it), T)
+    return(setkeyv(rbindlist(l, idcol = T), xx))
+  }
 )
 
 # function to calculate mortality based on 1st and 5th year survival based on Weibull distribution
@@ -301,22 +311,41 @@ setnames(Fertility, c("age", 2000:2061))
 setkey(Fertility, age)
 
 
-# Find and load scenarios
+
+# Find and load scenarios -------------------------------------------------
 if (!exists("scenarios.list")) { # not if defined by GUI
-  scenarios.list <- list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = F, recursive = F)
+  scenarios.list <- list.files(path = "./Scenarios", pattern = glob2rx("*.Rc"), full.names = F, recursive = F)
 }
 
 n.scenarios <- length(scenarios.list)
 scenarios.list <- rep(scenarios.list, each = numberofiterations)
-
 it <- numberofiterations * n.scenarios
+if (paired == T) counter <- rep(1:numberofiterations, n.scenarios)
+if (paired == F) counter <- 1:it
 
-# specify output.txt file for simulation parameters
+paired.mem <-
+  suppressWarnings(
+    max(
+      as.integer(
+        list.dirs(
+          path = "./Output/current trends", 
+          #pattern = "riskfactors.rds", 
+          full.names = F, 
+          recursive = F
+        )
+      )
+    )
+  )
+paired.mem <- ifelse(is.infinite(paired.mem), 0, paired.mem)
+
+
+# Specify output.txt file for simulation parameters -----------------------
 dir.create(path = "./Output/", recursive = T, showWarnings = F)
 fileOut <- file(paste0("./Output/simulation parameters temp.txt"))
 writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n", 
              paste0("Simulation started at: ", Sys.time(), "\n"),
              "Simulation parameters:\n",
+             paste0("Paired = ", paired),
              paste0("First year of the simulation = ", init.year),
              paste0("Years to project = ", yearstoproject),
              paste0("Fertility assumption = ", Fertility.Assumption),
@@ -334,11 +363,254 @@ writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n
              paste0("Sample size = ", format(n, scientific = F)),
              paste0("Number of iterations = ", numberofiterations),
              paste0("Number of scenarios = ", n.scenarios) 
-             ), 
-           fileOut)
+), 
+fileOut)
 close(fileOut)
-# Load C++ function to summarise riskfactors
+
+
+# Load C++ function to summarise riskfactors ------------------------------
 sourceCpp("functions.cpp")
+
+
+# Sample for parameter distributions --------------------------------------
+load(file="./Lagtimes/salt.rq.coef.rda")
+if (paired == T) { 
+  if (numberofiterations <= length(salt.rq.coef)) {
+    salt.rq.coef <- sample(salt.rq.coef, numberofiterations, F)
+  } else {
+    salt.rq.coef <- sample(salt.rq.coef, numberofiterations, T)
+  }
+} else {
+  if (it <= length(salt.rq.coef)) {
+    salt.rq.coef <- sample(salt.rq.coef, it, F)
+  } else {
+    salt.rq.coef <- sample(salt.rq.coef, it, T)
+  }
+}
+
+
+# CHD parameters ----------------------------------------------------------
+if ("CHD" %in% diseasestoexclude) {
+  chd.ets.rr.l <-  stochRRabov1(ifelse(paired, numberofiterations, it), 1.26, 1.38)
+  chd.fv.rr.l <- stochRRbelow1(ifelse(paired, numberofiterations, it), 0.96, 0.99)
+  
+  chd.tobacco.rr.l  <- setkey(
+    fread(
+      "./CVD Statistics/tobacco.rrchd.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "factor",
+                     "factor", "numeric",
+                     "numeric")
+    ),
+    agegroup, sex, cigst1.cvdlag
+  )
+  
+  chd.tobacco.rr.l <- clonedt(chd.tobacco.rr.l)
+  chd.tobacco.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  
+  
+  chd.sbp.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/sbp.rrchd.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "factor",
+                     "numeric", "numeric")
+    ),
+    agegroup, sex
+  )
+  
+  chd.sbp.rr.l <- clonedt(chd.sbp.rr.l)
+  chd.sbp.rr.l[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  
+  chd.chol.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/chol.rrchd.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "numeric",
+                     "numeric")
+    ),
+    agegroup
+  )
+  
+  chd.chol.rr.l <- clonedt(chd.chol.rr.l)
+  chd.chol.rr.l[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  
+  chd.bmi.rr.l <-setkey(
+    fread(
+      "./CVD Statistics/bmi.rrchd.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor",
+                     "numeric", "numeric")
+    ),
+    agegroup
+  )
+  
+  chd.bmi.rr.l <- clonedt(chd.bmi.rr.l)
+  chd.bmi.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  chd.bmi.rr.l[is.na(rr), rr := 1]
+  
+  chd.diab.rr.l <-setkey(
+    fread(
+      "./CVD Statistics/diab.rrchd.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "factor",
+                     "numeric", "numeric")
+    ),
+    agegroup, diabtotr.cvdlag
+  )
+  
+  chd.diab.rr.l <- clonedt(chd.diab.rr.l)
+  chd.diab.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  chd.diab.rr.l[is.na(rr), rr := 1]
+  
+  chd.pa.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/pa.rrchd.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "integer",
+                     "numeric", "numeric")
+    ),
+    agegroup, a30to06m.cvdlag
+  )
+  
+  chd.pa.rr.l <- clonedt(chd.pa.rr.l)
+  chd.pa.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+}
+
+
+# Stroke parameters -------------------------------------------------------
+if ("stroke" %in% diseasestoexclude) {
+  stroke.ets.rr.l <- stochRRabov1(ifelse(paired, numberofiterations, it), 1.25, 1.38)
+  stroke.fv.rr.l <- stochRRbelow1(ifelse(paired, numberofiterations, it), 0.95, 0.97)
+  
+  stroke.tobacco.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/tobacco.rrstroke.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "factor", 
+                     "factor", "numeric",
+                     "numeric")
+    ),
+    agegroup, sex, cigst1.cvdlag
+  )
+  stroke.tobacco.rr.l <- clonedt(stroke.tobacco.rr.l)
+  stroke.tobacco.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  
+  stroke.sbp.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/sbp.rrstroke.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "factor",
+                     "numeric", "numeric")
+    ),
+    agegroup, sex
+  )
+  stroke.sbp.rr.l <- clonedt(stroke.sbp.rr.l)
+  stroke.sbp.rr.l[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  
+  stroke.chol.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/chol.rrstroke.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "numeric", 
+                     "numeric")
+    ),
+    agegroup
+  )
+  stroke.chol.rr.l <- clonedt(stroke.chol.rr.l)
+  stroke.chol.rr.l[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  
+  stroke.pa.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/pa.rrstroke.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "integer",
+                     "numeric", "numeric")
+    ),
+    agegroup, a30to06m.cvdlag
+  )
+  stroke.pa.rr.l <- clonedt(stroke.pa.rr.l)
+  stroke.pa.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  
+  stroke.bmi.rr.l <- setkey(
+    fread(
+      "./CVD Statistics/bmi.rrstroke.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor",
+                     "numeric", "numeric")
+    ),
+    agegroup
+  )
+  
+  stroke.bmi.rr.l <- clonedt(stroke.bmi.rr.l)
+  stroke.bmi.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  stroke.bmi.rr.l[is.na(rr), rr := 1]
+  
+  stroke.diab.rr.l <-setkey(
+    fread(
+      "./CVD Statistics/diab.rrstroke.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "factor",
+                     "numeric", "numeric")
+    ),
+    agegroup, diabtotr.cvdlag
+  )
+  
+  stroke.diab.rr.l <- clonedt(stroke.diab.rr.l)
+  stroke.diab.rr.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  stroke.diab.rr.l[is.na(rr), rr := 1]
+}
+
+
+# Gastric cancer parameters -----------------------------------------------
+if ("C16" %in% diseasestoexclude) {
+  c16.salt.optim.l <- rpert(ifelse(paired, numberofiterations, it), 614*2.5/1000, 1500*2.5/1000, 2391*2.5/1000, 4) # optimal level for salt around 4 g/day. Under which no risk from mozaffarian NEJM
+  c16.salt.mr.l <- rpert(ifelse(paired, numberofiterations, it), 5.8, 6, 7, 4) # optimal level for salt around 4 g/day. Under which no risk
+  c16.tob.rr.mc.l <- stochRRabov1(ifelse(paired, numberofiterations, it), 1.04, 1.01)
+  c16.extob.rr.mc.l <- stochRRbelow1(ifelse(paired, numberofiterations, it), 0.961, 1)
+  
+  c16.fv.rr.mc.l <- setkey(
+    fread(
+      "./Cancer Statistics/fv.rrc16.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "numeric",
+                     "numeric")
+    ),
+    agegroup
+  )
+  c16.fv.rr.mc.l <- clonedt(c16.fv.rr.mc.l)
+  c16.fv.rr.mc.l[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  c16.fv.rr.mc.l[is.na(rr), rr := 1]
+  
+  c16.salt.rr.mc.l <- setkey(
+    fread(
+      "./Cancer Statistics/salt.rrc16.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("factor", "numeric",
+                     "numeric")
+    ),
+    agegroup
+  )
+  c16.salt.rr.mc.l <- clonedt(c16.salt.rr.mc.l)
+  c16.salt.rr.mc.l[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr, .id)]
+  c16.salt.rr.mc.l[is.na(rr), rr := 1]
+}
+
+# SPOP order --------------------------------------------------------------
+if (init.year == 2006) {
+  random.spop.file <- list.files("./SynthPop", 
+                                       pattern = glob2rx("SPOP2006*.rds"), 
+                                       full.names = T) # pick a random file from the available population files
+} else {
+  random.spop.file <- list.files("./SynthPop", 
+                                       pattern = glob2rx("spop2011*.rds"), 
+                                       full.names = T) # pick a random file from the available population files
+}
+
+random.spop.file <- sample(random.spop.file, ifelse(paired, numberofiterations, it), T)
+
+# Set seed to ensure same sample and rng streams per scenario per iterations
+seed <- sample(1e6:1e7, ifelse(paired, numberofiterations, it), T) 
 
 rm(Fertility.Assumption, n.scenarios)
 

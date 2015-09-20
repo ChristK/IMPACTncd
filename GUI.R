@@ -25,7 +25,8 @@ input.fn <- function(yearstoproject=30L,
                      fatality.sec.gradient.c16,
                      process.output,
                      export.graphs,
-                     qdrisk = T
+                     qdrisk = T,
+                     paired
                      ) {
   if (ageL > ageH) {
     tt <- ageL
@@ -54,7 +55,8 @@ input.fn <- function(yearstoproject=30L,
               numberofiterations = numberofiterations,
               process.output = process.output,
               export.graphs = export.graphs,
-              qdrisk = qdrisk)
+              qdrisk = qdrisk,
+              paired = paired)
   )
 }
 
@@ -63,9 +65,9 @@ input.fn <- function(yearstoproject=30L,
   title = "IMPACTncd by Chris Kypridemos",
   label = "Set simulation parameters",
   #long.running = TRUE,
-  yearstoproject.rangeItem = c(value=26L, from=1L, to=60L, by=1L), 
+  yearstoproject.rangeItem = c(value=30L, from=1L, to=60L, by=1L), 
   label = "Forecast horizon",
-  numberofiterations.integerItem = c(value=70L, from=1L, to=1000L, by=1L),
+  numberofiterations.integerItem = c(value=30L, from=1L, to=1000L, by=1L),
   label = "Define number of iterations", 
   diseasestoexclude.variableSelectorItem =  c("CHD", "Stroke", "Gastric cancer"),
   label = "Define diseases to be included in the simulation",
@@ -80,7 +82,7 @@ input.fn <- function(yearstoproject=30L,
   BREAK = T,
   
   advanced.trueFalseItem = FALSE, 
-  label = "     *** Set advanced settings... USE WITH CAUTION!!! ***",
+  label = "         *** Set advanced settings... USE WITH CAUTION!!! ***",
   signal = c("default", "toggle.sensitive", "ageL"),
   signal = c("default", "toggle.sensitive", "ageH"),
   signal = c("default", "toggle.sensitive", "alignment"),
@@ -95,6 +97,7 @@ input.fn <- function(yearstoproject=30L,
   signal = c("default", "toggle.sensitive", "fatality.sec.gradient.c16"),
   signal = c("default", "toggle.sensitive", "init.year"),
   signal = c("default", "toggle.sensitive", "qdrisk"),
+  signal = c("default", "toggle.sensitive", "paired"),
   signal = c("default", "toggle.sensitive", "process.output"),
   signal = c("default", "toggle.sensitive", "export.graphs"),
   
@@ -105,31 +108,33 @@ input.fn <- function(yearstoproject=30L,
   label = "Assumption about annual percentage improvement in stroke fatality",
   fatality.annual.improvement.c16.rangeItem = c(value=2, from=0, to=10, by=0.1),
   label = "Assumption about annual percentage improvement in gastric cancer fatality",
-  fatality.sec.gradient.chd.rangeItem = c(value=40, from=-100, to=100, by=10L),
+  fatality.sec.gradient.chd.rangeItem = c(value=25, from=-100, to=100, by=10L),
   label = "Assumption about percentage difference in CHD fatality\nbetween QIMD 1 and 5. Positive values mean the\npoorest are experiencing higher fatality",
-  fatality.sec.gradient.stroke.rangeItem = c(value=40, from=-100, to=100, by=10L),
+  fatality.sec.gradient.stroke.rangeItem = c(value=20, from=-100, to=100, by=10L),
   label = "Assumption about percentage difference in stroke fatality\nbetween QIMD 1 and 5. Positive values mean the\npoorest are experiencing higher fatality",
-  fatality.sec.gradient.c16.rangeItem = c(value=40, from=-100, to=100, by=10L),
+  fatality.sec.gradient.c16.rangeItem = c(value=20, from=-100, to=100, by=10L),
   label = "Assumption about percentage difference in gastric cancer fatality\nbetween QIMD 1 and 5. Positive values mean the\npoorest are experiencing higher fatality",
   
   BREAK = T,
   
-  ageL.rangeItem = c(value=30L, from=30L, to=84L, by=1L), 
+  ageL.rangeItem = c(value=30L, from=30L, to=39L, by=5L), 
   label = "Define lower age limit for the diseases-model simulation",
-  ageH.rangeItem = c(value=84L, from=30L, to=84L, by=1L), 
+  ageH.rangeItem = c(value=84L, from=69L, to=84L, by=5L), 
   label = "Define upper age limit for the diseases-model simulation",
-  init.year.integerItem = c(value=2011L, from=2005L, to=2011L, by=1L),
+  init.year.choiceItem = c(2006, 2011),
   label = "Define year to start the simulation",
   tooltip = "Use years other than 2011 with caution",
-  clusternumber.integerItem = c(value=70L, from=1L, to=80L, by=1L),
+  clusternumber.integerItem = c(value=30L, from=1L, to=80L, by=1L),
   label = "Define number of cores", 
-  tooltip = "Each core needs about 4Gb of ram",
-  Fertility.Assumption.radiobuttonItem = c(value="N", "H", "L"),
+  tooltip = "Each core needs about 2.5Gb of ram",
+  Fertility.Assumption.choiceItem = c(value="N", "H", "L"),
   label = "Select (N)ormal, (H)igh or (L)ow fertility rate asumptions\nbased on ONS scenarios",
   alignment.trueFalseItem = FALSE,
   label = "Apply correction factor to balance exposure error)",
   qdrisk.trueFalseItem = TRUE,
   label = "Use QDiabetes score to predict diabetes incidence",
+  paired.trueFalseItem = TRUE,
+  label = "Do paired experiments",
   process.output.trueFalseItem = TRUE,
   label = "Process the output",
   export.graphs.trueFalseItem = FALSE,
@@ -142,6 +147,7 @@ run.dialog(input.fn)
 
 list2env(input_fn_output, envir = .GlobalEnv)
 
+names(init.year) <- NULL
 # Define outersect. Like setdiff but symmetrical. I.e. setdiff(a,b) is not the same as setdiff(b,a). outersect solve this by calculating both
 outersect <- function(x, y, ...) {
   big.vec <- c(x, y, ...)
@@ -171,6 +177,6 @@ choose.scenarios <- function(x) {x}
 .choose.scenarios.dialog = list(
   title = "IMPACTncd by Chris Kypridemos",
   label = "Choose scenarios to simulate",
-  x.variableSelectorItem =  list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = F, recursive = F))
+  x.variableSelectorItem =  list.files(path = "./Scenarios", pattern = glob2rx("*.Rc"), full.names = F, recursive = F))
 
 run.dialog(choose.scenarios, output.name = "scenarios.list") 

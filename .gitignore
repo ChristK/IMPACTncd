@@ -18,5 +18,7 @@
 *.directory
 .Rproj.user
 Graphs for Martin/
+Output/
+Unused Scripts/
 *.realsync
 *.Rc

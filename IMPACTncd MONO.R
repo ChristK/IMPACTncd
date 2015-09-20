@@ -19,7 +19,7 @@ n <- 2e5  # Define the sample size
 
 yearstoproject <- 7  # NEED TO force >=1 and up to 50
 
-numberofiterations <- 1
+numberofiterations <- 5
 
 ageL <- 30  # Define lower age limit to diseases-model simulation (min = 30)
 
@@ -44,7 +44,11 @@ cancer.lag <- 10L # Needs to be longer than cvd.lag to work properly (smoking hi
 
 clusternumber <- 4 # Change to your number of CPU cores 
 
+paired <- T 
+
 cleardirectories <- F # If T delete auxiliary output directories when simulation finish
+
+export.graphs <- F
 
 diseasestoexclude <- c("CHD", "stroke", "C16")  # Define disease to be excluded from lifetables
 {
@@ -102,23 +106,26 @@ source(file = "./initialisation.R")
 # England and Wales not just England. Minimal bias since we use probabilities.
 cat("Generating life table...\n\n")
 source(file = "./life table engine.R")
+source(file = "./cancer statistics.R") # for cancer
+source(file = "./CVD statistics.R") # for cvd
+
 iterations = 1 
 my.env <- environment() # get environment of this branch
 
 # Define functions in foreach loop
 sys.source(file = "./cluster functions.R", my.env)
-
+sys.source(file = "./diseases epidemiology.R", my.env)
 # Load synthetic population
 sys.source(file = "./load synthetic population.R", my.env)
 
 # Generating Incidence tables
-sys.source(file = "./cancer statistics.R", my.env) # for cancer
-sys.source(file = "./CVD statistics.R", my.env) # for cvd
+
 
 # Actual simulation
 i = init.year - 2011
-loadcmp(file = paste0("./Scenarios/", scenarios.list[[iterations]],"c"), my.env)
+loadcmp(file = "./risk factor trajectories.Rc", my.env)
 loadcmp(file = "./2dmc.Rc", my.env)
+loadcmp(file = paste0("./Scenarios/", scenarios.list[[iterations]]), my.env)
 loadcmp(file = "./birth engine.Rc", my.env)
 loadcmp(file = "./ageing engine.Rc", my.env)
 

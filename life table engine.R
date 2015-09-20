@@ -71,6 +71,8 @@ deaths.causes <-
     value.name = "disease"
   )
 
+deaths.causes.secgrad = copy(deaths.causes) # To be used later for prevalence sec gradient
+
 deaths.causes <-
   deaths.causes[, list(disease = sum(disease)), 
                 by = .(year, agegroup, sex, qimd)]
@@ -240,7 +242,58 @@ smokriskofdeath <-
 smokriskofdeath <-
   smokriskofdeath[,(sum(Current) * 4680 / 35.30) / (sum(Lifelong.non.smokers) *
                                                       2917 / 19.34)] 
-# to calculate number of deaths
+# Estimate prevalence sec gradient
+deaths.causes.secgrad <- 
+  deaths.causes.secgrad[year <= init.year & 
+                         agegroup %in% unique(agegroup.fn(ageL:ageH))
+                       ] # That for 2011 means the mean of 10 years. May have to reduce that
+
+deaths.causes.secgrad <-
+  deaths.causes.secgrad[, .(deaths = sum(disease, na.rm = T)),
+                       by = .(agegroup, sex, qimd, cause)]
+
+tt <- deaths.causes.secgrad[qimd == "1"][, qimd := NULL]
+
+deaths.causes.secgrad <- 
+  merge(deaths.causes.secgrad, 
+        setnames(tt, "deaths", "ref.deaths"), 
+        by = c("agegroup", "sex", "cause"), all.x = T)
+
+deaths.causes.secgrad[, sec.grad := deaths/ref.deaths]
+deaths.causes.secgrad[, sec.grad.adj := sec.grad]
+
+if ("CHD" %in% diseasestoexclude) {
+  deaths.causes.secgrad[cause == "Ischaemic heart diseases" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(ageL:69)), 
+                       sec.grad.adj := sec.grad / 
+                         ((100 + (as.integer(qimd) - 1) * 0.25 * fatality.sec.gradient.chd)/100)]
+  deaths.causes.secgrad[cause == "Ischaemic heart diseases" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(70:ageH)), 
+                        sec.grad.adj := sec.grad / 
+                          ((100 + (as.integer(qimd) - 1) * 0.125 * fatality.sec.gradient.chd)/100)]
+}
+
+if ("stroke" %in% diseasestoexclude) {
+  deaths.causes.secgrad[cause == "Cerebrovascular diseases" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(ageL:69)), 
+                       sec.grad.adj := sec.grad / 
+                         ((100 + (as.integer(qimd) - 1) * 0.25 * fatality.sec.gradient.stroke)/100)]
+  deaths.causes.secgrad[cause == "Cerebrovascular diseases" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(70:ageH)), 
+                        sec.grad.adj := sec.grad / 
+                          ((100 + (as.integer(qimd) - 1) * 0.125 * fatality.sec.gradient.stroke)/100)]
+}
+
+if ("C16" %in% diseasestoexclude) {
+  deaths.causes.secgrad[cause == "Malignant neoplasm of stomach" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(ageL:69)), 
+                       sec.grad.adj := sec.grad / 
+                         ((100 + (as.integer(qimd) - 1) * 0.25 * fatality.sec.gradient.c16)/100)]
+  deaths.causes.secgrad[cause == "Malignant neoplasm of stomach" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(70:ageH)), 
+                        sec.grad.adj := sec.grad / 
+                          ((100 + (as.integer(qimd) - 1) * 0.125 * fatality.sec.gradient.c16)/100)]
+}
 
 #rm(list = c(apropos(glob2rx("mortal.sex-*"))))
 #rm(list = c(apropos(glob2rx("POP.sex-*"))))

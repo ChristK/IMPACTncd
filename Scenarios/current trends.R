@@ -3,21 +3,9 @@
 # Assumes that the trends that where observed since 2001 will continue in the future
 cat("current trends scenario\n\n")
 
-# Load prediction equations
 if (i == (init.year-2011)) {
-  
-  # Load RF trajectoy functions
-  #cmpfile("./risk factor trajectories.R")
-  #sys.source(file = "./risk factor trajectories.R", my.env)
-  loadcmp(file = "./risk factor trajectories.Rc", my.env)
-  
-  # coefficients for salt model from the MC simulation
-  load(file="./Lagtimes/salt.rq.coef.rda")
-  salt.rq$coefficients <- sample(salt.rq.coef,1)[[1]] 
-  #salt.rq$coefficients <- apply(simplify2array(salt.rq.coef), 1:2, mean) # mean of MC
-  
   # Function to apply after ageing
-  post.ageing.scenario.fn <- function(i) {
+  post.ageing.scenario.fn <- function(i, env = my.env) {
     cat("Post ageing scenario function\n")
   }
 }

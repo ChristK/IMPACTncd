@@ -88,6 +88,34 @@ save(
 
 #rm(riskfactors)
 #gc()
+cat(
+  "Collecting individual trajectories...\n"
+)
+
+all.files <- as.list(
+  list.files(
+    path = "./Output", 
+    pattern = "indiv.traj.rds", 
+    full.names = T, 
+    recursive = T
+  )
+) 
+
+indiv.traj <- rbindlist(
+  mclapply(
+    all.files,
+    readRDS,
+    mc.cores = clusternumber
+  ),
+  T, T
+)
+
+indiv.traj[, sex := factor(sex, c("1", "2"), c("Men" ,"Women"))]
+
+save(
+  indiv.traj,
+  file="./Output/Other/indiv.traj.RData"
+)
 
 cat(
   "Collecting high risk output...\n"
@@ -306,6 +334,48 @@ if ("stroke" %in% diseasestoexclude) {
   
   #write.csv(healthylife.exp, file="./Output/stroke/healthylife.exp.csv", row.names = F)
   #save(healthylife.exp.stroke, file="./Output/Stroke/indiv.incid.RData")
+}
+
+if ("CHD" %in% diseasestoexclude & "stroke" %in% diseasestoexclude) {
+  cat(
+    "Collecting CVD prevelence output...\n"
+  )
+  
+  dir.create(
+    path = "./Output/CVD/",
+    recursive = T,
+    showWarnings = F
+  )
+  
+  all.files <- as.list(
+    list.files(
+      path = "./Output",
+      pattern = "cvd.burden.rds",
+      full.names = T,
+      recursive = T
+    )
+  ) 
+  
+  cvd.burden <- rbindlist(
+    mclapply(
+      all.files,
+      readRDS,
+      mc.cores = clusternumber
+    ),
+    T, T
+  )
+  
+  cvd.burden[,
+             group := "SAQ"
+             ]
+  
+  
+  cvd.burden[, sex := factor(sex, c("1", "2"), c("Men" ,"Women"))]
+  
+  save(
+    cvd.burden,
+    file="./Output/CVD/cvd.burden.RData"
+  )
 }
 
 if ("C16" %in% diseasestoexclude) {

@@ -1,20 +1,34 @@
 #cmpfile("./cluster functions.R")
-haha <- paste(sample(c(rep(0:9,each=5),LETTERS,letters),12,replace=T),collapse='')   
+if (paired == T) {
+  haha <- counter[[iterations]] + paired.mem
+} else {
+  haha <- paste(sample(c(rep(0:9,each=5),LETTERS,letters),12,replace=T),collapse='')   
+}
 
 # Define function for output dir
-output.dir <- cmpfun(function() {
-  paste0("./Output/", gsub(".R", "", scenarios.list[[iterations]]), "/", haha , "/")
-}
-)
+output.dir <-
+  cmpfun(
+    function() {
+      paste0("./Output/",
+             gsub(".Rc", "", scenarios.list[[iterations]]), 
+             "/",
+             haha,
+             "/")
+    }
+  )
 
 
 dir.create(path = output.dir(), recursive = T) # create a unique directory for each run of each scenario
 
-# Define list of function to run for each diseases models
-#cmpfile("./chd model.R")
-#cmpfile("./stroke model.R")
-#cmpfile("./lung cancer model.R")
-#cmpfile("./other model.R")
+# from Mozaffarian NEJM 
+salt.sbp.reduct <- cmpfun(
+  function(salt.difference, age, sbp, n) {
+    y = rnorm(n, -3.735, 0.73) + rnorm(n, -0.105, 0.029) * (age - 50) +
+      rnorm(n, -1.874, 0.884) * (sbp > 135) +
+      rnorm(n, -2.489, 1.188) * sample(0:1, n, T, c(0.9, 0.1))
+    return(salt.difference * y /5.85)
+  }
+)
 
 diseases <- list(
   chd = function() 
@@ -69,7 +83,7 @@ ageing.distr <- # smaller fortune increase the variability of the join
 # Define function to export annual summaries of RF
 pop.summ <-  cmpfun(function(N, ...) {
   return(list("year" = 2011 + i,
-              "scenario" = gsub(".R", "", scenarios.list[[iterations]]),
+              "scenario" = gsub(".Rc", "", scenarios.list[[iterations]]),
               "mc" = haha,
               "pop" = N))
 }
@@ -130,8 +144,8 @@ cat.summ <- cmpfun(function(rf, name, ...) {
 # )
 
 output.rf  <- cmpfun(function(dt, strata, l = 0, h = 100, ...) {
-  dt[between(age, l, h), c(init.year + i,
-                           gsub(".R", "", scenarios.list[[iterations]]),
+  dt[between(age, l, h), c(2011 + i,
+                           gsub(".Rc", "", scenarios.list[[iterations]]),
                            haha,
                            .N,
                            meansd(bmival.cvdlag),
@@ -157,100 +171,13 @@ output.rf.names <-
     paste0("pa.cvd.", 0:7)  
   )
 
-# output.rf  <- cmpfun(function(dt, strata, l = 0, h = 100, ...) {
-#   dt[between(age, l, h), list("year"            = init.year + i,
-#             "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
-#             "mc"              = haha,
-#             "pop"             = .N,
-#             "bmi.cvd.mean"    = mean(bmival.cvdlag, na.rm = T),
-#             "bmi.cvd.sd"      = stats::sd(bmival.cvdlag, na.rm = T),
-#             "bmi.ca.mean"     = mean(bmival.calag, na.rm = T),
-#             "bmi.ca.sd"       = stats::sd(bmival.calag, na.rm = T),
-#             "sbp.cvd.mean"    = mean(omsysval.cvdlag, na.rm = T),
-#             "sbp.cvd.sd"      = stats::sd(omsysval.cvdlag, na.rm = T),
-#             "tc.cvd.mean"     = mean(cholval.cvdlag, na.rm = T),
-#             "tc.cvd.sd"       = stats::sd(cholval.cvdlag, na.rm = T),
-#             "salt.cvd.mean"   = mean(salt24h.cvdlag, na.rm = T),
-#             "salt.cvd.sd"     = stats::sd(salt24h.cvdlag, na.rm = T),
-#             "salt.ca.mean"    = mean(salt24h.calag, na.rm = T),
-#             "salt.ca.sd"      = stats::sd(salt24h.calag, na.rm = T),
-#             "packyears.mean"  = mean(packyears, na.rm = T),
-#             "packyears.sd"    = stats::sd(packyears, na.rm = T),
-#             "smok.cvd.never"  = sum(cigst1.cvdlag == 1, na.rm = T),
-#             #"smok.cvd.ex.2"   = sum(cigst1.cvdlag == 2, na.rm = T),
-#             #"smok.cvd.ex.3"   = sum(cigst1.cvdlag == 3, na.rm = T),
-#             "smok.cvd.active" = sum(cigst1.cvdlag == 4, na.rm = T),
-#             "smok.ca.never"   = sum(cigst1.calag == 1, na.rm = T),
-#             #"smok.ca.ex.2"    = sum(cigst1.calag == 2, na.rm = T),
-#             #"smok.ca.ex.3"    = sum(cigst1.calag == 3, na.rm = T),
-#             "smok.ca.active"  = sum(cigst1.calag == 4, na.rm = T),
-#             "fv.cvd.0"        = sum(porftvg.cvdlag == 0, na.rm = T),
-#             "fv.cvd.1"        = sum(porftvg.cvdlag == 1, na.rm = T),
-#             "fv.cvd.2"        = sum(porftvg.cvdlag == 2, na.rm = T),
-#             "fv.cvd.3"        = sum(porftvg.cvdlag == 3, na.rm = T),
-#             "fv.cvd.4"        = sum(porftvg.cvdlag == 4, na.rm = T),
-#             "fv.cvd.5"        = sum(porftvg.cvdlag == 5, na.rm = T),
-#             "fv.cvd.6"        = sum(porftvg.cvdlag == 6, na.rm = T),
-#             "fv.cvd.7"        = sum(porftvg.cvdlag == 7, na.rm = T),
-#             "fv.cvd.8"        = sum(porftvg.cvdlag == 8, na.rm = T),
-#             "fv.ca.0"         = sum(porftvg.calag == 0, na.rm = T),
-#             "fv.ca.1"         = sum(porftvg.calag == 1, na.rm = T),
-#             "fv.ca.2"         = sum(porftvg.calag == 2, na.rm = T),
-#             "fv.ca.3"         = sum(porftvg.calag == 3, na.rm = T),
-#             "fv.ca.4"         = sum(porftvg.calag == 4, na.rm = T),
-#             "fv.ca.5"         = sum(porftvg.calag == 5, na.rm = T),
-#             "fv.ca.6"         = sum(porftvg.calag == 6, na.rm = T),
-#             "fv.ca.7"         = sum(porftvg.calag == 7, na.rm = T),
-#             "fv.ca.8"         = sum(porftvg.calag == 8, na.rm = T),
-#             #             "fruit.cvd.0"     = sum(frtpor.cvdlag == 0, na.rm = T),
-#             #             "fruit.cvd.1"     = sum(frtpor.cvdlag == 1, na.rm = T),
-#             #             "fruit.cvd.2"     = sum(frtpor.cvdlag == 2, na.rm = T),
-#             #             "fruit.cvd.3"     = sum(frtpor.cvdlag == 3, na.rm = T),
-#             #             "fruit.cvd.4"     = sum(frtpor.cvdlag == 4, na.rm = T),
-#             #             "fruit.cvd.5"     = sum(frtpor.cvdlag == 5, na.rm = T),
-#             #             "fruit.cvd.6"     = sum(frtpor.cvdlag == 6, na.rm = T),
-#             #             "fruit.cvd.7"     = sum(frtpor.cvdlag == 7, na.rm = T),
-#             #             "fruit.cvd.8"     = sum(frtpor.cvdlag == 8, na.rm = T),
-#             #             "fruit.ca.0"     = sum(frtpor.calag == 0, na.rm = T),
-#             #             "fruit.ca.1"     = sum(frtpor.calag == 1, na.rm = T),
-#             #             "fruit.ca.2"     = sum(frtpor.calag == 2, na.rm = T),
-#             #             "fruit.ca.3"     = sum(frtpor.calag == 3, na.rm = T),
-#             #             "fruit.ca.4"     = sum(frtpor.calag == 4, na.rm = T),
-#             #             "fruit.ca.5"     = sum(frtpor.calag == 5, na.rm = T),
-#             #             "fruit.ca.6"     = sum(frtpor.calag == 6, na.rm = T),
-#             #             "fruit.ca.7"     = sum(frtpor.calag == 7, na.rm = T),
-#             #             "fruit.ca.8"     = sum(frtpor.calag == 8, na.rm = T),
-#             "pa.cvd.0"        = sum(a30to06m.cvdlag == 0, na.rm = T),
-#             "pa.cvd.1"        = sum(a30to06m.cvdlag == 1, na.rm = T),
-#             "pa.cvd.2"        = sum(a30to06m.cvdlag == 2, na.rm = T),
-#             "pa.cvd.3"        = sum(a30to06m.cvdlag == 3, na.rm = T),
-#             "pa.cvd.4"        = sum(a30to06m.cvdlag == 4, na.rm = T),
-#             "pa.cvd.5"        = sum(a30to06m.cvdlag == 5, na.rm = T),
-#             "pa.cvd.6"        = sum(a30to06m.cvdlag == 6, na.rm = T),
-#             "pa.cvd.7"        = sum(a30to06m.cvdlag == 7, na.rm = T),
-#             #             "pa.ca.0"         = sum(a30to06m.calag == 0, na.rm = T),
-#             #             "pa.ca.1"         = sum(a30to06m.calag == 1, na.rm = T),
-#             #             "pa.ca.2"         = sum(a30to06m.calag == 2, na.rm = T),
-#             #             "pa.ca.3"         = sum(a30to06m.calag == 3, na.rm = T),
-#             #             "pa.ca.4"         = sum(a30to06m.calag == 4, na.rm = T),
-#             #             "pa.ca.5"         = sum(a30to06m.calag == 5, na.rm = T),
-#             #             "pa.ca.6"         = sum(a30to06m.calag == 6, na.rm = T),
-#             #             "pa.ca.7"         = sum(a30to06m.calag == 7, na.rm = T),
-#             "diab.cvd.yes"    = sum(diabtotr.cvdlag == 2, na.rm = T),
-#             #"diab.cvd.no"     = sum(diabtotr.cvdlag == 1, na.rm = T),
-#             "ets.yes"         = sum(expsmokCat == 1, na.rm = T)#,
-#             #"ets.no"          = sum(expsmokCat == 0, na.rm =T)
-#   ), by = strata]
-# }
-# )
-
 output.chd  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"            = 2011 + i,
-          "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
+          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
           "mc"              = haha,
           "pop"             = .N,
-          "chd.incidence"   = sum(chd.incidence == init.year + i, na.rm = T),
+          "chd.incidence"   = sum(chd.incidence == 2011 + i, na.rm = T),
           "chd.prevalence"  = sum(chd.incidence > 0, na.rm = T),
           "chd.mortality"   = sum(dead, na.rm = T)
      ), by = strata]
@@ -259,12 +186,23 @@ output.chd  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
 output.stroke  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"            = 2011 + i,
-          "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
+          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
           "mc"              = haha,
           "pop"             = .N,
-          "stroke.incidence"   = sum(stroke.incidence == init.year + i, na.rm = T),
+          "stroke.incidence"   = sum(stroke.incidence == 2011 + i, na.rm = T),
           "stroke.prevalence"  = sum(stroke.incidence > 0, na.rm = T),
           "stroke.mortality"   = sum(dead, na.rm = T)
+     ), by = strata]
+}
+)
+output.cvd  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
+  dt[between(age, l, h), 
+     list("year"            = 2011 + i,
+          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
+          "mc"              = haha,
+          "pop"             = .N,
+          #"cvd.incidence"   = sum(chd.incidence == (2011 + i) | stroke.incidence == (2011 + i), na.rm = T), # proper incidence is difficult because of mortality, but the bias is minimal
+          "cvd.prevalence"  = sum(chd.incidence > 0 | stroke.incidence > 0, na.rm = T)
      ), by = strata]
 }
 )
@@ -272,10 +210,10 @@ output.stroke  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
 output.c16  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"            = 2011 + i,
-          "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
+          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
           "mc"              = haha,
           "pop"             = .N,
-          "c16.incidence"   = sum(c16.incidence == init.year + i, na.rm = T),
+          "c16.incidence"   = sum(c16.incidence == 2011 + i, na.rm = T),
           "c16.prevalence"  = sum(c16.incidence > 0, na.rm = T),
           "c16.mortality"   = sum(dead, na.rm = T)
      ), by = strata]
@@ -284,61 +222,10 @@ output.c16  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
 
 output.other  <- cmpfun(function(dt, strata, ...) {
   dt[, list("year"            = 2011 + i,
-            "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
+            "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
             "mc"              = haha,
             "pop"             = .N,
             "other.mortality" = sum(dead, na.rm = T)
   ), by = strata]
 }
 )
-
-# output.chd  <- cmpfun(function(x, ...) {
-#   O1 <- pop.summ(nrow(x))
-#   O2 <- with(x, cat.summ(chd.incidence, "chd",levels = init.year + i, labels="incidence"))
-#   O3 <- with(x, sum(table(factor(chd.incidence, exclude = c(0, NA)))))
-#   names(O3) <- "chd.prevalence"
-#   O4 <- with(x, sum(table(dead, exclude=c(F, NA, NaN))))
-#   names(O4) <- "chd.mortality"
-#   return(c(O1, O2, O3, O4))
-# }
-# )
-
-# output.stroke  <- cmpfun(function(x, ...) {
-#   O1 <- pop.summ(nrow(x))
-#   O2 <- with(x, cat.summ(stroke.incidence, "stroke", 
-#                          levels = 2011 + i, labels="incidence"))
-#   O3 <- with(x, sum(table(factor(stroke.incidence, exclude = c(0, NA)))))
-#   names(O3) <- "stroke.prevalence"
-#   O4 <- with(x, sum(table(dead, exclude=c(F, NA, NaN))))
-#   names(O4) <- "stroke.mortality"
-#   return(c(O1, O2, O3, O4))
-# }
-# )
-
-# output.c16  <- cmpfun(function(x, ...) {
-#   O1 <- pop.summ(nrow(x))
-#   O2 <- with(x, cat.summ(c16.incidence, "c16", 
-#                          levels = init.year + i, labels="incidence"))
-#   O3 <- with(x, sum(table(factor(c16.incidence, exclude = c(0, NA)))))
-#   names(O3) <- "c16.prevalence"
-#   O4 <- with(x, sum(table(dead, exclude=c(F, NA, NaN))))
-#   names(O4) <- "c16.mortality"
-#   O5 <- with(x, sum(table(c16.remission, exclude = c(0, NA))))
-#   names(O5) <- "c16.remission"
-#   return(c(O1, O2, O3, O4, O5))
-# }
-# )
-
-# output.other  <- cmpfun(function(x, ...) {
-#   O1 <- pop.summ(nrow(x))
-#   O2 <- with(x, sum(table(dead, exclude=c(F, NA, NaN))))
-#   names(O2) <- "other.mortality"
-#   return(c(O1, O2))
-# }
-# )
-
-# convert changes in lipids consumption to cholestrol
-# keys.formula <- function(ds=0, dp=0, dz=0){
-#   dchol = (1.35*(2*ds-dp)+1.5*dz) * 0.0259 ## dchol in mmol/L
-#   return(dchol)
-# }

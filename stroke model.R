@@ -43,7 +43,7 @@ cat("chol RR\n")
 set(POP, NULL, "stroke.chol.rr",  1)
 setkey(POP, agegroup)
 POP[chol.rr.stroke, stroke.chol.rr := rr^(3.8 - cholval.cvdlag)]
-POP[stroke.chol.rr<1, stroke.chol.rr := 1]
+POP[stroke.chol.rr < 1, stroke.chol.rr := 1]
 
 # RR for BMI from "The Emerging Risk Factors Collaboration.
 # Separate and combined associations of body-mass index and abdominal adiposity with cardiovascular disease:
@@ -183,7 +183,7 @@ setkey(POP, age, sex)
 POP[strokeincid, p0 := p0]
 
 # Estimate prevalence of stroke only in first run when i does not exist yet
-if (i == init.year-2011) {
+if (i == init.year - 2011) {
   cat(paste0("Estimating stroke prevalence in ", init.year, " ...\n\n"))
   age.structure <- setkey(POP[age <= ageH, .N, by = .(age, sex)], age, sex)
   age.structure[strokepreval[age <= ageH], Nprev := rbinom(.N, N, prevalence)]
@@ -193,15 +193,21 @@ if (i == init.year-2011) {
   #age.structure[strokesurv, Nprev := round(Nprev * (1 - fatality * 1.03))]
   setnames(age.structure, "N", "population")
   
+  POP <- merge(POP,
+               deaths.causes.secgrad[cause == "Cerebrovascular diseases", .(agegroup, sex, qimd, sec.grad.adj)],
+               by = c("agegroup", "sex", "qimd"), all.x = T)
+  POP[is.na(sec.grad.adj), sec.grad.adj := 1]
+        
   id.stroke <- POP[age <= ageH, 
                    sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]], Nprev], 
                             weight = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
                               stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr *
-                              stroke.fv.rr * stroke.pa.rr, 
+                              stroke.fv.rr * stroke.pa.rr * sec.grad.adj, 
                             replace = F), 
                    by = .(age, sex)][, id]
   POP[id %in% id.stroke, stroke.incidence := init.year - 1] # and then we assign
   # these ids to the population
+  POP[, sec.grad.adj := NULL]
   rm(id.stroke)
 }
 
@@ -233,7 +239,7 @@ POP[between(age, ageL, ageH) &
       stroke.sbp.rr * stroke.chol.rr * 
       stroke.bmi.rr * stroke.diab.rr * 
       stroke.fv.rr * stroke.pa.rr * b, 
-    stroke.incidence := init.year + i]
+    stroke.incidence := 2011 + i]
 #setkey(Out.Inc.stroke, agegroup, sex)
 
 # Estimate stroke mortality 
@@ -250,11 +256,14 @@ Temp <- POP[stroke.incidence > 0, .N, by = .(age, sex) #expected number of death
             ][strokesurv, sum(fatality * N, na.rm = T)]
 
 # Fatality SEC gradient and healthcare improvement (supported by table 1.13 BHF2012)
-POP[qimd == "1", fatality := (100 - fatality.sec.gradient.stroke / 2) * fatality/100]
-POP[qimd == "2", fatality := (100 - fatality.sec.gradient.stroke / 4) * fatality/100]
-POP[qimd == "4", fatality := (100 + fatality.sec.gradient.stroke / 4) * fatality/100]
-POP[qimd == "5", fatality := (100 + fatality.sec.gradient.stroke / 2) * fatality/100]
-
+POP[between(age, ageL, 69) & qimd == "1", fatality := (100 - fatality.sec.gradient.stroke / 2) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "2", fatality := (100 - fatality.sec.gradient.stroke / 4) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "4", fatality := (100 + fatality.sec.gradient.stroke / 4) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "5", fatality := (100 + fatality.sec.gradient.stroke / 2) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.stroke / 4) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.stroke / 8) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.stroke / 8) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.stroke / 4) * fatality/100]
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
 Temp1 <- POP[stroke.incidence>0, mean(fatality)*.N, by = .(age, sex, qimd) 
              ][, sum(V1, na.rm = T)]
@@ -266,7 +275,8 @@ setkey(POP, agegroup, sex)
 POP[fatality30stroke, fatality30 := fatality30]
 
 POP[between(age, ageL, ageH),
-    fatality2 := (.SD[stroke.incidence > 0, .N * mean(fatality)] - .SD[stroke.incidence == 2011 + i, .N * mean(fatality30)])/.SD[stroke.incidence > 0, .N],
+    fatality2 := (.SD[stroke.incidence > 0, .N * mean(fatality)] - .SD[stroke.incidence == 2011 + i, .N * mean(fatality30)]) /
+      (.SD[stroke.incidence > 0, .N] - .SD[stroke.incidence == 2011 + i, .N * mean(fatality30)]),
     by = group] # mean is used instaed of unique to maintain groups with no events in the result
 
 POP[ fatality2 < 0, fatality2 := 0]

@@ -468,37 +468,39 @@ pred.bmi <- cmpfun(function(year, age, sex, qimd, a30to06m, lag = cvd.lag) {
 
 # Salt prediction ---------------------------------------------------------
 # Returns a dataframe of 24h salt percentiles by year, age, sex, qimd 
-pred.salt <- cmpfun(function(year, lag = cancer.lag) {
-  if ((year - lag) < -13) year <- lag - 13 # otherwse log(0)
-  tmp <- expand.grid(
-    year = year-lag,
-    age  = (19-lag):(ageH-lag),
-    #age  = (ageL-lag):(ageH-lag),
-    sex  = factor(1:2),
-    qimd = ordered(1:5)
+pred.salt <- 
+  cmpfun(
+    function(year, lag = cancer.lag) {
+      if ((year - lag) < -13) year <- lag - 13 # otherwse log(0)
+      tmp <- expand.grid(
+        year = year-lag,
+        age  = (19-lag):(ageH-lag),
+        #age  = (ageL-lag):(ageH-lag),
+        sex  = factor(1:2),
+        qimd = ordered(1:5)
+      )
+      cc <- predict(salt.rq, tmp)^3
+      
+      tmp <- data.table(cbind(tmp, cc))
+      tmp[, `:=` (year = NULL, age = age + lag)]
+      setnames(tmp,
+               paste0("tau= ", sprintf("%.2f", c(0.01, 1:19/20, 0.99))),
+               paste0(c(0.01, 1:19/20, 0.99)))
+      
+      tmp <- melt(tmp, 1:3, 
+                  variable.name = "percentile",
+                  value.name = "salt.u", 
+                  variable.factor = F)
+      
+      tmp[, percentile := as.numeric(percentile)]
+      tmp[, salt.l := shift(salt.u, 1, 1, "lag"),
+          by = .(age, sex, qimd)]
+      tmp[salt.u<salt.l, salt.t := salt.u] # logic to reverse column l u columns
+      tmp[salt.u<salt.l, `:=` (salt.u = salt.l, salt.l = salt.t)]
+      if ("salt.t" %in% names(tmp)) tmp[, salt.t := NULL]
+      return(tmp)
+    }
   )
-  cc <- predict(salt.rq, tmp)^3
-  
-  tmp <- data.table(cbind(tmp, cc))
-  tmp[, `:=` (year = NULL, age = age + lag)]
-  setnames(tmp,
-           paste0("tau= ", sprintf("%.2f", c(0.01, 1:19/20, 0.99))),
-           paste0(c(0.01, 1:19/20, 0.99)))
-  
-  tmp <- melt(tmp, 1:3, 
-              variable.name = "percentile",
-              value.name = "salt.u", 
-              variable.factor = F)
-  
-  tmp[, percentile := as.numeric(percentile)]
-  tmp[, salt.l := shift(salt.u, 1, 1, "lag"),
-      by = .(age, sex, qimd)]
-  tmp[salt.u<salt.l, salt.t := salt.u] # logic to reverse column l u columns
-  tmp[salt.u<salt.l, `:=` (salt.u = salt.l, salt.l = salt.t)]
-  if ("salt.t" %in% names(tmp)) tmp[, salt.t := NULL]
-  return(tmp)
-}
-)
 
 
 # SBP prediction ----------------------------------------------------------

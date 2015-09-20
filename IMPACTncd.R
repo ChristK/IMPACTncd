@@ -11,12 +11,12 @@ options(warn = 1)
 if (Sys.info()[1] == "Linux") {
   if (system("whoami", T )== "mdxasck2") {
     setwd("~/IMPACTncd/")
-#     all.files <- list.files("./SynthPop", 
-#                             pattern = glob2rx("spop2011*.rds"), 
-#                             full.names = T)
-#     
-#     spop.l <- lapply(all.files, readRDS)
-#     rm(all.files)
+    #     all.files <- list.files("./SynthPop", 
+    #                             pattern = glob2rx("spop2011*.rds"), 
+    #                             full.names = T)
+    #     
+    #     spop.l <- lapply(all.files, readRDS)
+    #     rm(all.files)
   } else {
     setwd(paste("/home/", 
                 system("whoami", T), 
@@ -40,16 +40,12 @@ if (Sys.info()[1] == "Linux") {
 require(compiler)
 
 loadcmp("./GUI.Rc")
-#cmpfile(infile = "./initialisation.R")
 loadcmp("./initialisation.Rc")
-#loadcmp(file = "./initialisation.Rc")
-
 
 # Create lifetable without the disease(s) to be modelled. Lifetables were calculated using data from
 # England and Wales not just England. Minimal bias since we use probabilities.
 cat("Generating life table...\n\n")
 loadcmp("./life table engine.Rc")
-
 
 # cl <- makeCluster(clusternumber) # used for clustering. win compatible
 # registerDoParallel(cl) 
@@ -64,25 +60,33 @@ foreach(iterations = 1 : it,
                       "truncnorm", 
                       "stringr",
                       "compiler",
+                      "mc2d",
                       "quantreg"),
         .export = ls(),
         .noexport = c("scenarios.list", "time.mark")) %dorng% {
+          
+          if (paired) set.seed(seed[[counter[[iterations]]]])
           
           my.env <- environment() # get environment of this branch
           
           #time.mark("Define functions in foreach loop")
           loadcmp(file = "./cluster functions.Rc", my.env)
           
+          loadcmp(file = "./diseases epidemiology.Rc", my.env)
+          
           #time.mark("Load synthetic population")
           loadcmp(file = "./load synthetic population.Rc", my.env)
           
-          # Generating Incidence tables
-          loadcmp(file = "./cancer statistics.Rc", my.env) # for cancer
-          loadcmp(file = "./CVD statistics.Rc", my.env) # for cvd
+          # Load RF trajectoy functions
+          #cmpfile("./risk factor trajectories.R")
+          #sys.source(file = "./risk factor trajectories.R", my.env)
+          loadcmp(file = "./risk factor trajectories.Rc", my.env)
+          loadcmp(file = "./2dmc.Rc", my.env) # sample a value for each parameter 
           
           time.mark("start simulation")
           loadcmp(file = "./simulation.Rc", my.env)
-          rm(my.env)
+          rm(my.env) # BE CAREFULL. DTs altered with in my.env, change universaly. 
+          # You need copies of DTs to by handled within my.env
         }
 
 if (exists("cl")) stopCluster(cl)

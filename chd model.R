@@ -192,17 +192,24 @@ if (i == init.year - 2011) {
   #age.structure[CHDsurv  , Nprev := round(Nprev *(1-fatality * 1.03))]
   setnames(age.structure, "N", "population")
   
+  POP <- merge(POP,
+        deaths.causes.secgrad[cause == "Ischaemic heart diseases", .(agegroup, sex, qimd, sec.grad.adj)],
+        by = c("agegroup", "sex", "qimd"), all.x = T)
+  POP[is.na(sec.grad.adj), sec.grad.adj := 1]
+  
   id.chd <- POP[age <=  ageH, 
                 sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]],
                                             Nprev], 
                          weight = chd.tob.rr * chd.ets.rr * 
                            chd.sbp.rr * chd.chol.rr * chd.bmi.rr * 
-                           chd.diab.rr * chd.fv.rr * chd.pa.rr, 
+                           chd.diab.rr * chd.fv.rr * chd.pa.rr * 
+                           sec.grad.adj, 
                          replace = F), 
                 by = .(age, sex)][, id]
   
   POP[id %in% id.chd, chd.incidence := init.year - 1] # and then we assign
   # these ids to the population
+  POP[, sec.grad.adj := NULL]
   rm(id.chd)
 }
 
@@ -254,10 +261,14 @@ Temp <- POP[chd.incidence > 0, .N, by = .(age, sex) #expected number of deaths
             ][CHDsurv, sum(fatality * N, na.rm = T)]
 
 # Fatality SEC gradient and healthcare improvement (supported by table 1.13 BHF2012)
-POP[qimd == "1", fatality := (100 - fatality.sec.gradient.chd/2) * fatality/100]
-POP[qimd == "2", fatality := (100 - fatality.sec.gradient.chd/4) * fatality/100]
-POP[qimd == "4", fatality := (100 + fatality.sec.gradient.chd/4) * fatality/100]
-POP[qimd == "5", fatality := (100 + fatality.sec.gradient.chd/2) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "1", fatality := (100 - fatality.sec.gradient.chd/2) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "2", fatality := (100 - fatality.sec.gradient.chd/4) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "4", fatality := (100 + fatality.sec.gradient.chd/4) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "5", fatality := (100 + fatality.sec.gradient.chd/2) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.chd/4) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.chd/8) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.chd/8) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.chd/4) * fatality/100]
 
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
 Temp1 <- POP[chd.incidence>0, mean(fatality)*.N, by = .(age, sex, qimd) 
@@ -269,7 +280,8 @@ POP[, fatality := fatality * Temp / Temp1]
 setkey(POP, agegroup, sex)
 POP[fatality30chd, fatality30 := fatality30]
 POP[between(age, ageL, ageH),
-    fatality2 := (.SD[chd.incidence > 0, .N * mean(fatality)] - .SD[chd.incidence == 2011 + i, .N * mean(fatality30)])/.SD[chd.incidence > 0, .N],
+    fatality2 := (.SD[chd.incidence > 0, .N * mean(fatality)] - .SD[chd.incidence == 2011 + i, .N * mean(fatality30)]) /
+      (.SD[chd.incidence > 0, .N] - .SD[chd.incidence == 2011 + i, .N * mean(fatality30)]),
     by = group] # mean is used instead of unique to maintain groups with no events in the result
 
 POP[ fatality2 < 0, fatality2 := 0]

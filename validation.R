@@ -1,9 +1,12 @@
 #cmpfile("./validation.R")
 # preample ----------------------------------------------------------------
+# if (exists("scenarios.list") &
+#     "current trends.R" %in% scenarios.list) {
+#   
 if (Sys.info()[1] == "Linux") {
   if (system("whoami", T ) == "mdxasck2") {
     setwd("~/IMPACTncd/")
-    clusternumber <- ifelse(clusternumber < 70, 70, clusternumber)  # overwrites previous if <60
+    clusternumber <- ifelse(clusternumber > 70, 70, clusternumber)  # overwrites previous if <60
   } else {
     setwd(paste("/home/", 
                 system("whoami", T), 
@@ -29,6 +32,8 @@ if (Sys.info()[1] == "Linux") {
 
 ext <- ".pdf"
 dir <- "./Output/Validation/"
+
+#  if (!exists("yearstoproject")) {
 tt <- readLines("./Output/simulation parameters.txt")
 
 yearstoproject <- as.numeric(substring(tt[[grep(glob2rx("Years to project = *"), tt)]], 19))
@@ -59,6 +64,7 @@ pop.fraction                       <- as.numeric(substring(tt[[grep(glob2rx("Pop
 cleardirectories                   <- F
 
 rm(jjj, tt)
+# }
 
 require(compiler)
 loadcmp(file = "./initialisation.Rc")
@@ -86,7 +92,7 @@ loadcmp(file = "./post simulation functions.Rc")
 
 cleardirectories <- F
 
-pd <- position_dodge(.2) 
+pd <- position_dodge(0.0) 
 # The palette with black:
 cbbPalette <- c(#"#000000", 
   "#E69F00", 
@@ -114,6 +120,12 @@ MC.mean <- function(m, ...) {
               uui = quantile(m, probs = 0.975, na.rm = T)))
 }
 
+# MC.mean <- function(m, ...) {
+#   return(list(mean = median(m, na.rm = T),
+#               lui = mad(m, na.rm = T, low = T),
+#               uui = mad(m, na.rm = T, high = T)))
+# }
+
 clonedt <- function(DT, times = 500) {
   l <- sample(list(DT), times, T)
   rbindlist(l, idcol = T)
@@ -126,9 +138,11 @@ ggsave.mine <- function(x, y, ...) {
   }
   
   if (ext == ".pdf") {
-    ggsave(x, y, width = 11.69/1.5, height = 8.27/2, device = cairo_pdf)
+    ggsave(x, y, width = 11.69, height = 8.27, device = cairo_pdf)
   }
 }
+
+sy <- ifelse (init.year == 2006, 2001, 2006)
 
 # Rename scenarios --------------------------------------------------------
 scn.levels <- c(
@@ -201,6 +215,230 @@ qimd_labeller <- function(var, value){
   }
   return(value)
 }
+
+# CHD validation ----------------------------------------------------------
+#load("./Output/CHD/chd.burden.RData")
+#load(file="./Validation/kirk.RData") # chd.drates
+
+chd.drates <- fread("./Validation/BAMP 02-13 model 14-2112 proj with CI.csv")
+
+setnames(chd.drates, c("year", "agegroup", "sex", "qimd", "mean", "lui", "uui"))
+chd.drates[, Model:="BAMP"]
+chd.drates[, sex:= factor(sex, c("M", "F"), c("Men", "Women"))]
+chd.drates[, `:=` (lui = mean, uui = mean)] # ignore BAMP CI
+
+chd.mort = copy(chd.burden[group=="SAQ" & scenario == "Current Policy",])
+chd.mort = copy(chd.mort[agegroup!="30-34",])
+chd.mort[agegroup %in% c("35-39", "40-44"), agegroup := "35-44"]
+chd.mort[agegroup %in% c("45-49", "50-54"), agegroup := "45-54"]
+chd.mort[agegroup %in% c("55-59", "60-64"), agegroup := "55-64"]
+chd.mort[agegroup %in% c("65-69", "70-74"), agegroup := "65-74"]
+chd.mort[agegroup %in% c("75-79", "80-84"), agegroup := "75-84"]
+chd.mort <- chd.mort[, .(pop = sum(pop),
+                         chd.mortality = sum(chd.mortality)),
+                     by = .(agegroup, sex, qimd, scenario, mc, year)]
+
+grp <- c("year", "scenario", "sex", "agegroup", "qimd")
+
+chd.mort <- chd.mort[,
+                     MC.mean(chd.mortality/pop),
+                     by = grp]
+
+chd.mort[, `:=` (Model= "IMPACTNCD", scenario = NULL)]
+chd.mort <- rbind(chd.mort, chd.drates, fill = T)
+chd.mort <- chd.mort[agegroup!="85+" & between(year, 2002, init.year + yearstoproject)]
+
+chd.men <- ggplot(chd.mort[sex=="Men",],
+                  aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
+  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
+  #geom_smooth(size = 2, alpha=1/4) +
+  geom_line(position=pd,size= 1, alpha=3/5) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
+                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+  ggtitle("CHD Mortality Validation (Men)") +
+  theme(text = element_text(family="Calibri", size = 12)) +
+  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
+  theme(strip.text.x = element_text(size = 10, face = "bold"),
+        strip.text.y = element_text(size = 10, face = "bold"),
+        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
+
+
+chd.women <- ggplot(chd.mort[sex=="Women",],
+                    aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
+  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
+  geom_line(position=pd,size= 1, alpha=3/5) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
+                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+  ggtitle("CHD Mortality Validation (Women)") +
+  theme(text = element_text(family="Calibri", size = 12)) +
+  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
+  theme(strip.text.x = element_text(size = 10, face = "bold"),
+        strip.text.y = element_text(size = 10, face = "bold"),
+        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
+
+#print(chd.men)
+#print(chd.women) 
+
+
+# ggsave("./Validation/validation men chd.pdf", chd.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
+# ggsave("./Validation/validation women chd.pdf", chd.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
+
+ggsave.mine(paste0(dir, "chd men", ext), chd.men)
+ggsave.mine(paste0(dir, "chd women", ext), chd.women)
+
+# Stroke validation -------------------------------------------------------
+#load("./Output/Stroke/stroke.burden.RData")
+load(file="./Validation/stroke.drates.RData")
+stroke.drates[, Model:="BAMP"]
+stroke.drates[, `:=` (lui = mean, uui = mean)] # ignore BAMP CI
+
+stroke.mort = copy(stroke.burden[group=="SAQ" & scenario == "Current Policy",])
+stroke.mort = copy(stroke.mort[agegroup!="30-34",])
+stroke.mort[agegroup %in% c("35-39", "40-44"), agegroup := "35-44"]
+stroke.mort[agegroup %in% c("45-49", "50-54"), agegroup := "45-54"]
+stroke.mort[agegroup %in% c("55-59", "60-64"), agegroup := "55-64"]
+stroke.mort[agegroup %in% c("65-69", "70-74"), agegroup := "65-74"]
+stroke.mort[agegroup %in% c("75-79", "80-84"), agegroup := "75-84"]
+stroke.mort <- stroke.mort[, .(pop = sum(pop),
+                               stroke.mortality = sum(stroke.mortality)),
+                           by = .(agegroup, sex, qimd, scenario, mc, year)]
+
+grp <- c("year", "scenario", "sex", "agegroup", "qimd")
+
+
+stroke.mort <- stroke.mort[,
+                           MC.mean(stroke.mortality/pop),
+                           by = grp]
+
+stroke.mort[, `:=` (Model= "IMPACTNCD", scenario = NULL)]
+stroke.mort <- rbind(stroke.mort,stroke.drates, fill=T)
+stroke.mort <- stroke.mort[agegroup!="85+" & between(year, 2002, init.year + yearstoproject)]
+
+stroke.men <- ggplot(stroke.mort[sex=="Men",],
+                     aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
+  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position = pd, alpha=3/5) +
+  #geom_smooth(size = 2, alpha=1/4) +
+  geom_line(position=pd,size= 1, alpha=3/5) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
+                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+  ggtitle("Stroke Mortality Validation (Men)") +
+  theme(text = element_text(family="Calibri", size = 12)) +
+  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
+  theme(strip.text.x = element_text(size = 10, face = "bold"),
+        strip.text.y = element_text(size = 10, face = "bold"),
+        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
+
+
+stroke.women <- ggplot(stroke.mort[sex=="Women",],
+                       aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
+  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
+  #geom_smooth(size = 2, alpha=1/4) +
+  geom_line(position=pd,size= 1, alpha=3/5) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
+                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+  ggtitle("Stroke Mortality Validation (Women)") +
+  theme(text = element_text(family="Calibri", size = 12)) +
+  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
+  theme(strip.text.x = element_text(size = 10, face = "bold"),
+        strip.text.y = element_text(size = 10, face = "bold"),
+        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
+
+#print(stroke.men)
+#print(stroke.women) 
+
+
+# ggsave("./Validation/validation men stroke.pdf", stroke.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
+# ggsave("./Validation/validation women stroke.pdf", stroke.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
+
+ggsave.mine(paste0(dir, "stroke men", ext), stroke.men)
+ggsave.mine(paste0(dir, "stroke women", ext), stroke.women)
+
+
+# Gastric cancer validation -----------------------------------------------
+#load("./Output/Gastric ca/c16.burden.RData")
+load(file="./Validation/c16.drates.RData")
+c16.drates[, Model:="BAMP"]
+c16.drates[, `:=` (lui = mean, uui = mean)] # ignore BAMP CI
+
+c16.mort = copy(c16.burden[group=="SAQ" & scenario == "Current Policy",])
+c16.mort = copy(c16.mort[agegroup!="30-34",])
+c16.mort[agegroup %in% c("35-39", "40-44"), agegroup := "35-44"]
+c16.mort[agegroup %in% c("45-49", "50-54"), agegroup := "45-54"]
+c16.mort[agegroup %in% c("55-59", "60-64"), agegroup := "55-64"]
+c16.mort[agegroup %in% c("65-69", "70-74"), agegroup := "65-74"]
+c16.mort[agegroup %in% c("75-79", "80-84"), agegroup := "75-84"]
+c16.mort <- c16.mort[, .(pop = sum(pop),
+                         c16.mortality = sum(c16.mortality)),
+                     by = .(agegroup, sex, qimd, scenario, mc, year)]
+
+grp <- c("year", "scenario", "sex", "agegroup", "qimd")
+
+
+c16.mort <- c16.mort[,
+                     MC.mean(c16.mortality/pop),
+                     by = grp]
+
+c16.mort[, `:=` (Model= "IMPACTNCD", scenario = NULL)]
+c16.mort <- rbind(c16.mort,c16.drates, fill=T)
+c16.mort <- c16.mort[agegroup!="85+" & between(year, 2002, init.year + yearstoproject)]
+
+c16.men <- ggplot(c16.mort[sex=="Men",],
+                  aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
+  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
+  #geom_smooth(size = 2, alpha=1/4) +
+  geom_line(position=pd,size= 1, alpha=3/5) +
+  facet_grid(agegroup ~ qimd, labeller=qimd_labeller, scales="free") +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
+                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+  ggtitle("Gastric Cancer Mortality Validation (Men)") +
+  theme(text = element_text(family="Calibri", size = 12)) +
+  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
+  theme(strip.text.x = element_text(size = 10, face = "bold"),
+        strip.text.y = element_text(size = 10, face = "bold"),
+        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
+
+
+c16.women <- ggplot(c16.mort[sex=="Women",],
+                    aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
+  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
+  #geom_smooth(size = 2, alpha=1/4) +
+  geom_line(position=pd,size= 1, alpha=3/5) +
+  facet_grid(agegroup ~ qimd,  labeller=qimd_labeller, scales="free") +
+  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
+  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
+                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
+  ggtitle("Gastric Cancer Mortality Validation (Women)") +
+  theme(text = element_text(family="Calibri", size = 12)) +
+  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
+  theme(strip.text.x = element_text(size = 10, face = "bold"),
+        strip.text.y = element_text(size = 10, face = "bold"),
+        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
+
+#print(c16.men)
+#print(c16.women) 
+
+
+# ggsave("./Validation/validation men c16.pdf", c16.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
+# ggsave("./Validation/validation women c16.pdf", c16.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
+
+ggsave.mine(paste0(dir, "gastric ca men", ext), c16.men)
+ggsave.mine(paste0(dir, "gastric ca women", ext), c16.women)
+
 
 # Salt graph 20-64 ------------------------------------------------------------------
 pop.st <- pop.abs[, mean(pop), by = .(year, agegroup, sex, scenario, qimd)
@@ -439,7 +677,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.nurse <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.nurse, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             is.na(omsysval) == F & year > -6)
+                             is.na(omsysval) == F)
 
 dt2 <- data.table(svyby(~omsysval, ~sex + year, HSE.ts.srv.nurse, svymean, na.rm = T))
 setnames(dt2, "omsysval", "mean")
@@ -451,7 +689,7 @@ dt2[, scenario := "Observed"]
 dt <- rbind(dt, dt2, fill = T)
 
 sbp <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -464,7 +702,7 @@ sbp <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ ., labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name = "Systolic blood pressure (mmHg)",
                      limits = c(120, 135),
                      breaks = c(120, 125, 130, 135)) +
@@ -493,7 +731,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.nurse <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.nurse, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             !is.na(omsysval) & year > -6 & !is.na(qimd))
+                             !is.na(omsysval) & !is.na(qimd))
 
 dt2 <- data.table(svyby(~omsysval, ~sex + qimd + year, HSE.ts.srv.nurse, svymean, na.rm = T))
 setnames(dt2, "omsysval", "mean")
@@ -505,7 +743,7 @@ dt2[, scenario := "Observed"]
 dt <- rbind(dt, dt2, fill = T)
 
 sbp <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -518,7 +756,7 @@ sbp <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ qimd, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name = "Systolic blood pressure (mmHg)",
                      limits = c(115, 135),
                      breaks = c(115, 120, 125, 130, 135)) +
@@ -548,7 +786,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.nurse <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.nurse, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             !is.na(omsysval) & year > -6 & !is.na(agegroup))
+                             !is.na(omsysval) & !is.na(agegroup))
 
 dt2 <- data.table(svyby(~omsysval, ~sex + agegroup + year, HSE.ts.srv.nurse, svymean, na.rm = T))
 setnames(dt2, "omsysval", "mean")
@@ -560,7 +798,7 @@ dt2[, scenario := "Observed"]
 dt <- rbind(dt, dt2, fill = T)
 
 sbp <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -573,7 +811,7 @@ sbp <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ agegroup, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006, 2010, 2013)) +
+  scale_x_continuous(name = "Year", breaks = seq(sy, 2013, 3)) +
   scale_y_continuous(name = "Systolic blood pressure (mmHg)") + #,
   #limits = c(115, 135),
   #breaks = c(115, 120, 125, 130, 135)) +
@@ -602,7 +840,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.blood <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.blood, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             is.na(cholval1) == F & year > -6)
+                             is.na(cholval1) == F)
 
 dt2 <- setnames(data.table(svyby(~cholval1, ~sex + year, HSE.ts.srv.blood, svymean, na.rm = T)), "cholval1", "mean")
 dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
@@ -614,7 +852,7 @@ dt <- rbind(dt, dt2, fill = T)
 
 
 tc <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -628,7 +866,7 @@ tc <-
     )
   ) +
   facet_grid(sex ~ .) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name = "Cholesterol (mmol/L)") +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Mean total cholesterol (ages 30 - 84)") +
@@ -654,7 +892,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.blood <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.blood, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             is.na(cholval1) == F & year > -6 & !is.na(qimd))
+                             is.na(cholval1) == F & !is.na(qimd))
 
 dt2 <- setnames(data.table(svyby(~cholval1, ~sex + qimd + year, HSE.ts.srv.blood, svymean, na.rm = T)), "cholval1", "mean")
 dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
@@ -666,7 +904,7 @@ dt <- rbind(dt, dt2, fill = T)
 
 
 tc <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -680,7 +918,7 @@ tc <-
     )
   ) +
   facet_grid(sex ~ qimd, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name = "Cholesterol (mmol/L)") +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Mean total cholesterol (ages 30 - 84)") +
@@ -707,7 +945,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.blood <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.blood, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             is.na(cholval1) == F & year > -6 & !is.na(agegroup))
+                             is.na(cholval1) == F & !is.na(agegroup))
 
 dt2 <- setnames(data.table(svyby(~cholval1, ~sex + agegroup + year, HSE.ts.srv.blood, svymean, na.rm = T)), "cholval1", "mean")
 dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
@@ -719,7 +957,7 @@ dt <- rbind(dt, dt2, fill = T)
 
 
 tc <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -733,7 +971,7 @@ tc <-
     )
   ) +
   facet_grid(sex ~ agegroup, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006, 2010, 2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy, 2010, 2013)) +
   scale_y_continuous(name = "Cholesterol (mmol/L)") +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Mean total cholesterol (ages 30 - 84)") +
@@ -760,7 +998,7 @@ HSE.ts[, age := age + cancer.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.nurse <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.nurse, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             is.na(bmival) == F & year > -6)
+                             is.na(bmival) == F)
 
 dt2 <- setnames(data.table(svyby(~bmival, ~sex + year, HSE.ts.srv.nurse, svymean, na.rm = T)), "bmival", "mean")
 dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
@@ -813,7 +1051,7 @@ HSE.ts[, age := age + cancer.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.nurse <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.nurse, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             is.na(bmival) == F & year > -6 & !is.na(qimd))
+                             is.na(bmival) == F & !is.na(qimd))
 
 dt2 <- setnames(data.table(svyby(~bmival, ~sex + qimd + year, HSE.ts.srv.nurse, svymean, na.rm = T)), "bmival", "mean")
 dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
@@ -867,7 +1105,7 @@ HSE.ts[, age := age + cancer.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.nurse <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.nurse, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age >= ageL & age <= ageH & wt.nurse > 0 & 
-                             is.na(bmival) == F & year > -6 & !is.na(agegroup))
+                             is.na(bmival) == F & !is.na(agegroup))
 
 dt2 <- setnames(data.table(svyby(~bmival, ~sex + agegroup + year, HSE.ts.srv.nurse, svymean, na.rm = T)), "bmival", "mean")
 dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
@@ -919,7 +1157,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
-                           is.na(cigst1) == F & year > -6)
+                           is.na(cigst1) == F)
 
 dt2 <- setnames(
   data.table(
@@ -936,7 +1174,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 smok <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -949,7 +1187,7 @@ smok <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ ., labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Active smoking prevalence (ages 30 - 84)") +
@@ -975,7 +1213,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
-                           is.na(cigst1) == F & year > -6 & !is.na(qimd))
+                           is.na(cigst1) == F & !is.na(qimd))
 
 dt2 <- setnames(
   data.table(
@@ -992,7 +1230,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 smok <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1005,7 +1243,7 @@ smok <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ qimd, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Active smoking prevalence (ages 30 - 84)") +
@@ -1032,7 +1270,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
-                           is.na(cigst1) == F & year > -6 & !is.na(agegroup))
+                           is.na(cigst1) == F & !is.na(agegroup))
 
 dt2 <- setnames(
   data.table(
@@ -1049,7 +1287,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 smok <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1062,7 +1300,7 @@ smok <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ agegroup, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006, 2010, 2013)) +
+  scale_x_continuous(name = "Year", breaks = seq(sy, 2013, 3)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Active smoking prevalence (ages 30 - 84)") +
@@ -1088,7 +1326,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.blood <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.blood, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age >= ageL & age <= ageH & wt.blood > 0 & 
-                             is.na(diabtotr) == F & year > -6)
+                             is.na(diabtotr) == F)
 
 dt2 <- setnames(
   data.table(
@@ -1105,7 +1343,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 diab <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1118,7 +1356,7 @@ diab <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ ., labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Diabetes mellitus prevalence (ages 30 - 84)") +
@@ -1144,7 +1382,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.blood <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.blood, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age >= ageL & age <= ageH & wt.blood > 0 & 
-                             is.na(diabtotr) == F & year > -6 & !is.na(qimd))
+                             is.na(diabtotr) == F & !is.na(qimd))
 
 dt2 <- setnames(
   data.table(
@@ -1161,7 +1399,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 diab <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1174,7 +1412,7 @@ diab <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ qimd, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Diabetes mellitus prevalence (ages 30 - 84)") +
@@ -1201,7 +1439,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.blood <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.blood, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age >= ageL & age <= ageH & wt.blood > 0 & 
-                             is.na(diabtotr) == F & year > -6 & !is.na(agegroup))
+                             is.na(diabtotr) == F & !is.na(agegroup))
 
 dt2 <- setnames(
   data.table(
@@ -1218,7 +1456,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 diab <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1231,7 +1469,7 @@ diab <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ agegroup, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006, 2010, 2013)) +
+  scale_x_continuous(name = "Year", breaks = seq(sy, 2013, 3)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("Diabetes mellitus prevalence (ages 30 - 84)") +
@@ -1257,7 +1495,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
-                           is.na(a30to06m) == F & year > -6)
+                           is.na(a30to06m) == F)
 
 dt2 <- setnames(
   data.table(
@@ -1274,7 +1512,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 pa <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1287,7 +1525,7 @@ pa <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ ., labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("More than 5 active days prevalence (ages 30 - 84)") +
@@ -1313,7 +1551,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
-                           is.na(a30to06m) == F & year > -6 & !is.na(qimd))
+                           is.na(a30to06m) == F & !is.na(qimd))
 
 dt2 <- setnames(
   data.table(
@@ -1330,7 +1568,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 pa <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1343,7 +1581,7 @@ pa <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ qimd, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006:2013)) +
+  scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("More than 5 active days prevalence (ages 30 - 84)") +
@@ -1370,7 +1608,7 @@ HSE.ts[, age := age + cvd.lag]
 agegroup.fn(HSE.ts)
 HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
-                           is.na(a30to06m) == F & year > -6 & !is.na(agegroup))
+                           is.na(a30to06m) == F & !is.na(agegroup))
 
 dt2 <- setnames(
   data.table(
@@ -1387,7 +1625,7 @@ dt2[, year := year + 2011]
 dt <- rbind(dt, dt2, fill = T)
 
 pa <- 
-  ggplot(dt[between(year, 2006, 2012)],
+  ggplot(dt[between(year, sy, 2012)],
          aes(x = year + 0.5, 
              y = mean,
              colour = scenario)) + 
@@ -1400,7 +1638,7 @@ pa <-
   #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
   geom_point(size = 2, alpha = 4/5) +
   facet_grid(sex ~ agegroup, labeller = qimd_labeller) +
-  scale_x_continuous(name = "Year", breaks = c(2006, 2010, 2013)) +
+  scale_x_continuous(name = "Year", breaks = seq(sy, 2013, 3)) +
   scale_y_continuous(name="Prevalence",labels = percent_format()) +
   theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
   ggtitle("More than 5 active days prevalence (ages 30 - 84)") +
@@ -1585,227 +1823,4 @@ fv <-
 # print(fv)
 
 ggsave.mine(paste0(dir, "fv.a", ext), fv)
-
-# CHD validation ----------------------------------------------------------
-#load("./Output/CHD/chd.burden.RData")
-#load(file="./Validation/kirk.RData") # chd.drates
-
-chd.drates <- fread("./Validation/BAMP 02-13 model 14-2112 proj with CI.csv")
-
-setnames(chd.drates, c("year", "agegroup", "sex", "qimd", "mean", "lui", "uui"))
-chd.drates[, Model:="BAMP"]
-chd.drates[, sex:= factor(sex, c("M", "F"), c("Men", "Women"))]
-chd.drates[, `:=` (lui = mean, uui = mean)] # ignore BAMP CI
-
-chd.mort = copy(chd.burden[group=="SAQ" & scenario == "Current Policy",])
-chd.mort = copy(chd.mort[agegroup!="30-34",])
-chd.mort[agegroup %in% c("35-39", "40-44"), agegroup := "35-44"]
-chd.mort[agegroup %in% c("45-49", "50-54"), agegroup := "45-54"]
-chd.mort[agegroup %in% c("55-59", "60-64"), agegroup := "55-64"]
-chd.mort[agegroup %in% c("65-69", "70-74"), agegroup := "65-74"]
-chd.mort[agegroup %in% c("75-79", "80-84"), agegroup := "75-84"]
-chd.mort <- chd.mort[, .(pop = sum(pop),
-                         chd.mortality = sum(chd.mortality)),
-                     by = .(agegroup, sex, qimd, scenario, mc, year)]
-
-grp <- c("year", "scenario", "sex", "agegroup", "qimd")
-
-chd.mort <- chd.mort[,
-                     MC.mean(chd.mortality/pop),
-                     by = grp]
-
-chd.mort[, `:=` (Model= "IMPACTNCD", scenario = NULL)]
-chd.mort <- rbind(chd.mort,chd.drates, fill=T)
-chd.mort <- chd.mort[agegroup!="85+" & between(year, 2002, 2035)]
-
-chd.men <- ggplot(chd.mort[sex=="Men",],
-                  aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
-  #geom_smooth(size = 2, alpha=1/4) +
-  geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
-  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
-  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
-                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
-  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("CHD Mortality Validation (Men)") +
-  theme(text = element_text(family="Calibri", size = 12)) +
-  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
-  theme(strip.text.x = element_text(size = 10, face = "bold"),
-        strip.text.y = element_text(size = 10, face = "bold"),
-        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
-
-
-chd.women <- ggplot(chd.mort[sex=="Women",],
-                    aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
-  geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
-  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
-  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
-                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
-  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("CHD Mortality Validation (Women)") +
-  theme(text = element_text(family="Calibri", size = 12)) +
-  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
-  theme(strip.text.x = element_text(size = 10, face = "bold"),
-        strip.text.y = element_text(size = 10, face = "bold"),
-        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
-
-#print(chd.men)
-#print(chd.women) 
-
-
-# ggsave("./Validation/validation men chd.pdf", chd.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
-# ggsave("./Validation/validation women chd.pdf", chd.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
-
-ggsave.mine(paste0(dir, "chd men", ext), chd.men)
-ggsave.mine(paste0(dir, "chd women", ext), chd.women)
-
-# Stroke validation -------------------------------------------------------
-#load("./Output/Stroke/stroke.burden.RData")
-load(file="./Validation/stroke.drates.RData")
-stroke.drates[, Model:="BAMP"]
-stroke.drates[, `:=` (lui = mean, uui = mean)] # ignore BAMP CI
-
-stroke.mort = copy(stroke.burden[group=="SAQ" & scenario == "Current Policy",])
-stroke.mort = copy(stroke.mort[agegroup!="30-34",])
-stroke.mort[agegroup %in% c("35-39", "40-44"), agegroup := "35-44"]
-stroke.mort[agegroup %in% c("45-49", "50-54"), agegroup := "45-54"]
-stroke.mort[agegroup %in% c("55-59", "60-64"), agegroup := "55-64"]
-stroke.mort[agegroup %in% c("65-69", "70-74"), agegroup := "65-74"]
-stroke.mort[agegroup %in% c("75-79", "80-84"), agegroup := "75-84"]
-stroke.mort <- stroke.mort[, .(pop = sum(pop),
-                               stroke.mortality = sum(stroke.mortality)),
-                           by = .(agegroup, sex, qimd, scenario, mc, year)]
-
-grp <- c("year", "scenario", "sex", "agegroup", "qimd")
-
-
-stroke.mort <- stroke.mort[,
-                           MC.mean(stroke.mortality/pop),
-                           by = grp]
-
-stroke.mort[, `:=` (Model= "IMPACTNCD", scenario = NULL)]
-stroke.mort <- rbind(stroke.mort,stroke.drates, fill=T)
-stroke.mort <- stroke.mort[agegroup!="85+" & between(year, 2002, 2035)]
-
-stroke.men <- ggplot(stroke.mort[sex=="Men",],
-                     aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position = pd, alpha=3/5) +
-  #geom_smooth(size = 2, alpha=1/4) +
-  geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
-  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
-  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
-                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
-  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("Stroke Mortality Validation (Men)") +
-  theme(text = element_text(family="Calibri", size = 12)) +
-  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
-  theme(strip.text.x = element_text(size = 10, face = "bold"),
-        strip.text.y = element_text(size = 10, face = "bold"),
-        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
-
-
-stroke.women <- ggplot(stroke.mort[sex=="Women",],
-                       aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
-  #geom_smooth(size = 2, alpha=1/4) +
-  geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
-  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
-  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
-                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
-  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("Stroke Mortality Validation (Women)") +
-  theme(text = element_text(family="Calibri", size = 12)) +
-  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
-  theme(strip.text.x = element_text(size = 10, face = "bold"),
-        strip.text.y = element_text(size = 10, face = "bold"),
-        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
-
-#print(stroke.men)
-#print(stroke.women) 
-
-
-# ggsave("./Validation/validation men stroke.pdf", stroke.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
-# ggsave("./Validation/validation women stroke.pdf", stroke.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
-
-ggsave.mine(paste0(dir, "stroke men", ext), stroke.men)
-ggsave.mine(paste0(dir, "stroke women", ext), stroke.women)
-
-
-# Gastric cancer validation -----------------------------------------------
-#load("./Output/Gastric ca/c16.burden.RData")
-load(file="./Validation/c16.drates.RData")
-c16.drates[, Model:="BAMP"]
-c16.drates[, `:=` (lui = mean, uui = mean)] # ignore BAMP CI
-
-c16.mort = copy(c16.burden[group=="SAQ" & scenario == "Current Policy",])
-c16.mort = copy(c16.mort[agegroup!="30-34",])
-c16.mort[agegroup %in% c("35-39", "40-44"), agegroup := "35-44"]
-c16.mort[agegroup %in% c("45-49", "50-54"), agegroup := "45-54"]
-c16.mort[agegroup %in% c("55-59", "60-64"), agegroup := "55-64"]
-c16.mort[agegroup %in% c("65-69", "70-74"), agegroup := "65-74"]
-c16.mort[agegroup %in% c("75-79", "80-84"), agegroup := "75-84"]
-c16.mort <- c16.mort[, .(pop = sum(pop),
-                         c16.mortality = sum(c16.mortality)),
-                     by = .(agegroup, sex, qimd, scenario, mc, year)]
-
-grp <- c("year", "scenario", "sex", "agegroup", "qimd")
-
-
-c16.mort <- c16.mort[,
-                     MC.mean(c16.mortality/pop),
-                     by = grp]
-
-c16.mort[, `:=` (Model= "IMPACTNCD", scenario = NULL)]
-c16.mort <- rbind(c16.mort,c16.drates, fill=T)
-c16.mort <- c16.mort[agegroup!="85+" & between(year, 2002, 2035)]
-
-c16.men <- ggplot(c16.mort[sex=="Men",],
-                  aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
-  #geom_smooth(size = 2, alpha=1/4) +
-  geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, labeller=qimd_labeller, scales="free") +
-  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
-  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
-                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
-  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("Gastric Cancer Mortality Validation (Men)") +
-  theme(text = element_text(family="Calibri", size = 12)) +
-  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
-  theme(strip.text.x = element_text(size = 10, face = "bold"),
-        strip.text.y = element_text(size = 10, face = "bold"),
-        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
-
-
-c16.women <- ggplot(c16.mort[sex=="Women",],
-                    aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
-  #geom_smooth(size = 2, alpha=1/4) +
-  geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd,  labeller=qimd_labeller, scales="free") +
-  ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
-  scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
-                        labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
-  theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("Gastric Cancer Mortality Validation (Women)") +
-  theme(text = element_text(family="Calibri", size = 12)) +
-  theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
-  theme(strip.text.x = element_text(size = 10, face = "bold"),
-        strip.text.y = element_text(size = 10, face = "bold"),
-        strip.background = element_rect(colour="purple", fill="#CCCCFF"))
-
-#print(c16.men)
-#print(c16.women) 
-
-
-# ggsave("./Validation/validation men c16.pdf", c16.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
-# ggsave("./Validation/validation women c16.pdf", c16.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
-
-ggsave.mine(paste0(dir, "gastric ca men", ext), c16.men)
-ggsave.mine(paste0(dir, "gastric ca women", ext), c16.women)
-
+# }

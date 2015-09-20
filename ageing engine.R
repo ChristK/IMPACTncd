@@ -25,11 +25,27 @@ if (i == init.year - 2011) {
 
 setkey(POP,     age, sex, qimd, percentile)
 
-if (scenarios.list[[iterations]] == "salt no intervention.R") {
-  if (i < 2) {
+if (scenarios.list[[iterations]] == "salt no intervention.Rc") {
+  if ((i + 2011 - cancer.lag) < 2003 && (i + 2011 - cvd.lag) < 2003) {
+    tmp.cvd  <- pred.salt(i, cvd.lag) 
+    tmp.ca  <- pred.salt(i, cancer.lag)
+    setkey(tmp.cvd,  age, sex, qimd, percentile)
+    setkey(tmp.ca,  age, sex, qimd, percentile)
+    
+    POP <- tmp.cvd[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP[between(age, 19, ageH), salt24h.cvdlag.alt := salt24h.cvdlag] # so the difference is 0 and doesn't affect sbp
+
+    POP <- tmp.ca[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
+    rm(tmp.ca, tmp.cvd)
+  } else if ((i + 2011 - cancer.lag) < 2003 && (i + 2011 - cvd.lag) >= 2003) {
     tmp.cvd0 <- pred.salt(cvd.lag - 8, cvd.lag) # salt exposure remains as of 2003
     tmp.cvd  <- pred.salt(i, cvd.lag) # alternative current policy
-    tmp.ca0  <- pred.salt(i, cancer.lag) # as of 2003
+    tmp.ca0  <- pred.salt(i, cancer.lag) 
     setkey(tmp.cvd0, age, sex, qimd, percentile)
     setkey(tmp.cvd,  age, sex, qimd, percentile)
     setkey(tmp.ca0,  age, sex, qimd, percentile)
@@ -330,7 +346,7 @@ if (qdrisk == F) {
 } 
 
 if (qdrisk == T) {
-  if (i < (init.year - 2011 + cvd.lag)) {
+  if (i == (init.year - 2011)) {
     POP[, diabtotr.cvdlag := diabtotr]
     POP[between(age, 25, ageH) & diabtotr == "2", 
         diabtotr.cvdlag := pred.diab.incid.lag(age,
@@ -338,14 +354,16 @@ if (qdrisk == T) {
                                                qimd,
                                                bmival.cvdlag,
                                                a30to06m.cvdlag,
-                                               cvd.lag - i)]
-  } else if (i == (init.year - 2011 + cvd.lag)) {
-    POP[, diabtotr.cvdlag := diabtotr]
+                                               cvd.lag - i - 2011 + init.year)]
+    
   } else {
     POP[between(age, 25, ageH) & diabtotr.cvdlag == "1",
-        diabtotr.cvdlag := pred.diab.qdrisk(.SD)]
-  }
+        diabtotr.cvdlag := pred.diab.qdrisk(.SD)] 
+    # This ignore type 1 diabetes. For ages <25 the prevalence is ~0.2% and for ages <35 ~0.37% (HSE2006)
+    # However my synthpop already contains diabetics for ages <25. For short horisons this is absolutely fine
+  } 
 }
+
 cat("DIAB finished\n")
 
 agegroup.fn(POP)
@@ -378,7 +396,7 @@ if (i == yearstoproject + init.year - 2012) {
          function (x) setnames(x,
                                paste0("V", 1:50),
                                output.rf.names)
-         )
+  )
   
   saveRDS(rbindlist(riskfactors, T, T) ,
           file = paste0(output.dir(), "riskfactors.rds"))

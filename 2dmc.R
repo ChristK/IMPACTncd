@@ -1,106 +1,38 @@
 #cmpfile("./2dmc.R")
 cat("Sample RR values for 2d Monte Carlo\n\n")
+# coefficients for salt model from the MC simulation
+load(file="./Lagtimes/salt.rq.coef.rda")
+salt.rq$coefficients <- salt.rq.coef[[counter[[iterations]]]]
+#salt.rq$coefficients <- apply(simplify2array(salt.rq.coef), 1:2, mean) # mean of MC
 
 if ("CHD" %in% diseasestoexclude) {
-  tobacco.rr.chd[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
-  chd.ets.rr.mc <-  stochRRabov1(1, 1.26, 1.38)
-  sbp.rr.chd[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
-  chol.rr.chd[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
-  chd.bmi.rr.mc <- 
-    data.table(
-      agegroup = unique(agegroup.fn(0:90)),
-      rr       = c(rep(1, 5), 
-                   rep(stochRRabov1(1, 1.213256, 1.278837), 8),
-                   rep(stochRRabov1(1, 1.058372, 1.115581), 2),
-                   rep(1, 4))
-    , key = "agegroup"
-    )
-  chd.diab.rr.mc <- 
-    data.table(
-      agegroup        = rep(unique(agegroup.fn(0:90)),2),
-      diabtotr.cvdlag = rep(c("1", "2"), each=19),
-      rr              = c(rep(1, 24), 
-                          rep(stochRRabov1(1, 2.51, 2.8), 8),
-                          rep(stochRRabov1(1, 2.01, 2.26), 2),
-                          rep(stochRRabov1(1, 1.78, 2.05), 4))
-    , key = c("agegroup", "diabtotr.cvdlag")
-    )
-  chd.fv.rr.mc <- stochRRbelow1(1, 0.96, 0.99)
-  pa.rr.chd[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
+  tobacco.rr.chd <- chd.tobacco.rr.l[.id == counter[[iterations]]]
+  chd.ets.rr.mc  <- chd.ets.rr.l[[counter[[iterations]]]]
+  sbp.rr.chd     <- chd.sbp.rr.l[.id == counter[[iterations]]]
+  chol.rr.chd    <- chd.chol.rr.l[.id == counter[[iterations]]]
+  chd.bmi.rr.mc  <- chd.bmi.rr.l[.id == counter[[iterations]]]
+  chd.diab.rr.mc <- chd.diab.rr.l[.id == counter[[iterations]]]
+  chd.fv.rr.mc   <- chd.fv.rr.l[[counter[[iterations]]]]
+  pa.rr.chd      <- chd.pa.rr.l[.id == counter[[iterations]]]
 }
 
 if ("stroke" %in% diseasestoexclude) {
-  tobacco.rr.stroke[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
-  stroke.ets.rr.mc <- stochRRabov1(1, 1.25, 1.38)
-  sbp.rr.stroke[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
-  chol.rr.stroke[, rr := stochRRbelow1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
-  stroke.bmi.rr.mc <- 
-    data.table(
-      agegroup = unique(agegroup.fn(0:90)),
-      rr       = c(rep(1, 5), 
-                   rep(stochRRabov1(1, 1.183667, 1.261833), 8),
-                   rep(stochRRabov1(1, 1.077667, 1.148833), 2),
-                   rep(1, 4))
-    , key = "agegroup"
-    )
-  stroke.diab.rr.mc <- 
-    data.table(
-      agegroup        = rep(unique(agegroup.fn(0:90)),2),
-      diabtotr.cvdlag = rep(c("1", "2"), each=19),
-      rr              = c(rep(1, 24), 
-                          rep(stochRRabov1(1, 3.74, 4.58), 8),
-                          rep(stochRRabov1(1, 2.06, 2.58), 2),
-                          rep(stochRRabov1(1, 1.8, 2.27), 4))
-    , key = c("agegroup", "diabtotr.cvdlag")
-    )
-  stroke.fv.rr.mc <- stochRRbelow1(1, 0.95, 0.97)
-  pa.rr.stroke[, rr := stochRRabov1(1, mean.rr, ci.rr), by = .(mean.rr, ci.rr)]
+  tobacco.rr.stroke <- stroke.tobacco.rr.l[.id == counter[[iterations]]]
+  stroke.ets.rr.mc  <- stroke.ets.rr.l[[counter[[iterations]]]]
+  sbp.rr.stroke     <- stroke.sbp.rr.l[.id == counter[[iterations]]]
+  chol.rr.stroke    <- stroke.chol.rr.l[.id == counter[[iterations]]]
+  stroke.bmi.rr.mc  <- stroke.bmi.rr.l[.id == counter[[iterations]]]
+  stroke.diab.rr.mc <- stroke.diab.rr.l[.id == counter[[iterations]]]
+  stroke.fv.rr.mc   <- stroke.fv.rr.l[[counter[[iterations]]]]
+  pa.rr.stroke      <- stroke.pa.rr.l[.id == counter[[iterations]]]
 }
 
 if ("C16" %in% diseasestoexclude) {
-  c16.salt.optim <- rnorm(1, 4, 0.3) # optimal level for salt around 4 g/day
-  c16.tob.rr.mc <- stochRRabov1(1, 1.04, 1.01)
-  c16.extob.rr.mc <- stochRRbelow1(1, 0.961, 1)
-  
-  c16.fv.rr.mc <- 
-    data.table(
-      agegroup = unique(agegroup.fn(0:90)),
-      rr       = c(rep(1, 5), 
-                   rep(stochRRbelow1(1, 0.94, 1), 10),
-                   rep(stochRRbelow1(1, 0.95, 1), 2),
-                   rep(stochRRbelow1(1, 0.97, 1), 2))
-    , key = "agegroup"
-    )
-  
-  c16.salt.rr.mc <- 
-    data.table(
-      agegroup = unique(agegroup.fn(0:90)),
-      rr       = c(rep(1, 5), 
-                   rep(stochRRabov1(1, 1.08, 1), 10),
-                   rep(stochRRabov1(1, 1.06, 1), 2),
-                   rep(stochRRabov1(1, 1.04, 1), 2))
-      , key = "agegroup"
-    )
-  
-  # Salt effect on sbp
-  # Calculate the effect of salt on SBP. From He FJ, MacGregor GA. 
-  # Effect of modest salt reduction on blood pressure: a meta-analysis
-  # of randomized trials. Implications for public health. 
-  # Journal of Human Hypertension 2002;16:761. 
-  # 100mmol reduction of salt (5.85 g) causes 7.11 mmHg reduction in SBP
-  # in hypertensives and 3.57 in normotensive. 
-  # no ci reported but both have p<0.001 so from Altman DG, Bland JM. 
-  # How to obtain the confidence interval
-  # from a P value. The BMJ 2011   z = -0.862 + sqrt(0.743 - 2.404 * log(0.001)) 
-  # and se = effect/z (ie 7.11/z)
-  salt.sbp.norm.mc <- rtruncnorm(1, 0, Inf, 3.57, 3.57/(-0.862 + sqrt(0.743 - 2.404 * log(0.001))))
-  salt.sbp.htn.mc <- rtruncnorm(1, 0, Inf, 7.11, 7.11/(-0.862 + sqrt(0.743 - 2.404 * log(0.001))))
-  
-  salt.sbp.norm <- function(salt.difference) {
-    return(salt.difference * salt.sbp.norm.mc /5.85)
-  }
-  
-  salt.sbp.htn <- function(salt.difference) {
-    return(salt.difference * salt.sbp.htn.mc /5.85)
-  }
+  c16.salt.optim  <- c16.salt.optim.l[[counter[[iterations]]]]
+  c16.salt.mr     <- c16.salt.mr.l[[counter[[iterations]]]]
+  c16.tob.rr.mc   <- c16.tob.rr.mc.l[[counter[[iterations]]]]
+  c16.extob.rr.mc <- c16.extob.rr.mc.l[[counter[[iterations]]]]
+  c16.fv.rr.mc    <- c16.fv.rr.mc.l[.id == counter[[iterations]]]
+  c16.salt.rr.mc  <- c16.salt.rr.mc.l[.id == counter[[iterations]]]
 }
+

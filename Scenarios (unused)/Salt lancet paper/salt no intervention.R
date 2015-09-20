@@ -20,17 +20,13 @@ if (i == (init.year - 2011)) {
     cat("Post ageing scenario function\n")
     
     cat("translate salt to sbp change\n")
+    # translate to sbp change 
+    POP[between(age, ageL, ageH), 
+        omsysval.cvdlag := omsysval.cvdlag + 
+          salt.sbp.reduct(salt24h.cvdlag.alt - salt24h.cvdlag, 
+                          age, omsysval.cvdlag, .N)]
     
-    # translate to sbp change for normotensives
-    POP[between(age, ageL, ageH) & omsysval.cvdlag <= 130, 
-        omsysval.cvdlag := omsysval.cvdlag - 
-          salt.sbp.norm(salt24h.cvdlag.alt - salt24h.cvdlag)]
-    # translate to sbp change for hypertensives
-    POP[between(age, ageL, ageH) & omsysval.cvdlag > 130, 
-        omsysval.cvdlag := omsysval.cvdlag - 
-          salt.sbp.htn(salt24h.cvdlag.alt - salt24h.cvdlag)]
-    
-    cat("delete salt24h.cvdlag.mr\n")
+    cat("delete salt24h.cvdlag.alt\n")
     POP[, `:=`(salt24h.cvdlag.alt = NULL)]
     
     assign("POP", POP, envir = env)

@@ -156,5 +156,27 @@ if (i == yearstoproject + init.year - 2012) {
   saveRDS(ind.mortal.rds65, file = paste0(output.dir(), "ind.mortal.rds65"))
 }
 
+cat("Export CVD burden summary...\n\n")
+cat(paste0(Sys.time(), "\n\n"))
+if (i == init.year-2011) cvd.burden <- vector("list", yearstoproject)
+
+cvd.burden[[(2011 - init.year + i) + 1]] <-
+  output.cvd(POP, c("qimd", "sex", "agegroup"))
+
+# cvd.burden[[(2011 - init.year + i) * 5 + 2]] <- 
+#   output.cvd(POP, c("sex", "agegroup"))
+# 
+# cvd.burden[[(2011 - init.year + i) * 5 + 3]] <- 
+#   output.cvd(POP, c("qimd", "sex"))
+# 
+# cvd.burden[[(2011 - init.year + i) * 5 + 4]] <- 
+#   output.cvd(POP, c("sex"))
+# 
+# cvd.burden[[(2011 - init.year + i) * 5 + 5]] <- 
+#   output.cvd(POP, c())
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(rbindlist(cvd.burden, T, T), file = paste0(output.dir(), "cvd.burden.rds"))
+}
 
 
