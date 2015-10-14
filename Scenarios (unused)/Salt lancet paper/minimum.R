@@ -6,9 +6,6 @@ cat("Salt theoretical minimum risk\n\n")
 intervention.year <- 2003
 diffusion.period <- 0 # years till reaching target
 
-# Load prediction equations
-if (i == (init.year - 2011)) loadcmp("./risk factor trajectories.Rc", my.env)
-
 # Function to apply after ageing
 post.ageing.scenario.fn <- 
   cmpfun(

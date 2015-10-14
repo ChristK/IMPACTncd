@@ -182,12 +182,13 @@ if (i == init.year - 2011) {
 setkey(POP, age, sex)
 POP[CHDincid, p0 := p0]
 
-# Estimate prevalence of CHD only in first run when i does not exist yet
+
+# Estimate prevalence -----------------------------------------------------
 if (i == init.year - 2011) {
   cat(paste0("Estimating CHD prevalence in ", init.year, " ...\n\n"))
   age.structure <- setkey(POP[age <= ageH, .N, by = .(age, sex)], age, sex)
   age.structure[CHDpreval[age <= ageH], Nprev := rbinom(.N, N, prevalence)]
-  age.structure[CHDincid[age <= ageH],  Nprev := Nprev - rbinom(.N, N, incidence)]
+  age.structure[CHDincid[age <= ageH],  Nprev := Nprev - rbinom(.N, N - Nprev, incidence)]
   age.structure[Nprev < 0, Nprev := 0]
   #age.structure[CHDsurv  , Nprev := round(Nprev *(1-fatality * 1.03))]
   setnames(age.structure, "N", "population")
@@ -257,8 +258,9 @@ if (i > init.year - 2011) CHDsurv[, fatality := fatality * (100 - fatality.annua
 setkey(POP, age, sex)
 POP[CHDsurv, fatality := fatality]
 
-Temp <- POP[chd.incidence > 0, .N, by = .(age, sex) #expected number of deaths
-            ][CHDsurv, sum(fatality * N, na.rm = T)]
+Temp <- POP[between(age, ageL, ageH), 
+            .(before = sum(chd.incidence > 0) * mean(fatality)),
+            by = .(agegroup, sex)] #expected number of deaths
 
 # Fatality SEC gradient and healthcare improvement (supported by table 1.13 BHF2012)
 POP[between(age, ageL, 69) & qimd == "1", fatality := (100 - fatality.sec.gradient.chd/2) * fatality/100]
@@ -271,10 +273,14 @@ POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradie
 POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.chd/4) * fatality/100]
 
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
-Temp1 <- POP[chd.incidence>0, mean(fatality)*.N, by = .(age, sex, qimd) 
-             ][, sum(V1, na.rm = T)]
+Temp1 <- POP[between(age, ageL, ageH), 
+            .(after = sum(chd.incidence > 0) * mean(fatality)),
+            by = .(agegroup, sex)] #expected number of deaths
 
-POP[, fatality := fatality * Temp / Temp1]
+# POP[, fatality := fatality * Temp / Temp1]
+Temp[Temp1, corr := before/after, on = c("agegroup", "sex")]
+Temp[is.na(corr), corr := 1]
+POP[Temp, fatality := fatality * corr, on = c("agegroup", "sex")]
 
 # 30 day fatality from bhf2012 (see MI 30 days fatality.xlsx for the adjustments)
 setkey(POP, agegroup, sex)

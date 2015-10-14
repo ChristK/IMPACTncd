@@ -3,22 +3,17 @@
 # Example code in package build process
 *-Ex.R
 # R data files from past sessions
-*.Rdata
 # RStudio files
 .Rproj.user/
 *.Rproj.user
-*.csv
 *.txt
-*.RData
-*.rda
-*.rds
 *.xls
 *.xlsx
 *.pdf
+*.tiff
 *.directory
-.Rproj.user
 Graphs for Martin/
 Output/
 Unused Scripts/
+Scenarios (unused)/
 *.realsync
-*.Rc

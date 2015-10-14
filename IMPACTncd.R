@@ -66,6 +66,13 @@ foreach(iterations = 1 : it,
         .noexport = c("scenarios.list", "time.mark")) %dorng% {
           
           if (paired) set.seed(seed[[counter[[iterations]]]])
+          cat(paste0("iteration: ", iterations,
+                     " counter: ",counter[[iterations]],
+                     " seed: ",seed[[counter[[iterations]]]], "\n"), 
+              file = "./Output/seed temp.txt",
+              append = T)
+          
+          print(seed[[counter[[iterations]]]])
           
           my.env <- environment() # get environment of this branch
           
@@ -94,6 +101,7 @@ time.mark("End of parallelisation")
 
 # Output
 file.rename("./Output/simulation parameters temp.txt", "./Output/simulation parameters.txt")
+file.rename("./Output/seed temp.txt", "./Output/seed.txt")
 loadcmp(file = "./post simulation functions.Rc")
 if (process.output == T) {
   loadcmp(file = "./output.Rc")

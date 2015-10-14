@@ -30,7 +30,7 @@ dependencies(c("demography",
                "data.table", 
                "dplyr"))
 
-enableJIT(0) #set to 1,2 or 3 to enable different precompiling levels
+enableJIT(2) #set to 1,2 or 3 to enable different precompiling levels
 
 options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata around the sample grand mean rather than the stratum mean)
 # require(devtools)
@@ -375,17 +375,9 @@ sourceCpp("functions.cpp")
 # Sample for parameter distributions --------------------------------------
 load(file="./Lagtimes/salt.rq.coef.rda")
 if (paired == T) { 
-  if (numberofiterations <= length(salt.rq.coef)) {
-    salt.rq.coef <- sample(salt.rq.coef, numberofiterations, F)
-  } else {
-    salt.rq.coef <- sample(salt.rq.coef, numberofiterations, T)
-  }
+  salt.rq.coef <- sample(salt.rq.coef, numberofiterations, T)
 } else {
-  if (it <= length(salt.rq.coef)) {
-    salt.rq.coef <- sample(salt.rq.coef, it, F)
-  } else {
-    salt.rq.coef <- sample(salt.rq.coef, it, T)
-  }
+  salt.rq.coef <- sample(salt.rq.coef, it, T)
 }
 
 
@@ -596,22 +588,26 @@ if ("C16" %in% diseasestoexclude) {
   c16.salt.rr.mc.l[is.na(rr), rr := 1]
 }
 
-# SPOP order --------------------------------------------------------------
+# SPOP load order --------------------------------------------------------------
 if (init.year == 2006) {
   random.spop.file <- list.files("./SynthPop", 
-                                       pattern = glob2rx("SPOP2006*.rds"), 
-                                       full.names = T) # pick a random file from the available population files
+                                 pattern = glob2rx("SPOP2006*.rds"), 
+                                 full.names = T) # pick a random file from the available population files
 } else {
   random.spop.file <- list.files("./SynthPop", 
-                                       pattern = glob2rx("spop2011*.rds"), 
-                                       full.names = T) # pick a random file from the available population files
+                                 pattern = glob2rx("spop2011*.rds"), 
+                                 full.names = T) # pick a random file from the available population files
 }
 
 random.spop.file <- sample(random.spop.file, ifelse(paired, numberofiterations, it), T)
 
 # Set seed to ensure same sample and rng streams per scenario per iterations
-seed <- sample(1e6:1e7, ifelse(paired, numberofiterations, it), T) 
+seed <- sample(1e6:1e7, ifelse(paired, numberofiterations, it), F) 
 
-rm(Fertility.Assumption, n.scenarios)
+cat(paste0(seed), "\n", 
+    file = "./Output/seed temp.txt",
+    append = F)
+
+rm(n.scenarios)
 
 

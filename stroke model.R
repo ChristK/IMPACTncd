@@ -182,7 +182,8 @@ if (i == init.year - 2011) {
 setkey(POP, age, sex)
 POP[strokeincid, p0 := p0]
 
-# Estimate prevalence of stroke only in first run when i does not exist yet
+
+# Estimate prevalence -----------------------------------------------------
 if (i == init.year - 2011) {
   cat(paste0("Estimating stroke prevalence in ", init.year, " ...\n\n"))
   age.structure <- setkey(POP[age <= ageH, .N, by = .(age, sex)], age, sex)
@@ -202,7 +203,8 @@ if (i == init.year - 2011) {
                    sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]], Nprev], 
                             weight = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
                               stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr *
-                              stroke.fv.rr * stroke.pa.rr * sec.grad.adj, 
+                              stroke.fv.rr * stroke.pa.rr * 
+                              sec.grad.adj, 
                             replace = F), 
                    by = .(age, sex)][, id]
   POP[id %in% id.stroke, stroke.incidence := init.year - 1] # and then we assign
@@ -252,23 +254,31 @@ if (i > init.year - 2011) strokesurv[, fatality := fatality * (100 - fatality.an
 setkey(POP, age, sex)
 POP[strokesurv, fatality := fatality]
 
-Temp <- POP[stroke.incidence > 0, .N, by = .(age, sex) #expected number of deaths
-            ][strokesurv, sum(fatality * N, na.rm = T)]
+Temp <- POP[between(age, ageL, ageH), 
+            .(before = sum(stroke.incidence > 0) * mean(fatality)),
+            by = .(agegroup, sex)] #expected number of deaths
+
 
 # Fatality SEC gradient and healthcare improvement (supported by table 1.13 BHF2012)
 POP[between(age, ageL, 69) & qimd == "1", fatality := (100 - fatality.sec.gradient.stroke / 2) * fatality/100]
 POP[between(age, ageL, 69) & qimd == "2", fatality := (100 - fatality.sec.gradient.stroke / 4) * fatality/100]
 POP[between(age, ageL, 69) & qimd == "4", fatality := (100 + fatality.sec.gradient.stroke / 4) * fatality/100]
 POP[between(age, ageL, 69) & qimd == "5", fatality := (100 + fatality.sec.gradient.stroke / 2) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.stroke / 4) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.stroke / 8) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.stroke / 8) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.stroke / 4) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.stroke / 5) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.stroke / 10) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.stroke / 10) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.stroke / 5) * fatality/100]
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
-Temp1 <- POP[stroke.incidence>0, mean(fatality)*.N, by = .(age, sex, qimd) 
-             ][, sum(V1, na.rm = T)]
+# Temp1 <- POP[stroke.incidence>0, mean(fatality)*.N, by = .(age, sex, qimd) 
+#              ][, sum(V1, na.rm = T)]
+Temp1 <- POP[between(age, ageL, ageH), 
+             .(after = sum(stroke.incidence > 0) * mean(fatality)),
+             by = .(agegroup, sex)] #expected number of deaths
 
-POP[, fatality := fatality * Temp / Temp1]
+# POP[, fatality := fatality * Temp / Temp1]
+Temp[Temp1, corr := before/after, on = c("agegroup", "sex")]
+Temp[is.na(corr), corr := 1]
+POP[Temp, fatality := fatality * corr, on = c("agegroup", "sex")]
 
 # 30 day fatality from OXVASC (see 30 days fatality.xlsx for the adjustments)
 setkey(POP, agegroup, sex)

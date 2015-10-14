@@ -1,14 +1,4 @@
-#!/opt/gridware/apps/gcc/R/3.2.0/bin/Rscript
-#!/usr/bin/Rscript
-# ********************************************************************************
-#
-# IMPACT NCD Prototype 08
-#
-# ********************************************************************************
-
 # Preample ----------------------------------------------------------------
-
-
 gc()
 options(datatable.verbose = F)
 
@@ -106,8 +96,6 @@ source(file = "./initialisation.R")
 # England and Wales not just England. Minimal bias since we use probabilities.
 cat("Generating life table...\n\n")
 source(file = "./life table engine.R")
-source(file = "./cancer statistics.R") # for cancer
-source(file = "./CVD statistics.R") # for cvd
 
 iterations = 1 
 my.env <- environment() # get environment of this branch

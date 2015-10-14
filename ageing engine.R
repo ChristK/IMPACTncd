@@ -23,7 +23,7 @@ if (i == init.year - 2011) {
       by = .(age, sex, qimd)]
 }
 
-setkey(POP,     age, sex, qimd, percentile)
+setkey(POP, age, sex, qimd, percentile)
 
 if (scenarios.list[[iterations]] == "salt no intervention.Rc") {
   if ((i + 2011 - cancer.lag) < 2003 && (i + 2011 - cvd.lag) < 2003) {
@@ -37,13 +37,13 @@ if (scenarios.list[[iterations]] == "salt no intervention.Rc") {
     POP[, `:=`(salt.l = NULL, salt.u = NULL)]
     
     POP[between(age, 19, ageH), salt24h.cvdlag.alt := salt24h.cvdlag] # so the difference is 0 and doesn't affect sbp
-
+    
     POP <- tmp.ca[POP, roll = "nearest"]
     POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
     POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
     rm(tmp.ca, tmp.cvd)
   } else if ((i + 2011 - cancer.lag) < 2003 && (i + 2011 - cvd.lag) >= 2003) {
-    tmp.cvd0 <- pred.salt(cvd.lag - 8, cvd.lag) # salt exposure remains as of 2003
+    tmp.cvd0 <- pred.salt(cvd.lag - 7.5, cvd.lag) # salt exposure remains as of 2003
     tmp.cvd  <- pred.salt(i, cvd.lag) # alternative current policy
     tmp.ca0  <- pred.salt(i, cancer.lag) 
     setkey(tmp.cvd0, age, sex, qimd, percentile)
@@ -63,9 +63,70 @@ if (scenarios.list[[iterations]] == "salt no intervention.Rc") {
     POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
     rm(tmp.ca0, tmp.cvd0, tmp.cvd)
   } else {
-    tmp.cvd0 <- pred.salt(-8 + cvd.lag, cvd.lag) # salt exposure remains as of 2003
+    tmp.cvd0 <- pred.salt(-7.5 + cvd.lag, cvd.lag) # salt exposure remains as of 2003
     tmp.cvd <- pred.salt(i, cvd.lag) # alternative current policy
-    tmp.ca0  <- pred.salt(-8 + cancer.lag, cancer.lag) # as of 2003
+    tmp.ca0  <- pred.salt(-7.5 + cancer.lag, cancer.lag) # as of 2003
+    setkey(tmp.cvd0, age, sex, qimd, percentile)
+    setkey(tmp.cvd, age, sex, qimd, percentile)
+    setkey(tmp.ca0,  age, sex, qimd, percentile)
+    
+    POP <- tmp.cvd0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.cvd[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag.alt := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.ca0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
+    rm(tmp.ca0, tmp.cvd0, tmp.cvd)
+  }
+} else if (scenarios.list[[iterations]] == "salt slow intervention.Rc") {
+  time.correction.cvd <- -2003 + 2011 - cvd.lag
+  time.correction.ca  <- -2003 + 2011 - cancer.lag
+  
+  if ((i + 2011 - cancer.lag) < 2003 && (i + 2011 - cvd.lag) < 2003) {
+    tmp.cvd  <- pred.salt(i, cvd.lag) 
+    tmp.ca  <- pred.salt(i, cancer.lag)
+    setkey(tmp.cvd,  age, sex, qimd, percentile)
+    setkey(tmp.ca,  age, sex, qimd, percentile)
+    
+    POP <- tmp.cvd[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP[between(age, 19, ageH), salt24h.cvdlag.alt := salt24h.cvdlag] # so the difference is 0 and doesn't affect sbp
+    
+    POP <- tmp.ca[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
+    rm(tmp.ca, tmp.cvd)
+  } else if ((i + 2011 - cancer.lag) < 2003 && (i + 2011 - cvd.lag) >= 2003) {
+    tmp.cvd0 <- pred.salt(cvd.lag - 7.5 + (time.correction.cvd + i)/5, cvd.lag) # salt exposure remains as of 2003
+    tmp.cvd  <- pred.salt(i, cvd.lag) # alternative current policy
+    tmp.ca0  <- pred.salt(i, cancer.lag) 
+    setkey(tmp.cvd0, age, sex, qimd, percentile)
+    setkey(tmp.cvd,  age, sex, qimd, percentile)
+    setkey(tmp.ca0,  age, sex, qimd, percentile)
+    
+    POP <- tmp.cvd0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.cvd[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.cvdlag.alt := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(salt.l = NULL, salt.u = NULL)]
+    
+    POP <- tmp.ca0[POP, roll = "nearest"]
+    POP[between(age, 19, ageH), salt24h.calag := runif(.N, salt.l, salt.u)]
+    POP[, `:=`(percentile = NULL, salt.l = NULL, salt.u = NULL)]
+    rm(tmp.ca0, tmp.cvd0, tmp.cvd)
+  } else {
+    tmp.cvd0 <- pred.salt(cvd.lag - 7.5 + (time.correction.cvd + i)/5, cvd.lag) # salt exposure remains as of 2003
+    tmp.cvd  <- pred.salt(i, cvd.lag) # alternative current policy
+    tmp.ca0  <- pred.salt(cancer.lag - 7.5 + (time.correction.ca + i)/5, cancer.lag) # as of 2003
     setkey(tmp.cvd0, age, sex, qimd, percentile)
     setkey(tmp.cvd, age, sex, qimd, percentile)
     setkey(tmp.ca0,  age, sex, qimd, percentile)

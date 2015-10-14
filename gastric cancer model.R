@@ -1,4 +1,5 @@
 #cmpfile("./gastric cancer model.R")
+# RF to RR  ---------------------------------------------------------------
 cat("Loading gastric cancer model (C16) model...\n")
 cat(paste0(Sys.time(), "\n\n"))
 if (i == init.year - 2011) set(POP, NULL, "c16.incidence",  0) # Only needs to run the very first time of each simulation
@@ -14,7 +15,7 @@ set(POP, NULL, "c16.tob.rr", 1)
 POP[cigst1.cvdlag %in% c("2", "3", "4") & packyears > 0,
     `:=` (c16.tob.rr = c16.tob.rr.mc^log2(packyears * 20))] # packyears * 20 = cigarette years
 POP[cigst1.cvdlag %in% c("2", "3") & endsmoke>0, `:=` (c16.tob.rr = c16.tob.rr * (c16.extob.rr.mc^log2(endsmoke)))] # packyears * 20 = cigarette years
-POP[c16.tob.rr < 1 | endsmoke > 50, c16.tob.rr := 1] #ex smokersof more than 20 years 
+POP[c16.tob.rr < 1 | endsmoke > 20, c16.tob.rr := 1] #ex smokersof more than 20 years 
 # atract no risk. This is not true when PAF is calculated. The results seem more accurate
 # this way
 
@@ -24,7 +25,7 @@ POP[c16.tob.rr < 1 | endsmoke > 50, c16.tob.rr := 1] #ex smokersof more than 20 
 cat("f&v RR\n")
 setkey(POP, agegroup)
 set(POP, NULL, "c16.fv.rr", 1)
-POP[c16.fv.rr.mc,  c16.fv.rr := rr^(porftvg.calag - 8)]
+POP[c16.fv.rr.mc,  c16.fv.rr := rr^(porftvg.calag - 7)] # no effect for more than 7 portions
 POP[c16.fv.rr < 1, c16.fv.rr := 1]
 POP[is.na(c16.fv.rr), c16.fv.rr := 1]
 # Calculate RR for C16. From World Cancer Research Fund, 
@@ -33,7 +34,6 @@ POP[is.na(c16.fv.rr), c16.fv.rr := 1]
 # a global perspective. Washington, DC: WCRF/AICR; 2007.
 # p145. RR 1.08 (1 - 1.17) per 1gr/day of salt. Risk starts from
 # 3gr/day (around reference category of the 2 cohort studies) 
-# I will artificially decrease it for older ages  
 cat("salt RR\n")
 set(POP, NULL, "c16.salt.rr", 1)
 POP[c16.salt.rr.mc, c16.salt.rr := rr^(salt24h.calag - c16.salt.optim)]
@@ -55,7 +55,7 @@ if (i == init.year - 2011) {
     POP[between(age, ageL, ageH), 
         .(fvpaf = 
             (sum(c16.fv.rr - 1, na.rm = T) / .N) / 
-            ((sum(c16.fv.rr - 1, na.rm = T) /.N ) + 1)
+            ((sum(c16.fv.rr - 1, na.rm = T) / .N ) + 1)
         ), 
         by = .(agegroup, sex)
         ]
@@ -65,7 +65,7 @@ if (i == init.year - 2011) {
     POP[between(age, ageL, ageH), 
         .(saltpaf = 
             (sum(c16.salt.rr - 1, na.rm = T) / .N) / 
-            ((sum(c16.salt.rr - 1, na.rm = T) /.N ) + 1)
+            ((sum(c16.salt.rr - 1, na.rm = T) / .N ) + 1)
         ), 
         by = .(agegroup, sex)
         ]
@@ -73,7 +73,8 @@ if (i == init.year - 2011) {
   
   C16incid[, agegroup := agegroup.fn(age)]
   setkey(C16incid, agegroup, sex)
-  C16incid[c16tobpaf[c16fvpaf[c16saltpaf]], p0 := incidence * (1 - tobpaf) * (1 - fvpaf) * (1 - saltpaf)]
+  C16incid[c16tobpaf[c16fvpaf[c16saltpaf]],
+           p0 := incidence * (1 - tobpaf) * (1 - fvpaf) * (1 - saltpaf)]
   C16incid[is.na(p0), p0 := incidence]
   C16incid[, agegroup := NULL]
   setkey(C16incid, NULL)
@@ -83,14 +84,15 @@ if (i == init.year - 2011) {
 setkey(POP, age, sex)
 POP[C16incid, p0 := p0]
 
-# Estimate prevalence of C16 only in first run 
+
+# Prevalence of C16 only in first run  ------------------------------------
 if (i == init.year - 2011) {
   cat(paste0("Estimating gastric cancer prevalence in ",
              init.year - 1, " ...\n\n"))
   age.structure <- setkey(POP[age <= ageH, .N, by = .(age, sex)], age, sex)
-  age.structure[C16preval[age <= ageH], Nprev := rbinom(.N, N, prevalence)]
-  age.structure[C16incid[age <= ageH],  Nprev := Nprev - rbinom(.N, N, incidence)]
-  age.structure[Nprev < 0, Nprev := 0]
+  Temp <- merge(C16preval[age <= ageH], C16incid[age <= ageH], by = c("age", "sex"))
+  Temp[, prevalence := prevalence - incidence][prevalence < 0, prevalence := 0]
+  age.structure[Temp, Nprev := rbinom(.N, N, prevalence)]
   
   #age.structure[C16fatal[C16remis, on = c("age", "sex")],
   #             Nprev := round(Nprev * (1 + fatality + remission))]
@@ -145,7 +147,7 @@ cat("Estimating gastric cancer mortality...\n\n")
 # Apply assumptions about improvement of fatality by year
 if (i > init.year - 2011) {
   C16fatal[, fatality  := fatality  * (100 - fatality.annual.improvement.c16)/100]
-  C16remis[, remission := remission * (100 + fatality.annual.improvement.c16 * 0.5)/100]
+  C16remis[, remission := remission * (100 + fatality.annual.improvement.c16)/100]
   # It make sense when fatality decreasing remission to increase and vice versa. 
   # The increase of remission was set to half the decrease in survival to adjust
   # for increase survival but not cure 
@@ -154,44 +156,55 @@ if (i > init.year - 2011) {
 setkey(POP, age, sex)
 POP[C16fatal, fatality := fatality]
 
-Temp <- POP[c16.incidence > 0, .N, by = .(age, sex) #expected number of deaths
-            ][C16fatal, sum(fatality * N, na.rm = T)]
+Temp <- POP[between(age, ageL, ageH), 
+            .(before = sum(c16.incidence > 0) * mean(fatality)),
+            by = .(agegroup, sex)] #expected number of deaths
 
 POP[between(age, ageL, 69) & qimd == "1", fatality := (100 - fatality.sec.gradient.c16 / 2) * fatality/100]
 POP[between(age, ageL, 69) & qimd == "2", fatality := (100 - fatality.sec.gradient.c16 / 4) * fatality/100]
 POP[between(age, ageL, 69) & qimd == "4", fatality := (100 + fatality.sec.gradient.c16 / 4) * fatality/100]
 POP[between(age, ageL, 69) & qimd == "5", fatality := (100 + fatality.sec.gradient.c16 / 2) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.c16 / 4) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.c16 / 8) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.c16 / 8) * fatality/100]
-POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.c16 / 4) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.c16 / 1) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.c16 / 2) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.c16 / 2) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.c16 / 1) * fatality/100]
 
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
-Temp1 <- POP[c16.incidence>0, mean(fatality)*.N, by = .(age, sex, qimd) 
-             ][, sum(V1, na.rm = T)]
+Temp1 <- POP[between(age, ageL, ageH), 
+            .(after = sum(c16.incidence > 0) * mean(fatality)),
+            by = .(agegroup, sex)] #expected number of deaths
 
-POP[, fatality := fatality * Temp / Temp1]
+Temp[Temp1, corr := before/after, on = c("agegroup", "sex")]
+Temp[is.na(corr), corr := 1]
+POP[Temp, fatality := fatality * corr, on = c("agegroup", "sex")]
+POP[fatality > 1, fatality := 0.99]
 
 # Mortality and remission need to be calculated on the same step
 # I NEED TO implement also decreasing probability of death by duration
 POP[C16remis, `:=` (remission = remission)]
 
-Temp <- POP[c16.incidence > 0, .N, by = .(age, sex) #expected number of deaths
-            ][C16remis, sum(remission * N, na.rm = T)]
+Temp <- POP[between(age, ageL, ageH), 
+            .(before = sum(c16.incidence > 0) * mean(remission)),
+            by = .(agegroup, sex)] #expected number of deaths
 
 POP[between(age, ageL, 69) & qimd == "1", remission := (100 + fatality.sec.gradient.c16 / 2) * remission/100]
 POP[between(age, ageL, 69) & qimd == "2", remission := (100 + fatality.sec.gradient.c16 / 4) * remission/100]
 POP[between(age, ageL, 69) & qimd == "4", remission := (100 - fatality.sec.gradient.c16 / 4) * remission/100]
 POP[between(age, ageL, 69) & qimd == "5", remission := (100 - fatality.sec.gradient.c16 / 2) * remission/100]
-POP[between(age, 70, ageH) & qimd == "1", remission := (100 + fatality.sec.gradient.c16 / 4) * remission/100]
-POP[between(age, 70, ageH) & qimd == "2", remission := (100 + fatality.sec.gradient.c16 / 8) * remission/100]
-POP[between(age, 70, ageH) & qimd == "4", remission := (100 - fatality.sec.gradient.c16 / 8) * remission/100]
-POP[between(age, 70, ageH) & qimd == "5", remission := (100 - fatality.sec.gradient.c16 / 4) * remission/100]
+POP[between(age, 70, ageH) & qimd == "1", remission := (100 + fatality.sec.gradient.c16 / 2) * remission/100]
+POP[between(age, 70, ageH) & qimd == "2", remission := (100 + fatality.sec.gradient.c16 / 4) * remission/100]
+POP[between(age, 70, ageH) & qimd == "4", remission := (100 - fatality.sec.gradient.c16 / 4) * remission/100]
+POP[between(age, 70, ageH) & qimd == "5", remission := (100 - fatality.sec.gradient.c16 / 2) * remission/100]
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
-Temp1 <- POP[c16.incidence>0, mean(remission)*.N, by = .(age, sex, qimd) 
-             ][, sum(V1, na.rm = T)]
 
-POP[, remission := remission * Temp / Temp1]
+Temp1 <- POP[between(age, ageL, ageH), 
+            .(after = sum(c16.incidence > 0) * mean(remission)),
+            by = .(agegroup, sex)] #expected number of deaths
+
+Temp[Temp1, corr := before/after, on = c("agegroup", "sex")]
+Temp[is.na(corr), corr := 1]
+POP[Temp, remission := remission * corr, on = c("agegroup", "sex")]
+POP[remission > 1, remission := 0.99]
 
 POP[c16.incidence > 0, 
     `:=` (v = dice(.N) <= fatality + remission, # T = dead or cured (F = diseased)

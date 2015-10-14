@@ -471,10 +471,23 @@ pred.bmi <- cmpfun(function(year, age, sex, qimd, a30to06m, lag = cvd.lag) {
 pred.salt <- 
   cmpfun(
     function(year, lag = cancer.lag) {
-      if ((year - lag) < -13) year <- lag - 13 # otherwse log(0)
+      year <- 
+        switch(EXPR = as.character((year - lag)),
+               "-16" =  lag - 8,
+               "-15" =  lag - 8.5, 
+               "-14" =  lag - 9,
+               "-13" =  lag - 9.5, 
+               "-12" =  lag - 9, #9
+               "-11" =  lag - 8.5, #8.5
+               "-10" =  lag - 8, #8
+               "-9"  =  lag - 7.7,
+               "-8"  =  lag - 7.5,
+               year
+        )
+      
       tmp <- expand.grid(
         year = year-lag,
-        age  = (19-lag):(ageH-lag),
+        age  = (19 - lag):(ageH - lag),
         #age  = (ageL-lag):(ageH-lag),
         sex  = factor(1:2),
         qimd = ordered(1:5)

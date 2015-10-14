@@ -24,8 +24,8 @@ dir.create(path = output.dir(), recursive = T) # create a unique directory for e
 salt.sbp.reduct <- cmpfun(
   function(salt.difference, age, sbp, n) {
     y = rnorm(n, -3.735, 0.73) + rnorm(n, -0.105, 0.029) * (age - 50) +
-      rnorm(n, -1.874, 0.884) * (sbp > 135) +
-      rnorm(n, -2.489, 1.188) * sample(0:1, n, T, c(0.9, 0.1))
+      rnorm(n, -1.874, 0.884) * (sbp > 140) +
+      rnorm(n, -2.489, 1.188) * rbinom(n, 1, 0.1)
     return(salt.difference * y /5.85)
   }
 )
