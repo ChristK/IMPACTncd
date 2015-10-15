@@ -5,17 +5,20 @@
 # R data files from past sessions
 # RStudio files
 .Rproj.user/
-#SynthPop\spop*
-#SynthPop\SPOP*
 SynthPop\
-Lagtimes\HSE.ts.RData
+Lagtimes\
+!Lagtimes\produce summary files for regression.R
 *.Rproj.user
+*.Rproj
 *.txt
 *.xls
 *.xlsx
 *.ods
 *.pdf
 *.tiff
+*.gif
+*.ico
+*.out
 *.directory
 *.Rc
 Graphs for Martin/
