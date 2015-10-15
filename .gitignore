@@ -5,8 +5,10 @@
 # R data files from past sessions
 # RStudio files
 .Rproj.user/
-SynthPop\spop*
-SynthPop\SPOP*
+#SynthPop\spop*
+#SynthPop\SPOP*
+SynthPop\
+Lagtimes\HSE.ts.RData
 *.Rproj.user
 *.txt
 *.xls
@@ -15,6 +17,7 @@ SynthPop\SPOP*
 *.pdf
 *.tiff
 *.directory
+*.Rc
 Graphs for Martin/
 Output/
 Unused Scripts/
