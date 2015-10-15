@@ -5,9 +5,7 @@
 # R data files from past sessions
 # RStudio files
 .Rproj.user/
-SynthPop\
-Lagtimes\
-!Lagtimes\produce summary files for regression.R
+
 *.Rproj.user
 *.Rproj
 *.txt
@@ -21,8 +19,13 @@ Lagtimes\
 *.out
 *.directory
 *.Rc
+*.realsync
+# Directories
+
 Graphs for Martin/
 Output/
 Unused Scripts/
 Scenarios (unused)/
-*.realsync
+SynthPop\
+Lagtimes\
+!Lagtimes\produce summary files for regression.R
