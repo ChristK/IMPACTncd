@@ -222,9 +222,8 @@ pip-log.txt
 *.txt
 *.pdf
 *.directory
-Output\
-SynthPop\
-Validation\
+SynthPop/
+Validation/
 Graphs for Martin/
 Output/
 Unused Scripts/
