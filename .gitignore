@@ -222,6 +222,8 @@ pip-log.txt
 *.txt
 *.pdf
 *.directory
+*.out
+*.jar
 SynthPop/
 Validation/
 Graphs for Martin/
@@ -230,3 +232,4 @@ Unused Scripts/
 Scenarios (unused)/
 #Lagtimes\
 #!Lagtimes\produce summary files for regression.R
+.Rproj.user
