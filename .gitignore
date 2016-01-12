@@ -222,6 +222,8 @@ pip-log.txt
 *.txt
 *.pdf
 *.directory
+*.tex
+*.out
 HSE.ts.RData
 SynthPop/
 Validation/
