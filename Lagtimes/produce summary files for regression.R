@@ -1,6 +1,6 @@
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or
@@ -59,26 +59,29 @@ options(warn = 1)
 if (Sys.info()[1] == "Linux") {
   if (system("whoami", T )== "mdxasck2") {
     setwd("~/IMPACTncd/")
-
+    clusternumber <- ifelse (clusternumber<70, 70, clusternumber)  # overwrites previous if <60
   } else {
     setwd(paste("/home/", 
                 system("whoami", T), 
-                "/Dropbox/PhD/", 
+                "/Dropbox/PhD/Models/IMPACTncd/", 
                 sep = "", 
                 collapse = ""))
   }
+} else if (Sys.info()[1] == "Darwin") {
+  setwd("/Users/chris/Dropbox/PhD/")
 } else {
   get.dropbox.folder <- function() {
     if (!require(RCurl)) 
       stop("You need to install RCurl package.")
     if (Sys.info()["sysname"] != "Windows") 
-      stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry...")
+      stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry.")
     db.file <- paste(Sys.getenv("APPDATA"), "\\Dropbox\\host.db", sep = "")
     base64coded <- readLines(db.file, warn = F)[2]
     base64(base64coded, encode = F)
   }
-  setwd(paste0(get.dropbox.folder(), "/PhD/"))
+  setwd(paste0(get.dropbox.folder(), "/PhD/Models/IMPACTncd/"))
 }
+
 
 
 # Define function to clear labels form SPSS labelled imports
@@ -139,12 +142,12 @@ agegroup.fn(HSE2012original)
 #HSE.1.srv.blood <- svydesign(id=~psu, strata=~cluster, weights=~wt.blood, nest=F, data=HSE2012original[wt.blood>0], check.strata = T)
 #HSE.1.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2012original[wt.nurse>0], check.strata = T)
 
-HSE2012 =copy(HSE2012original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval12, omsysval, diabtotr, cigst1, startsmk, endsmoke, numsmok, smokyrs, cigdyal, a30to06, sodiumval, potass, creatin, wt.urine)])
+HSE2012 =copy(HSE2012original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval12, omsysval, diabtotr, cigst1, startsmk, endsmoke, numsmok, smokyrs, cigdyal, a30to06, sodiumval, potass, creatin, wt.urine, origin, hdlval12, bpmedd2, diabete2)])
 HSE2012[, `:=`(year=1, porftvg = NA, frtpor = NA)]
 setnames(HSE2012, "sodiumval", "sodium")
 HSE2012[, psu := paste0(psu, "2012")]
 HSE2012[, cluster := paste0(cluster, "2012")]
-setnames(HSE2012, "cholval12", "cholval1")
+setnames(HSE2012, c("cholval12", "hdlval12", "bpmedd2"), c("cholval1", "hdlval1", "bpmedd"))
 
 load(file="./Datasets/Health Survey for England/2011/hse2011ai.RData")
 HSE2011original <- clear.labels(HSE.2011)
@@ -155,7 +158,8 @@ agegroup.fn(HSE2011original)
 #HSE0.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2011original[wt.nurse>0], check.strata = T)
 #HSE0.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2011original[wt.nurse>0], check.strata = T)
 
-HSE2011 =copy(HSE2011original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal)])
+HSE2011 =copy(HSE2011original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, origin, hdlval1,
+                                     iregdef, bpmedd, diabete2)])
 HSE2011[, `:=`(year=0, a30to06 = NA, sodium = NA, potass = NA, creatin = NA, wt.urine = 0)]
 HSE2011[, psu := paste0(psu, "2011")]
 HSE2011[, cluster := paste0(cluster, "2011")]
@@ -164,7 +168,7 @@ load(file="./Datasets/Health Survey for England/2010/hse10ai.RData")
 HSE2010original <- setDT(clear.labels(HSE2010original))
 HSE2010original <- filter(HSE2010original, samptype==1)
 setnames(HSE2010original, "imd2007", "qimd")
-HSE2010original[, cholval1 := cholval1 + 0.1]
+HSE2010original[cholflag == 1, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 HSE2010original[is.na(wt.nurse), wt.nurse := 0]
 HSE2010original[is.na(wt.blood), wt.blood := 0]
 agegroup.fn(HSE2010original)
@@ -174,17 +178,17 @@ HSE2010original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
 #HSE1.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2010original[wt.nurse>0], check.strata = T)
 #HSE1.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2010original[wt.int>0], check.strata = T)
 
-HSE2010 =copy(HSE2010original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodival, potass, creatin, wt.urine)])
+HSE2010 =copy(HSE2010original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodival, potass, creatin, wt.urine, origin, hdlval1, kiddiag, bpmedd, diabete2)])
 HSE2010[, `:=`(year=-1, a30to06 = NA)]
-setnames(HSE2010, "sodival", "sodium")
+setnames(HSE2010, c("sodival"), c("sodium"))
 HSE2010[, psu := paste0(psu, "2010")]
 HSE2010[, cluster := paste0(cluster, "2010")]
 
 load(file="./Datasets/Health Survey for England/2009/hse09ai.RData")
 HSE2009original <- setDT(clear.labels(HSE2009original))
 HSE2009original <- filter(HSE2009original, samptype==1)
-setnames(HSE2009original, "imd2007", "qimd")
-HSE2009original[, cholval1 := cholval1 + 0.1]
+setnames(HSE2009original, "imd2007" , "qimd")
+HSE2009original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 agegroup.fn(HSE2009original)
 HSE2009original[diabete2 == 2, diabtotr := 1]
 HSE2009original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
@@ -192,7 +196,7 @@ HSE2009original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
 #HSE2.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2009original[wt.nurse>0], check.strata = T)
 #HSE2.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2009original[wt.int>0], check.strata = T)
 
-HSE2009 =copy(HSE2009original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodium, potass, creatin, wt.urine)])
+HSE2009 =copy(HSE2009original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodium, potass, creatin, wt.urine, origin, hdlval1, bpmedd, diabete2)])
 HSE2009[, `:=`(year=-2, a30to06 = NA)]
 HSE2009[, psu := paste0(psu, "2009")]
 HSE2009[, cluster := paste0(cluster, "2009")]
@@ -200,14 +204,15 @@ HSE2009[, cluster := paste0(cluster, "2009")]
 load(file="./Datasets/Health Survey for England/2008/hse08ai.RData")
 HSE2008original <- setDT(clear.labels(HSE2008original))
 HSE2008original <- filter(HSE2008original, samptype==1) 
-HSE2008original[, cholval1 := cholval1 + 0.1]
+HSE2008original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 agegroup.fn(HSE2008original)
 #HSE3.srv.blood <- svydesign(id=~psu, strata=~cluster, weights=~wt.blood, nest=F, data=HSE2008original[wt.blood>0], check.strata = T)
 #HSE3.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2008original[wt.nurse>0], check.strata = T)
 #HSE3.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2008original[wt.int>0], check.strata = T)
 
-HSE2008 =copy(HSE2008original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval,  cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, a30to06)])
-HSE2008[, `:=`(year=-3, diabtotr = NA, sodium = NA, potass = NA, creatin = NA, wt.urine = 0)]
+HSE2008 =copy(HSE2008original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval,  cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, a30to06, origin, hdlval1,
+                                     bpmedd)])
+HSE2008[, `:=`(year=-3, diabtotr = NA, diabete2 = NA, sodium = NA, potass = NA, creatin = NA, wt.urine = 0)]
 HSE2008[, psu := paste0(psu, "2008")]
 HSE2008[, cluster := paste0(cluster, "2008")]
 
@@ -220,8 +225,8 @@ agegroup.fn(HSE2007original)
 #HSE4.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2007original[wt.nurse>0], check.strata = T)
 #HSE4.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2007original[wt.int>0], check.strata = T)
 
-HSE2007 =copy(HSE2007original[, list(wt.int, wt.nurse,  psu, cluster, age, agegroup, sex, group, qimd, bmival, omsysval, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodium, potass, creatin)])
-HSE2007[, `:=`(year=-4, diabtotr = NA, wt.blood = 1, cholval1 = NA, a30to06 = NA, wt.urine = wt.nurse)]
+HSE2007 =copy(HSE2007original[, list(wt.int, wt.nurse,  psu, cluster, age, agegroup, sex, group, qimd, bmival, omsysval, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodium, potass, creatin, bpmedd)])
+HSE2007[, `:=`(year=-4, diabtotr = NA, diabete2 = NA, wt.blood = 1, cholval1 = NA, a30to06 = NA, wt.urine = wt.nurse)]
 HSE2007[, psu := paste0(psu, "2007")]
 HSE2007[, cluster := paste0(cluster, "2007")]
 
@@ -230,7 +235,7 @@ HSE <- setDT(clear.labels(HSE))
 HSE2006original <- filter(HSE, samptype!=3)
 rm(HSE)
 setnames(HSE2006original, "imd2004", "qimd")
-HSE2006original[, cholval1 := cholval1 + 0.1]
+HSE2006original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 agegroup.fn(HSE2006original)
 HSE2006original[diabete2 == 2, diabtotr := 1]
 HSE2006original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
@@ -238,7 +243,7 @@ HSE2006original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
 #HSE5.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2006original[wt.nurse>0], check.strata = T)
 #HSE5.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2006original[wt.int>0], check.strata = T)
 
-HSE2006 =copy(HSE2006original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, a30to06, sodium, potass, creatin)])
+HSE2006 =copy(HSE2006original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, a30to06, sodium, potass, creatin, famcvd, hdlval1, bpmedd, diabete2)])
 HSE2006[, `:=`(year=-5, wt.urine = wt.nurse)]
 HSE2006[, psu := paste0(psu, "2006")]
 HSE2006[, cluster := paste0(cluster, "2006")]
@@ -247,7 +252,7 @@ load(file="./Datasets/Health Survey for England/2005/hse05ai.RData") # Only indi
 HSE2005original <- setDT(clear.labels(HSE2005original))
 HSE2005original <- filter(HSE2005original, samptype==1) 
 setnames(HSE2005original, c("imd2004", "area", "wt.bldel"), c("qimd", "psu", "wt.blood"))
-HSE2005original[, cholval1 := cholval1 + 0.1]
+HSE2005original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 agegroup.fn(HSE2005original)
 HSE2005original[diabete2 == 2, diabtotr := 1]
 HSE2005original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
@@ -255,7 +260,8 @@ HSE2005original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
 #HSE6.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2005original[wt.nurse>0], check.strata = T)
 #HSE6.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2005original[wt.int>0], check.strata = T)
 
-HSE2005 =copy(HSE2005original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodium, potass, creatin)])
+HSE2005 =copy(HSE2005original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, sodium, potass,
+                                     creatin, hdlval1, bpmedd, diabete2)])
 HSE2005[, `:=`(year=-6, a30to06 = NA, wt.urine = wt.nurse)]
 HSE2005[, psu := paste0(psu, "2005")]
 HSE2005[, cluster := paste0(cluster, "2005")]
@@ -264,7 +270,7 @@ load(file="./Datasets/Health Survey for England/2004/hse04gpa.RData") # It seems
 HSE2004original <- setDT(clear.labels(HSE2004original))
 HSE2004original <- filter(HSE2004original, samptype==7)
 setnames(HSE2004original, c("imd2004", "area"), c("qimd", "psu"))
-HSE2004original[, cholval1 := cholval1 + 0.1]
+HSE2004original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 agegroup.fn(HSE2004original)
 HSE2004original[diabete2 == 2, diabtotr := 1]
 HSE2004original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
@@ -273,7 +279,8 @@ HSE2004original[, `:=` (wt.blood = wt.int, wt.nurse = wt.int)]
 #HSE7.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2004original[wt.nurse>0], check.strata = T)
 #HSE7.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2004original[wt.int>0], check.strata = T)
 
-HSE2004 =copy(HSE2004original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, adtot30, sodium, potass, creatin)])
+HSE2004 =copy(HSE2004original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, adtot30, sodium,
+                                     potass, creatin, hdlval1, bpmedd, diabete2)])
 setnames(HSE2004, "adtot30","a30to06")
 HSE2004[, `:=`(year=-7, wt.urine = wt.nurse)]
 HSE2004[, psu := paste0(psu, "2004")]
@@ -284,7 +291,7 @@ HSE2003original <- setDT(clear.labels(HSE2003original))
 #HSE2003original <- filter(HSE2003original, samptype==1) #samples types are same from
 #the statistics point of view. Sampletype 2 has more nurse measurements 
 setnames(HSE2003original, c("imd2004", "area", "int.wt", "blood.wt", "nurse.wt"), c("qimd", "psu", "wt.int", "wt.blood", "wt.nurse"))
-HSE2003original[, cholval1 := cholval1 + 0.1]
+HSE2003original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 agegroup.fn(HSE2003original)
 HSE2003original[diabete2 == 2, diabtotr := 1]
 HSE2003original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
@@ -292,7 +299,8 @@ HSE2003original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
 #HSE8.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2003original[wt.nurse>0], check.strata = T)
 #HSE8.srv.int <- svydesign(id=~psu, strata=~cluster, weights=~wt.int, nest=F, data=HSE2003original[wt.int>0], check.strata = T)
 
-HSE2003 =copy(HSE2003original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, adtot30, sodium, potass, creatin)])
+HSE2003 =copy(HSE2003original[, list(wt.int, wt.nurse, wt.blood, psu, cluster, age, agegroup, sex, group, qimd, bmival, cholval1, omsysval, diabtotr, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, adtot30, sodium, 
+                                     potass, creatin, hdlval1, bpmedd, diabete2)])
 setnames(HSE2003, "adtot30", "a30to06")
 HSE2003[, `:=`(year=-8, wt.urine = wt.nurse)]
 HSE2003[, psu := paste0(psu, "2003")]
@@ -305,8 +313,8 @@ HSE2002original[, `:=`(cluster = 2002, wt.blood = tablewt, wt.nurse = tablewt, w
 agegroup.fn(HSE2002original)
 #HSE9.srv <- svydesign(id=~psu, strata=~cluster, weights = ~wt.int, nest=F, data=HSE2002original)
 
-HSE2002 = copy(HSE2002original[, list(wt.int, wt.nurse, wt.blood, wt.urine, psu, cluster, age, agegroup, sex, group, qimd, bmival, omsysval, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, a30to06)])
-HSE2002[, `:=`(year=-9, cholval1 =NA, diabtotr = NA, sodium = NA, potass = NA, creatin = NA)]
+HSE2002 = copy(HSE2002original[, list(wt.int, wt.nurse, wt.blood, wt.urine, psu, cluster, age, agegroup, sex, group, qimd, bmival, omsysval, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, a30to06, bpmedd)])
+HSE2002[, `:=`(year=-9, cholval1 =NA, diabtotr = NA, diabete2 = NA, sodium = NA, potass = NA, creatin = NA)]
 HSE2002[, psu := paste0(psu, "2002")]
 HSE2002[, cluster := paste0(cluster, "2002")]
 
@@ -317,12 +325,13 @@ HSE2001original[, `:=`(cluster = 2001, wt.blood =1, wt.nurse = 1, wt.int = 1, wt
 agegroup.fn(HSE2001original)
 #HSE10.srv <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE2001original, check.strata = T)
 
-HSE2001 =copy(HSE2001original[, list(wt.int, wt.nurse, wt.blood, wt.urine, psu, cluster, age, agegroup, sex, group, qimd, bmival, omsysval, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal)])
+HSE2001 =copy(HSE2001original[, list(wt.int, wt.nurse, wt.blood, wt.urine, psu, cluster, age, agegroup, sex, group, qimd, bmival, omsysval, cigst1, startsmk, endsmoke, porftvg, frtpor, numsmok, smokyrs, cigdyal, bpmedd)])
 HSE2001[, `:=`(year=-10, cholval1 =NA, diabtotr = NA, a30to06 = NA, sodium = NA, potass = NA, creatin = NA)]
 HSE2001[, psu := paste0(psu, "2001")]
 HSE2001[, cluster := paste0(cluster, "2001")]
 
-HSE.ts <- rbind(HSE2012, HSE2011, HSE2010, HSE2009, HSE2008, HSE2007, HSE2006, HSE2005, HSE2004, HSE2003, HSE2002, HSE2001)
+HSE.ts <- rbind(HSE2012, HSE2011, HSE2010, HSE2009, HSE2008, HSE2007, HSE2006, HSE2005, HSE2004, HSE2003, HSE2002, HSE2001, 
+                fill = T)
 HSE.ts[, sex := factor(sex)]
 HSE.ts[, qimd := ordered(qimd)]
 HSE.ts[porftvg == 0, porftvg := 1]
@@ -330,6 +339,18 @@ HSE.ts[, porftvg := as.integer(porftvg - 1)]
 HSE.ts[, frtpor := as.integer(frtpor)]
 HSE.ts[frtpor > 8, frtpor := 8]
 HSE.ts[, a30to06m := as.integer((a30to06/4))]
+HSE.ts[origin <5, origin := 1] # 1 = white
+HSE.ts[origin == 9, origin := 2] # 2 = indian
+HSE.ts[origin == 10, origin := 3] # 3 = pakistani
+HSE.ts[origin == 11, origin := 4] # 4 = bangladeshi
+HSE.ts[between(origin, 5, 8), origin := 18] # 18 = other
+HSE.ts[origin == 13, origin := 5] # 5 = other asian
+HSE.ts[origin == 15, origin := 6] # 6 = black caribbean
+HSE.ts[origin == 14, origin := 7] # 7 = black african
+HSE.ts[origin == 12, origin := 8] # 8 = chinese
+HSE.ts[origin > 8, origin := 9] # 9 = other
+rm(list=ls(pattern="HSE20"))
+
 
 # Impute PA
 HSE.ts[, id := 1:.N]
@@ -412,7 +433,6 @@ HSE.ts[is.na(porftvg.imp), porftvg.imp := porftvg]
 #HSE.ts.srv.blood <- svydesign(id=~psu, strata =~cluster, weights = ~wt.blood, nest=F, data=HSE.ts[wt.blood>0,], check.strata = T)
 #save(HSE.ts, file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
 #load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
-rm(list=ls(pattern="HSE20"))
 
 # Build Models
 
@@ -1415,6 +1435,63 @@ plot(pred.chol(0:50, 30,1,1,40,0,0,0), ylim = c(3,6))
 #save(chol.svylm, file="./Models/IMPACTncd/Lagtimes/chol.svylm.rda")
 #save(chol.svylm, file="./Lagtimes/chol.svylm.rda")
 
+# HDL model --------------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[bmival<16 & age>19, bmival := 16]
+HSE.ts[bmival>40 & age>19, bmival := 40]
+HSE.ts[age>85, age:= 85]
+HSE.ts[, tc.to.hdl := cholval1/hdlval1]
+HSE.ts[, cigst1 := mapvalues(cigst1,  c(4:1 ), c(1,0,0,0))]
+HSE.ts.srv.blood <- svydesign(id=~psu, strata =~cluster, weights = ~wt.blood, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age>19 & wt.blood>0 & !is.na(cholval1) & !is.na(qimd) & !is.na(bmival) & 
+                             !is.na(hdlval1) & !is.na(a30to06m.imp) & !is.na(cigst1))
+
+HSE.ts[tc.to.hdl<10, hist(log(tc.to.hdl))]
+HSE.ts[, scatter.smooth(cholval1, tc.to.hdl)]
+
+scatter.smooth(svyby(~tc.to.hdl, by=~age, design=HSE.ts.srv.blood, svymean), ylim=c(3,5))
+lines(y=predict(svyglm(tc.to.hdl~age + I(age^2) + I(age^3), family=gaussian, design=HSE.ts.srv.blood), data.frame(age=20:100), type="response"), x=20:100, col="red")
+lines(y=predict(svyglm(tc.to.hdl~age + I(age^2), family=gaussian, design=HSE.ts.srv.blood), data.frame(age=20:100), type="response"), x=20:100, col="green")
+
+scatter.smooth(svyby(~tc.to.hdl, by=~round(bmival), design=HSE.ts.srv.blood, svymean), ylim=c(3,5))
+lines(y=predict(svyglm(tc.to.hdl~bmival + I(1/bmival), family=gaussian, design=HSE.ts.srv.blood), data.frame(bmival=10:80), type="response"), x=10:80, col="red")
+lines(y=predict(svyglm(tc.to.hdl~ bmival + I(bmival^2), family=gaussian, design=HSE.ts.srv.blood), data.frame(bmival=10:80), type="response"), x=10:80, col="green")
+
+scatter.smooth(svyby(~tc.to.hdl, by=~round(cholval1), design=HSE.ts.srv.blood, svymean), ylim=c(0,20))
+lines(y=predict(svyglm(tc.to.hdl~cholval1 + I(1/cholval1), family=gaussian, design=HSE.ts.srv.blood), data.frame(cholval1=0:16), type="response"), x=0:16, col="red")
+lines(y=predict(svyglm(tc.to.hdl~cholval1 + I(cholval1^2), family=gaussian, design=HSE.ts.srv.blood), data.frame(cholval1=0:16), type="response"), x=0:16, col="blue")
+lines(y=predict(svyglm(tc.to.hdl~ cholval1 + I(log(cholval1)), family=gaussian, design=HSE.ts.srv.blood), data.frame(cholval1=0:16), type="response"), x=0:16, col="green")
+
+scatter.smooth(svyby(~tc.to.hdl, by=~as.integer(qimd), design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,5), xlim=c(0, 8))
+
+scatter.smooth(svyby(~tc.to.hdl, by=~as.integer(cigst1), design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,5), xlim=c(0, 8))
+
+scatter.smooth(svyby(~tc.to.hdl, by=~porftvg.imp, design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,5), xlim=c(0, 8))
+
+scatter.smooth(svyby(~tc.to.hdl, by=~a30to06m.imp, design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,5), xlim=c(0, 7))
+
+tctohdl.svylm <- svyglm(tc.to.hdl~ (cholval1 + I(cholval1^2)+ age + I(age^2) + sex + qimd +
+                                      bmival + I(bmival^2) + a30to06m.imp + cigst1)^2, 
+                        family = gaussian(link="log"),
+                        method = "glm.fit2",
+                        design = HSE.ts.srv.blood)
+anova(tctohdl.svylm)
+
+tctohdl.svylm2 <- svyglm(tc.to.hdl~ cholval1 + I(cholval1^2)+ age + I(age^2) + sex + qimd +
+                           bmival + I(bmival^2) + a30to06m.imp + cigst1 + 
+                           cholval1:age + cholval1:sex,
+                         family = gaussian(link="log"),
+                         method = "glm.fit2",
+                         design = HSE.ts.srv.blood)
+anova(tctohdl.svylm2)
+
+tctohdl.svylm <- tctohdl.svylm2
+tctohdl.svylm$deviance/tctohdl.svylm$df.null
+1-tctohdl.svylm$deviance/tctohdl.svylm$null.deviance
+#save(tctohdl.svylm, file="./Models/IMPACTncd/Lagtimes/tctohdl.svylm.rda")
+#save(tctohdl.svylm, file="./Lagtimes/tctohdl.svylm.rda")
+
 
 # diab model --------------------------------------------------------------
 # diab model (no time trend as will consider diabetes is totally dependant to BMI and age)
@@ -1773,3 +1850,143 @@ fvrate.svylr$deviance/fvrate.svylr$df.null
 1-fvrate.svylr$deviance/fvrate.svylr$null.deviance
 #save(fvrate.svylr, file="./Models/IMPACTncd/Lagtimes/fvrate.svylr.rda")
 #save(fvrate.svylr, file="./Lagtimes/fvrate.svylr.rda")
+
+
+# Ethnicity -------------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[, origin := factor(origin)]
+HSE.ts[, agegroup := agegroup.fn(age)]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & year > -2 & !is.na(origin) & !is.na(qimd) & !is.na(sex)) 
+
+ttt <- svyby(~origin, ~agegroup+sex+qimd, HSE.ts.srv.int, svymean)
+require(nnet)
+
+ttt <-data.table(
+  origin = HSE.ts[year > -2, factor(origin)],
+  HSE.ts[year > -2,.(age = age/100)],
+  HSE.ts[year > -2,.(sex, qimd = as.character(qimd), wt.int)]
+) 
+
+mod1 <- multinom(origin ~ age + sex + qimd,
+                 data = ttt, 
+                 weights = wt.int,
+                 Hess = T)
+summary(mod1)
+
+origin.multinom <- mod1
+#save(origin.multinom, file="./Models/IMPACTncd/Lagtimes/origin.multinom.rda")
+#save(origin.multinom, file="./Lagtimes/origin.multinom.rda")
+
+
+# FamCVD ------------------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[famcvd == 2,famcvd := 0]
+HSE.ts[, famcvd := factor(famcvd)]
+HSE.ts[, agegroup := agegroup.fn(age)]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & !is.na(famcvd) & !is.na(qimd)) 
+
+famcvd.svylr <- svyglm(famcvd~age + I(age^2) + qimd,
+                     design = HSE.ts.srv.int, 
+                     family=quasibinomial,
+                     method = "glm.fit2")
+anova(famcvd.svylr)
+1-famcvd.svylr$deviance/famcvd.svylr$null.deviance
+#save(famcvd.svylr, file="./Models/IMPACTncd/Lagtimes/famcvd.svylr.rda")
+#save(famcvd.svylr, file="./Lagtimes/famcvd.svylr.rda")
+
+# AF prevalence  ------------------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[iregdef == 2,iregdef := 0]
+HSE.ts[, iregdef := factor(iregdef)]
+HSE.ts[, agegroup := agegroup.fn(age)]
+#HSE.ts[, cigst1 := mapvalues(cigst1,  c(4:1 ), c(1,0,0,0))]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & !is.na(iregdef) & !is.na(qimd) & !is.na(cigst1)) 
+
+af.svylr <- svyglm(iregdef~ age + qimd + ordered(cigst1),
+                     design = HSE.ts.srv.int, 
+                     family=quasibinomial,
+                     method = "glm.fit2")
+anova(af.svylr) #omsysval non significant. ?? missing values ?? small sample
+
+#save(af.svylr, file="./Models/IMPACTncd/Lagtimes/af.svylr.rda")
+#save(af.svylr, file="./Lagtimes/af.svylr.rda")
+
+# Kidney disease prevalence  ------------------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[kiddiag == 2, kiddiag := 0]
+HSE.ts[, kiddiag := factor(kiddiag)]
+HSE.ts[, agegroup := agegroup.fn(age)]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & !is.na(kiddiag) & !is.na(qimd) & !is.na(sex)) 
+
+kiddiag.svylr <- svyglm(kiddiag~ age + sex + qimd,
+                     design = HSE.ts.srv.int, 
+                     family=quasibinomial,
+                     method = "glm.fit2")
+anova(kiddiag.svylr) #omsysval non significant. ?? missing values ?? small sample
+
+#save(kiddiag.svylr, file="./Models/IMPACTncd/Lagtimes/kiddiag.svylr.rda")
+#save(kiddiag.svylr, file="./Lagtimes/kiddiag.svylr.rda")
+
+# BP medication  ------------------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[, bpmedd := factor(bpmedd)]
+HSE.ts[, agegroup := agegroup.fn(age)]
+HSE.ts.srv.nurse <- svydesign(id=~psu, strata =~cluster, weights = ~wt.nurse, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, wt.nurse>0 & !is.na(bpmedd) & !is.na(qimd) & !is.na(sex) & !is.na(omsysval)) 
+svytable(~bpmedd, subset(HSE.ts.srv.nurse, age > 30 & age < 84))
+
+bpmed.svylr <- svyglm(bpmedd~ age + I(age^2) + sex + qimd + omsysval +
+                        age:sex + age:omsysval,
+                     design = HSE.ts.srv.nurse, 
+                     family=quasibinomial,
+                     method = "glm.fit2")
+anova(bpmed.svylr) # year non significant
+
+bpmed.svylr <- svyglm(bpmedd~ (age + I(age^2) + sex + qimd + omsysval)^2,
+                     design = HSE.ts.srv.nurse, 
+                     family=quasibinomial,
+                     method = "glm.fit2")
+bpmed.svylr2 <- stepAIC(bpmed.svylr)
+anova(bpmed.svylr2) # year non significant
+
+bpmed.svylr <- bpmed.svylr2
+1-bpmed.svylr$deviance/bpmed.svylr$null.deviance
+#save(bpmed.svylr, file="./Models/IMPACTncd/Lagtimes/bpmed.svylr.rda")
+#save(bpmed.svylr, file="./Lagtimes/bpmed.svylr.rda")
+
+
+# Undiagnosed diab --------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[, diabtotr := factor(diabtotr - 1)] #everybody
+HSE.ts[diabete2 == 2, diabete2 := 0] #only diagnosed
+HSE.ts[diabtotr == "1" & diabete2 == "0", undiag.diab := 1L]
+HSE.ts[diabtotr == "1" & diabete2 == "1", undiag.diab := 0L]
+HSE.ts[, undiag.diab :=  factor(undiag.diab)]
+HSE.ts[, diabete2 := factor(diabete2)]
+HSE.ts[, agegroup := agegroup.fn(age)]
+HSE.ts.srv.blood <- svydesign(id=~psu, strata =~cluster, weights = ~wt.blood, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, wt.blood > 0 & !is.na(qimd) & !is.na(sex) &
+                             !is.na(undiag.diab) & year!= -7) #-7 is influential outliar
+svytable(~undiag.diab, subset(HSE.ts.srv.blood, age > 30 & age < 84))
+pp<- svyby(~undiag.diab, by=~year, design=HSE.ts.srv.blood, svymean)
+scatter.smooth(x=pp$year, y=pp$undiag.diab1, family = "gaussian")
+
+undiag.diab.svylr <- svyglm(undiag.diab ~ qimd, #no other factors were signif. 
+                            # nor interactions. Year is signif but data not suitable for 
+                            # longitudianal analysis
+                      design = HSE.ts.srv.blood, 
+                      family=quasibinomial,
+                      method = "glm.fit2")
+anova(undiag.diab.svylr) # year non significant
+#save(undiag.diab.svylr, file="./Models/IMPACTncd/Lagtimes/undiag.diab.svylr.rda")
+#save(undiag.diab.svylr, file="./Lagtimes/undiag.diab.svylr.rda")

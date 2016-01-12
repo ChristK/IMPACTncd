@@ -1,7 +1,7 @@
 #cmpfile("./Scenarios/current trends.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or

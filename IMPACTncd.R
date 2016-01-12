@@ -80,7 +80,8 @@ foreach(iterations = 1 : it,
                       "stringr",
                       "compiler",
                       "mc2d",
-                      "quantreg"),
+                      "quantreg", 
+                      "nnet"),
         .export = ls(),
         .noexport = c("scenarios.list", "time.mark")) %dorng% {
           
@@ -101,6 +102,7 @@ foreach(iterations = 1 : it,
           loadcmp(file = "./diseases epidemiology.Rc", my.env)
           
           #time.mark("Load synthetic population")
+          if (paired) set.seed(seed[[counter[[iterations]]]])
           loadcmp(file = "./load synthetic population.Rc", my.env)
           
           # Load RF trajectoy functions

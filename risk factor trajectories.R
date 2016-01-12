@@ -1,7 +1,7 @@
 #cmpfile("./risk factor trajectories.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or
@@ -30,7 +30,12 @@ load(file="./Lagtimes/fv.svylr.rda")
 load(file="./Lagtimes/fvrate.svylr.rda")
 load(file="./Lagtimes/pa.svylr.rda")
 load(file="./Lagtimes/salt.rq.rda")
-
+load(file="./Lagtimes/tctohdl.svylm.rda")
+load(file="./Lagtimes/famcvd.svylr.rda")
+load(file="./Lagtimes/af.svylr.rda")
+load(file="./Lagtimes/kiddiag.svylr.rda")
+load(file="./Lagtimes/bpmed.svylr.rda")
+load(file="./Lagtimes/undiag.diab.svylr.rda")
 
 cat("Load RF trajectories\n")
 
@@ -72,18 +77,17 @@ pred.pa <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
   cc <- data.table(plogis(matrix(pa.svylr$zeta, n, q, byrow = TRUE) - 
                             eta))
   set(cc, NULL, "V8", 1)
+  #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
   set(cc, NULL, "d", dice(nrow(cc)))
   for (k in 1:8) set(cc, NULL, k, cc[, Reduce(`<`, .SD), .SDcol = c(k, 9)])
   cc[, a30 :=  Reduce(`+`, .SD), .SDcol = 1:8]
   
   if (PA.intervention != 0L) {
-    PA.intervention2 <- 
-      sample(
-        c(0L, PA.intervention),
-        nrow(cc), T,
-        prob = c(1-PA.intervention.success, PA.intervention.success)
-      )
-    cc[a30 <= 7L - PA.intervention, a30:= a30 + PA.intervention2]
+    #if (paired) set.seed(seed[[counter[[iterations]]]] + year + 1L)
+    cc[a30 <= 7L - PA.intervention &
+         rbinom(.N, 1, PA.intervention.success) == 1,
+       a30:= a30 + PA.intervention
+       ]
   }
   return(cc[, a30])  
 } 
@@ -127,18 +131,16 @@ pred.fv <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
   cc <- data.table(plogis(matrix(fv.svylr$zeta, n, q, byrow = TRUE) - 
                             eta))
   set(cc, NULL, "V9", 1)
+  #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
   set(cc, NULL, "d", dice(nrow(cc)))
   for (k in 1:9) set(cc, NULL, k, cc[, Reduce(`<`, .SD), .SDcol = c(k, 10)])
   cc[, fv :=  Reduce(`+`, .SD), .SDcol = 1:9]
   
-  if (FV.intervention != 0L) {
-    FV.intervention2 <- 
-      sample(
-        c(0L, FV.intervention),
-        nrow(cc), T,
-        prob = c(1-FV.intervention.success, FV.intervention.success)
-      )
-    cc[fv <= 8L - FV.intervention, fv:= fv + FV.intervention2]
+  if (FV.intervention != 0) {
+    #if (paired) set.seed(seed[[counter[[iterations]]]] + year + 1L)
+    cc[fv <= (8L - FV.intervention) &
+         rbinom(.N, 1, FV.intervention.success) == 1,
+       fv:= fv + FV.intervention]
   }
   return(cc[, fv])   
 }
@@ -174,6 +176,7 @@ pred.fvrate <- cmpfun(function(age, sex, qimd, porftvg, lag = cvd.lag) {
                 type="response", se.fit=F)
   #cc<- rtruncnorm(nrow(cc), a = 0, b = 1, mean=cc[[1]], sd=cc[[2]])
   #return(as.integer(porftvg*cc))
+  #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
   cc <- rbinom(length(cc), porftvg, cc)
   return(cc)
 }
@@ -211,17 +214,11 @@ pred.diab.qdrisk <- cmpfun(
       DT[chd.incidence > 0 | stroke.incidence > 0, `:=` (b_cvd = T)]
     }
     
-    DT[, b_treatedhyp := F]
-    DT[omsysval.cvdlag > 140, b_treatedhyp := T]
-    
-    DT[, bmi := bmival.cvdlag]
-    DT[bmival.cvdlag < 20, bmi := 20]
-    DT[bmival.cvdlag > 40, bmi := 40]
-    
     #white or not stated, indian, pakistani, baghladeshi, other asian,
     #black carribean, black african, chinese,  
     # from ONS white = 86% (census 2011)
-    DT[, ethrisk := sample(1:9, .N, T, c(0.86, rep(0.14/8, 8)))]
+    #DT[, ethrisk := sample(1:9, .N, T, c(0.86, rep(0.14/8, 8)))] ## not needed anymore. 
+    ## origin(ethnicity) is defined in the synthetic population now.
     
     # The prob of being diab is 8%. So the probability of having at least
     # one of 3 family members with diabetes is 1 - (1-0.08)^3. I let family members vary between 2 and 4
@@ -234,37 +231,18 @@ pred.diab.qdrisk <- cmpfun(
            (1 - sum(diabtotr.cvdlag == "2") / .N)^sample(2:4, .N, T)]
     }
     
-    # 0 = no smoker, 1 = exsmoker, 2 = <10 cigs, 3 = 10-19 cigs, 4 = >19 cigs
-    DT[, smoke_cat := 0]
-    DT[cigst1.cvdlag == "3", smoke_cat := 1]
-    DT[cigst1.cvdlag == "4", smoke_cat := 3]
-    DT[cigst1.cvdlag == "4" & cigdyalCat < 10, smoke_cat := 2]
-    DT[cigst1.cvdlag == "4" & cigdyalCat > 19, smoke_cat := 4]
-    
-    # townsend score 2001, -6 to 11, higher score means more deprived 
-    # (like qimd). 
-    # quintiles from census 2001, 1: -4.95 to -2.63
-    #                             2: -2.63 to -1.67
-    #                             3: -1.67 to -0.27
-    #                             4: -0.27 to 2.2
-    #                             5:   2.2 to 20.67
-    DT[qimd == "1", town := runif(.N, -6, -2.63)]
-    DT[qimd == "2", town := runif(.N, -2.63, -1.67)]
-    DT[qimd == "3", town := runif(.N, -1.67, -0.27)]
-    DT[qimd == "4", town := runif(.N, -0.27, 2.2)]
-    DT[qimd == "5", town := runif(.N, 2.2, 11)]
-    
+    #if (paired) set.seed(seed[[counter[[iterations]]]])
     DT[between(age, 25, 84), 
        (dice(.N) < QDrisk(age - lag,
                           sex,
                           b_corticosteroids,
                           b_cvd,
-                          b_treatedhyp,
-                          bmi,
-                          ethrisk,
+                          bpmed,
+                          bmival.cvdlag,
+                          origin,
                           fh_diab,
                           smoke_cat,
-                          town,
+                          townsend,
                           surv)) + 1L]
     #     DT[, c("b_corticosteroids", "b_cvd", "b_treatedhyp",
     #            "bmi", "ethrisk", "fh_diab", "smoke_cat", "town") := NULL]
@@ -337,6 +315,7 @@ pred.diab.incid <- cmpfun(function(year, age1, sex1, qimd1, bmival, a30to06m) {
   tc <- prev1 - prev0 + mort[, mortal]
   tc[tc<0] <- 0 
   tc[tc>1] <- 1  
+  #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
   tc <- rbinom(length(tc), 1L, tc) + 1L
   return(as.character(tc))
   #return(prev1 - prev0)
@@ -623,3 +602,164 @@ pred.chol <- cmpfun(function(year, age, sex, qimd, bmival, porftvg, a30to06m, la
 #                   sample(c(1:5), n, replace = T),
 #                   runif(n, 10, 50),runif(n, 10, 20),
 #                   sample(c(1,10), n, replace = T)))
+
+# TC to HDL prediction ---------------------------------------------------------
+# Define function for hdl estimation
+pred.tctohdl <- cmpfun(function(cholval1, age, sex, qimd, bmival, a30to06m, cigst1, lag = cvd.lag) {
+  if (is.factor(sex)==F) {
+    sex <-  factor(sex, 
+                   levels = c(1,2), 
+                   ordered = F)
+  }
+  if (is.ordered(qimd)==F) {
+    qimd <- factor(qimd, 
+                   levels = c(1,2,3,4,5), 
+                   ordered = T)
+  }
+  bmival[bmival>40] <- 40 # otherwise predicts NAN values
+  cigst2 <- mapvalues(cigst1,  c(4:1 ), c(1,0,0,0))
+  pr <- data.frame(
+    predict(
+      tctohdl.svylm, 
+      data.table(
+        cholval1     = cholval1,
+        age          = age - lag, 
+        sex          = sex, 
+        qimd         = qimd, 
+        bmival       = bmival,
+        a30to06m.imp = a30to06m,
+        cigst1       = cigst2),
+      type = "response", 
+      se.fit=T
+    )
+  )
+  #return(pr[[1]])
+  #return(rtruncnorm(nrow(pr), a = 2.5, b = 12,  pr[[1]], pr[[2]]))
+  return(rnorm(nrow(pr), pr[[1]], pr[[2]]))
+}
+)
+
+# FamCVD prediction ---------------------------------------------
+pred.famcvd <- cmpfun(function(n, age, qimd) {
+  newdata <-
+    data.table(
+      age          = age, 
+      qimd         = qimd
+    )
+  
+  type <-"response"
+  total <- NULL
+  tt <- delete.response(terms(formula(famcvd.svylr)))
+  mf <- model.frame(tt, data = newdata)
+  mm <- model.matrix(tt, mf)
+  if (!is.null(total) && attr(tt, "intercept")) {
+    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
+      total
+  }
+  eta <- drop(mm %*% coef(famcvd.svylr))
+  eta <- switch(type, link = eta, response = famcvd.svylr$family$linkinv(eta))
+  rbinom(n, 1, eta)
+  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+}
+)
+
+# AF prevalence prediction ---------------------------------------------
+pred.af <- cmpfun(function(n, age, qimd, cigst1) {
+  newdata <-
+    data.table(
+      age          = age, 
+      qimd         = qimd,
+      cigst1       = cigst1
+    )
+  
+  type <-"response"
+  total <- NULL
+  tt <- delete.response(terms(formula(af.svylr)))
+  mf <- model.frame(tt, data = newdata)
+  mm <- model.matrix(tt, mf)
+  if (!is.null(total) && attr(tt, "intercept")) {
+    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
+      total
+  }
+  eta <- drop(mm %*% coef(af.svylr))
+  eta <- switch(type, link = eta, response = af.svylr$family$linkinv(eta))
+  rbinom(n, 1, eta)
+  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+}
+)
+
+# Kidney disease prevalence prediction ---------------------------------------------
+pred.kiddiag <- cmpfun(function(n, age, sex, qimd) {
+  newdata <-
+    data.table(
+      age          = age, 
+      sex          = sex,
+      qimd         = qimd    )
+  
+  type <-"response"
+  total <- NULL
+  tt <- delete.response(terms(formula(kiddiag.svylr)))
+  mf <- model.frame(tt, data = newdata)
+  mm <- model.matrix(tt, mf)
+  if (!is.null(total) && attr(tt, "intercept")) {
+    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
+      total
+  }
+  eta <- drop(mm %*% coef(kiddiag.svylr))
+  eta <- switch(type, link = eta, response = kiddiag.svylr$family$linkinv(eta))
+  rbinom(n, 1, eta)
+  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+}
+)
+
+# BP medication prediction ---------------------------------------------
+pred.bpmed <- cmpfun(function(n, age, sex, qimd, omsysval) {
+  newdata <-
+    data.table(
+      age          = age, 
+      sex          = sex,
+      qimd         = qimd,
+      omsysval     = omsysval)
+  
+  type <-"response"
+  total <- NULL
+  tt <- delete.response(terms(formula(bpmed.svylr)))
+  mf <- model.frame(tt, data = newdata)
+  mm <- model.matrix(tt, mf)
+  if (!is.null(total) && attr(tt, "intercept")) {
+    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
+      total
+  }
+  eta <- drop(mm %*% coef(bpmed.svylr))
+  eta <- switch(type, link = eta, response = bpmed.svylr$family$linkinv(eta))
+  rbinom(n, 1, eta)
+  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+}
+)
+
+# Undiagnosed  prediction ---------------------------------------------
+pred.undiag.diab <- cmpfun(function(n, qimd, year) {
+  if (is.ordered(qimd)==F) {
+    qimd <- factor(qimd, 
+                   levels = c(1,2,3,4,5), 
+                   ordered = T)
+  }
+  newdata <-
+    data.table(
+      qimd = qimd)
+  
+  type <-"response"
+  total <- NULL
+  tt <- delete.response(terms(formula(undiag.diab.svylr)))
+  mf <- model.frame(tt, data = newdata)
+  mm <- model.matrix(tt, mf)
+  if (!is.null(total) && attr(tt, "intercept")) {
+    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
+      total
+  }
+  eta <- drop(mm %*% coef(undiag.diab.svylr))
+  eta <- switch(type, link = eta, response = undiag.diab.svylr$family$linkinv(eta))
+  rbinom(n, 1, eta)
+  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+}
+)

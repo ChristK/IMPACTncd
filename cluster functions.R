@@ -42,6 +42,7 @@ dir.create(path = output.dir(), recursive = T) # create a unique directory for e
 # from Mozaffarian NEJM 
 salt.sbp.reduct <- cmpfun(
   function(salt.difference, age, sbp, n) {
+    if (paired) set.seed(seed[[counter[[iterations]]]])
     y = rnorm(n, -3.735, 0.73) + rnorm(n, -0.105, 0.029) * (age - 50) +
       rnorm(n, -1.874, 0.884) * (sbp > 140) +
       rnorm(n, -2.489, 1.188) * rbinom(n, 1, 0.1)
@@ -93,6 +94,7 @@ ageing.distr <- # smaller fortune increase the variability of the join
          by = group]
       DT[, eval(risk.factor) := NULL]
       setkeyv(DT, c("group", nam))
+      if (paired) set.seed(seed[[counter[[iterations]]]])
       DT.ref <- DT.ref[, sample_frac(.SD, fortune, T), by = group]
       setkeyv(DT.ref, c("group", nam))
       assign("POP", DT.ref[DT, roll = "nearest"], envir = env)
@@ -108,7 +110,8 @@ pop.summ <-  cmpfun(function(N, ...) {
 }
 )
 
-cont.summ <- cmpfun(function(rf, name, ...) {
+cont.summ <- cmpfun(
+  function(rf, name, ...) {
   mylist <- list()
   mylist[[paste0(name, ".mean")]] <- mean(rf, na.rm = T, trim = 0.05)
   mylist[[paste0(name, ".sd")]] <- stats::sd(rf, na.rm = T)
@@ -119,7 +122,8 @@ cont.summ <- cmpfun(function(rf, name, ...) {
 }
 )
 
-cat.summ <- cmpfun(function(rf, name, ...) {
+cat.summ <- cmpfun(
+  function(rf, name, ...) {
   absol <- table(factor(rf, exclude = c(NA, NaN, "99", "999"), ...))
   #pct <- prop.table(absol)
   absol <- absol[names(absol)!="NA's"]
@@ -131,38 +135,8 @@ cat.summ <- cmpfun(function(rf, name, ...) {
 }
 )
 
-# Old output function. SLOW
-# output.rf  <- cmpfun(function(x, ...) {
-#   with(x, return(c(pop.summ(nrow(x)),
-#                    #cont.summ(bmival, "bmi"),
-#                    cont.summ(bmival.cvdlag, "bmi.cvd"),
-#                    cont.summ(bmival.calag, "bmi.ca"),
-#                    #cont.summ(omsysval, "sbp"),
-#                    cont.summ(omsysval.cvdlag, "sbp.cvd"),
-#                    #cont.summ(cholval, "tc"),
-#                    cont.summ(cholval.cvdlag, "tc.cvd"),
-#                    cont.summ(salt24h.calag, "salt.ca"),
-#                    cat.summ(cigst1.cvdlag, "smok.cvd",
-#                             levels = 1:4, 
-#                             labels = c("never", "ex.2", "ex.3", "active")),
-#                    cat.summ(cigst1.calag, "smok.ca", 
-#                             levels = 1:4, 
-#                             labels = c("never", "ex.2", "ex.3", "active")),
-#                    cat.summ(porftvg.cvdlag, "fv.cvd", levels = 0:8),
-#                    cat.summ(porftvg.calag, "fv.ca", levels = 0:8),
-#                    cat.summ(frtpor.cvdlag, "fruit.cvd", levels = 0:8),
-#                    cat.summ(frtpor.calag, "fruit.ca", levels = 0:8),
-#                    cat.summ(a30to06m.cvdlag, "pa.cvd", levels = 0:7),
-#                    cat.summ(a30to06m.calag, "pa.ca", levels = 0:7),
-#                    cat.summ(diabtotr.cvdlag, "diab.cvd",
-#                             levels = 1:2, 
-#                             labels = c("no", "yes")),
-#                    cat.summ(expsmokCat, "ets",
-#                             levels = 0:1))))
-# }
-# )
-
-output.rf  <- cmpfun(function(dt, strata, l = 0, h = 100, ...) {
+output.rf  <- cmpfun(
+  function(dt, strata, l = 0, h = 100, ...) {
   dt[between(age, l, h), c(2011 + i,
                            gsub(".Rc", "", scenarios.list[[iterations]]),
                            haha,
@@ -180,6 +154,7 @@ output.rf  <- cmpfun(function(dt, strata, l = 0, h = 100, ...) {
      by = strata]
 }
 )
+
 output.rf.names <- 
   c("year", "scenario", "mc" , "pop", "bmi.cvd.mean", "bmi.cvd.sd", "bmi.ca.mean",
     "bmi.ca.sd", "sbp.cvd.mean", "sbp.cvd.sd", "tc.cvd.mean", "tc.cvd.sd",
@@ -190,27 +165,34 @@ output.rf.names <-
     paste0("pa.cvd.", 0:7)  
   )
 
-output.chd  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
+output.chd  <- cmpfun(
+  function(dt, strata, l = ageL, h = ageH, ...
+           ) {
   dt[between(age, l, h), 
-     list("year"            = 2011 + i,
-          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
-          "mc"              = haha,
-          "pop"             = .N,
-          "chd.incidence"   = sum(chd.incidence == 2011 + i, na.rm = T),
-          "chd.prevalence"  = sum(chd.incidence > 0, na.rm = T),
-          "chd.mortality"   = sum(dead, na.rm = T)
+     list("year"              = 2011 + i,
+          "scenario"          = gsub(".Rc", "", scenarios.list[[iterations]]),
+          "mc"                = haha,
+          "pop"               = .N,
+          "chd.incidence"     = sum(chd.incidence == 2011 + i, na.rm = T),
+          "chd.incidence.cvd" = sum(chd.incidence == 2011 + i & 
+                                      stroke.incidence == 0, na.rm = T),
+          "chd.prevalence"    = sum(chd.incidence > 0, na.rm = T),
+          "chd.mortality"     = sum(dead, na.rm = T)
      ), by = strata]
 }
 )
 output.stroke  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
-     list("year"            = 2011 + i,
-          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
-          "mc"              = haha,
-          "pop"             = .N,
-          "stroke.incidence"   = sum(stroke.incidence == 2011 + i, na.rm = T),
-          "stroke.prevalence"  = sum(stroke.incidence > 0, na.rm = T),
-          "stroke.mortality"   = sum(dead, na.rm = T)
+     list("year"                 = 2011 + i,
+          "scenario"             = gsub(".Rc", "", scenarios.list[[iterations]]
+                                        ),
+          "mc"                   = haha,
+          "pop"                  = .N,
+          "stroke.incidence"     = sum(stroke.incidence == 2011 + i, na.rm = T),
+          "stroke.incidence.cvd" = sum(stroke.incidence == 2011 + i & 
+                                      chd.incidence == 0, na.rm = T),
+          "stroke.prevalence"    = sum(stroke.incidence > 0, na.rm = T),
+          "stroke.mortality"     = sum(dead, na.rm = T)
      ), by = strata]
 }
 )
@@ -248,3 +230,47 @@ output.other  <- cmpfun(function(dt, strata, ...) {
   ), by = strata]
 }
 )
+
+# Define origin(ethnicity)
+pred.origin <- cmpfun(function(age, sex, qimd) {
+  newdata <- data.table(
+    age  = age/100, 
+    sex  = sex, 
+    qimd = as.character(qimd)
+  )
+  #code adapted from method getAnywhere(predict.multinom)
+  Terms <- delete.response(origin.multinom$terms)
+  m <- model.frame(Terms, newdata, na.action = na.omit, 
+                   xlev = origin.multinom$xlevels)
+  if (!is.null(cl <- attr(Terms, "dataClasses"))) 
+    .checkMFClasses(cl, m)
+  X <- model.matrix(Terms, m, contrasts = origin.multinom$contrasts)
+  class(origin.multinom) <- "nnet"
+  cc <- data.table(predict(origin.multinom, X))
+  for (k in 2:8) set(cc, NULL, k, cc[, Reduce(`+`, .SD), .SDcol = c(k - 1, k)])
+  set(cc, NULL, 9L, 1L)
+  if (paired) set.seed(seed[[counter[[iterations]]]])
+  set(cc, NULL, "d", dice(nrow(cc)))
+  for (k in 1:8) set(cc, NULL, k, cc[, Reduce(`<`, .SD), .SDcol = c(k, 10)])
+  return(cc[, Reduce(`+`, .SD), .SDcol = 1:9])  
+} 
+)
+
+
+# Seeded random -----------------------------------------------------------
+# if (paired == T) {
+#   
+#   sample.ss <- cmpfun(
+#     function(x, size, replace = FALSE, prob = NULL, plu = 0, ...) {
+#     set.seed(seed[[counter[[iterations]]]] + plu)
+#     base:::sample(x, size, replace, prob)
+#     }
+#   )
+#   
+#   rnorm.ss <- cmpfun(
+#     function(x, size, replace = FALSE, prob = NULL, ...) {
+#       set.seed(seed[[counter[[iterations]]]])
+#       base:::sample(x, size, replace, prob)
+#     }
+#   )
+# }

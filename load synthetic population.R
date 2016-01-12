@@ -70,6 +70,7 @@ agegroup.fn(SPOP)
 SPOP[, age2 := age]
 SPOP[age2>90, age2 := 90]
 SPOP[, id:= seq_len(.N)]
+if (paired) set.seed(seed[[counter[[iterations]]]])
 tt <- SPOP[, sample(id, population.actual[age==.BY[1] & sex==.BY[2] & qimd==.BY[3], pct2], T), by = .(age2, sex, qimd)][, V1]
 POP = copy(SPOP[tt, ])
 # SPOP = copy(SPOP[, sample_n(.SD, population.actual[age==.BY[1] & sex==.BY[2] & qimd==.BY[3], pct2], T), by = .(age2, sex, qimd)])
@@ -101,5 +102,32 @@ chol.rank <- setkey(
                                                    ties.method = "random")-1)/(.N - 1)), by = group],
   group, cholval.rank)
 
-rm(tt, SPOP)
+
+# Define origin (ethnicity) -----------------------------------------------
+load(file="./Lagtimes/origin.multinom.rda")
+# 1 = white # 2 = indian # 3 = pakistani # 4 = bangladeshi # 5 = other asian
+# 6 = black caribbean # 7 = black african # 8 = chinese # 9 = other
+if (paired) set.seed(seed[[counter[[iterations]]]])
+POP[, origin := as.integer(pred.origin(age, sex, qimd))]
+
+# Estimate Townsend score
+# townsend score 2001, -6 to 11, higher score means more deprived 
+# (like qimd). 
+# quintiles from census 2001, 1: -4.95 to -2.63
+#                             2: -2.63 to -1.67
+#                             3: -1.67 to -0.27
+#                             4: -0.27 to 2.2
+#                             5:   2.2 to 20.67
+if (paired) set.seed(seed[[counter[[iterations]]]])
+POP[qimd == "1", townsend := runif(.N,   -7, -3.4)]
+if (paired) set.seed(seed[[counter[[iterations]]]])
+POP[qimd == "2", townsend := runif(.N, -3.4, 0.2)]
+if (paired) set.seed(seed[[counter[[iterations]]]])
+POP[qimd == "3", townsend := runif(.N,  0.2, 3.8)]
+if (paired) set.seed(seed[[counter[[iterations]]]])
+POP[qimd == "4", townsend := runif(.N,  3.8, 7.4)]
+if (paired) set.seed(seed[[counter[[iterations]]]])
+POP[qimd == "5", townsend := runif(.N,  7.4, 11)]
+
+rm(tt, SPOP, origin.multinom)
 # sink() 

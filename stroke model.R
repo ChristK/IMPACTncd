@@ -1,7 +1,7 @@
 #cmpfile("./stroke model.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or
@@ -20,9 +20,13 @@
 
 cat("Loading stroke (I60-I69) model...\n")
 cat(paste0(Sys.time(), "\n\n"))
-if (i == init.year-2011) set(POP, NULL, "stroke.incidence",  0L) # Only needs to run the very first time of each simulation
+if (i == init.year-2011) {
+  set(POP, NULL, "stroke.incidence",  0L) # Only needs to run the very first time of each simulation
+  if ("chd.incidence" %!in% names(POP)) {
+    set(POP, NULL, "chd.incidence",  0L)
+  }
+}
 POP[age==0, stroke.incidence := 0]
-
 
 # RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. Role of Smoking in Global and Regional 
 # Cardiovascular Mortality. Circulation. 2005 Jul 26;112(4):489–97.
@@ -217,7 +221,7 @@ if (i == init.year - 2011) {
                deaths.causes.secgrad[cause == "Cerebrovascular diseases", .(agegroup, sex, qimd, sec.grad.adj)],
                by = c("agegroup", "sex", "qimd"), all.x = T)
   POP[is.na(sec.grad.adj), sec.grad.adj := 1]
-        
+  
   id.stroke <- POP[age <= ageH, 
                    sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]], Nprev], 
                             weight = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
@@ -345,8 +349,8 @@ cat("Export stroke burden individuals...\n\n")
 indiv.incid[[which(diseasestoexclude=="stroke")]] <- 
   POP[stroke.incidence == 2011 + i, 
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
-      )][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), 
-                mc = haha, year = 2011+i, cause = "stroke")]
+      )][,`:=` (scenario = gsub(".Rc", "", scenarios.list[[iterations]]), 
+                mc = haha, year = 2011 + i, cause = "stroke")]
 
 
 # output <- vector("list", 2)

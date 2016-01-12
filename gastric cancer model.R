@@ -272,7 +272,7 @@ indiv.mort[[which(diseasestoexclude=="C16") + 1]] <-
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
       ][,
         `:=` (year = 2011 + i, cause = "c16",
-              scenario = gsub(".R", "", scenarios.list[[iterations]]), 
+              scenario = gsub(".Rc", "", scenarios.list[[iterations]]), 
               mc = haha)]
 POP[v == T & dead == F, 
     `:=` (c16.incidence = 0)]

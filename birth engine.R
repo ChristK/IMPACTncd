@@ -40,7 +40,7 @@ POP <- rbind(POP,
                           replace = T)
                  ][ , `:=`(age = 0, 
                            id = (1:.N) + POP[, max(id)], 
-                    sex = ifelse(dice(.N) < 0.487804872, "2", "1"), 
+                    sex = (dice(.N) < 0.487804872) + 1L, 
                     cigst1 = "1",
                     cigst1.cvdlag = "1",
                     cigst1.calag = "1",

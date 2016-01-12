@@ -1,7 +1,7 @@
 #cmpfile("./ageing engine.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or
@@ -21,7 +21,6 @@
 #************************* Lagtimes/Ageing implementation *******************#
 
 # salt estimation ---------------------------------------------------------
-
 cat("Initiating lag/ageing engine...\n")
 cat(paste0(Sys.time(), "\n\n"))
 
@@ -197,6 +196,7 @@ POP[between(age, ageL, ageH), porftvg.calag := pred.fv(i, age, sex, qimd, cancer
 POP[between(age, ageL, ageH), frtpor.calag := pred.fvrate(age, sex, qimd, porftvg.calag, cancer.lag)]
 
 # Smoking -----------------------------------------------------------------
+# cigst1 is updated anually. The cigst1.cvdlag is derived from cigst1 annually
 cat("Smoking initiation/cessation simulation\n")
 if (i == init.year - 2011) {
   POP[, `:=`(endsmoke.curr   = endsmoke, # .curr means current
@@ -294,9 +294,14 @@ POP[cigst1.cvdlag == "4" & (packyears * 20 /cigdyalCat) < cancer.lag,
     cigst1.calag := "1"]
 POP[, cigst1.calag := factor(cigst1.calag)]
 
+# needed for QRisk and QDrisk
+POP[, smoke_cat := 0L]
+POP[cigst1 == "3", smoke_cat := 1L]
+POP[cigst1 == "4", smoke_cat := 3L]
+POP[cigst1 == "4" & cigdyalCat < 10, smoke_cat := 2L]
+POP[cigst1 == "4" & cigdyalCat > 19, smoke_cat := 4L]
+
 # BMI estimation ----------------------------------------------------------
-
-
 cat("BMI estimation\n")
 if (i > (init.year - 2011)) ageing.distr(bmi.rank, bmival) # to match distribution shape to that of SPOP2011
 POP[between(age, 20, 84), 
@@ -315,7 +320,6 @@ POP[between(age, ageL, ageH),
 POP[bmival.cvdlag < 16, bmival.cvdlag := 16]
 POP[bmival.calag  < 16, bmival.calag  := 16]
 
-
 # SBP estimation ----------------------------------------------------------
 cat("SBP estimation\n")
 if (i > (init.year - 2011)) ageing.distr(sbp.rank, omsysval)
@@ -329,8 +333,6 @@ POP[omsysval.cvdlag < 70, omsysval.cvdlag := 70]
 
 
 # TC estimation -----------------------------------------------------------
-
-
 cat("CHOL estimation\n")
 if (i > (init.year - 2011)) ageing.distr(chol.rank, cholval)
 POP[between(age, ageL, ageH), 
@@ -342,57 +344,44 @@ POP[between(age, ageL, ageH),
       pred.chol(i, age, sex, qimd, bmival.cvdlag, porftvg.cvdlag, a30to06m.cvdlag, cvd.lag)] 
 POP[cholval.cvdlag < 2.2, cholval.cvdlag := 2.2]
 
-# ETS ---------------------------------------------------------------------
-# ETS (start 3 years after init.year to avoid artefactects from cigst1 estimatin)
-if (i == init.year - 2011 + 1) {
-  smoking.preva.forets0 <-
-    POP[between(age, ageL, ageH),
-        list(old.preval = .SD[cigst1.cvdlag == "4", .N]/ .N),
-        by = .(qimd)] # to be used for ETS
-  setkey(smoking.preva.forets0, qimd)
-}
 
-if (i > (init.year - 2011 + 1)) {
-  cat("Estimating ETS...\n")
-  smoking.preva.forets1 <-
-    POP[between(age, ageL, ageH),
-        list(new.preval = .SD[cigst1.cvdlag == "4", .N]/ .N),
-        by = .(qimd)]
-  setkey(smoking.preva.forets1, qimd)
-  # works for decreasing smoking prevelence
-  smoking.preva.forets1[smoking.preva.forets0,
-                        change := 1 - new.preval / old.preval][
-                          change < 0, change := 0][
-                            is.na(change), change := 0]
-  
-  POP[id %in% POP[expsmokCat == "1", 
-                  sample_frac(.SD,
-                              smoking.preva.forets1[qimd == .BY[1],
-                                                    change])[, id],
-                  by = qimd,
-                  .SDcols = "id"][, V1],
-      expsmokCat := "0"]
-  
-  # works for increasing smoking prevelence (the change apply to ets==1)
-  smoking.preva.forets1[smoking.preva.forets0,
-                        change := 1 - old.preval / new.preval][
-                          change < 0, change := 0][
-                            is.na(change), change := 0]
-  
-  POP[id %in% POP[expsmokCat == "0",
-                  sample_n(.SD,
-                           smoking.preva.forets1[qimd == .BY[1], change] * 
-                             POP[expsmokCat == "1" & qimd == .BY[1], .N])[, id], 
-                  by = qimd,
-                  .SDcols = "id"][,V1], 
-      expsmokCat := "1"]
-  
-  smoking.preva.forets0 = copy(smoking.preva.forets1[, change := NULL])
-  setnames(smoking.preva.forets0, "new.preval", "old.preval")
+# TC to HDL estimation ----------------------------------------------------------
+POP[between(age, ageL, ageH),
+    tctohdl := pred.tctohdl(cholval.cvdlag, age, sex, qimd, bmival.cvdlag, a30to06m.cvdlag, cigst1.cvdlag, cvd.lag)]
+
+# FamCVD ------------------------------------------------------------------
+POP[between(age, ageL, ageH), famcvd := pred.famcvd(.N, age, qimd)]
+
+# AF prevalence ------------------------------------------------------------------
+POP[between(age, ageL, ageH), af := pred.af(.N, age, qimd, cigst1.cvdlag)]
+
+# Kidney prevalence ------------------------------------------------------------------
+POP[between(age, ageL, ageH), kiddiag := pred.kiddiag(.N, age, sex, qimd)]
+
+# BP meds prevalence ------------------------------------------------------------------
+POP[between(age, 25, ageH), bpmed := pred.bpmed(.N, age, sex, qimd, omsysval.cvdlag)] # 25 for QDrisk
+
+# Rheum arthr prevalence --------------------------------------------------
+POP[RAincid.rr.l, on = c("age", "sex"), ra := rbinom(.N, 1, rr)]
+
+# ETS ---------------------------------------------------------------------
+cat("Estimating ETS...\n") # assumes linear relation with 
+# smoking prevalence by qimd, stratified by age and sex
+if (i == init.year - 2011) {
+  pred.ets <-
+    POP[, sm.pr := sum(cigst1 =="4") / .N, by = .(qimd)
+        ][, ets.pr := sum(expsmokCat == "1")/.N, by = .(agegroup, sex, qimd)
+          ][, .(ets.coef = mean(ets.pr/sm.pr)), by = .(agegroup, sex, qimd)]
+  POP[, ets.pr := NULL]
+} else {
+  setkey(POP, agegroup, sex, qimd)
+  POP[, sm.pr := sum(cigst1 =="4") / .N, by = qimd]
+  POP[pred.ets, expsmokCat := as.character(rbinom(.N, 1, sm.pr * ets.coef))]
 }
+  
 
 # Scenario fn -------------------------------------------------------------
-cat(paste0("before scenario.fn",Sys.time(), "\n\n"))
+cat(paste0("before scenario.fn ",Sys.time(), "\n\n"))
 post.ageing.scenario.fn(i)# placed here so bmi intervensions affect diabetes
 
 # Diabetes estimation ---------------------------------------------------------
@@ -443,6 +432,11 @@ if (qdrisk == T) {
     # However my synthpop already contains diabetics for ages <25. For short horisons this is absolutely fine
   } 
 }
+
+
+# Predict undiagnosed in the population -----------------------------------
+POP[, undiag.diab := 0L]
+POP[diabtotr.cvdlag == "2", undiag.diab := pred.undiag.diab(.N, qimd)] # 25 for QDrisk
 
 cat("DIAB finished\n")
 

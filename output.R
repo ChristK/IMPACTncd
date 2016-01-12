@@ -42,8 +42,9 @@ dir.create(
   showWarnings = F
 )
 
-cat(
-  "Collecting risk factors output...\n"
+
+# Risk factors ------------------------------------------
+cat("Collecting risk factors output...\n"
 )
 
 all.files <- as.list(
@@ -107,10 +108,11 @@ save(
 
 #rm(riskfactors)
 #gc()
-cat(
-  "Collecting individual trajectories...\n"
-)
 
+
+# Individual trajectories -------------------------------------------------
+cat("Collecting individual trajectories...\n"
+)
 all.files <- as.list(
   list.files(
     path = "./Output", 
@@ -136,8 +138,9 @@ save(
   file="./Output/Other/indiv.traj.RData"
 )
 
-cat(
-  "Collecting high risk output...\n"
+
+# High risk ---------------------------------------------------------------
+cat("Collecting high risk output...\n"
 )
 
 all.files <- as.list(
@@ -175,8 +178,9 @@ if (nrow(highrisk)>0) {
 #rm(highrisk)
 #gc()
 
-cat(
-  "Collecting other causes mortality output...\n"
+
+# Other cause mortality ---------------------------------------------------
+cat("Collecting other causes mortality output...\n"
 )
 
 all.files <- as.list(
@@ -228,9 +232,10 @@ save(
 #rm(other.mortality)
 #gc()
 
+
+# CHD burden --------------------------------------------------------------
 if ("CHD" %in% diseasestoexclude) {
-  cat(
-    "Collecting CHD burden output...\n"
+  cat("Collecting CHD burden output...\n"
   )
   
   dir.create(
@@ -292,9 +297,10 @@ if ("CHD" %in% diseasestoexclude) {
   #save(healthylife.exp.chd, file="./Output/CHD/indiv.incid.RData")
 }
 
+
+# Stroke burden -----------------------------------------------------------
 if ("stroke" %in% diseasestoexclude) {
-  cat(
-    "Collecting stroke burden output...\n"
+  cat("Collecting stroke burden output...\n"
   )
   dir.create(
     path = "./Output/Stroke/",
@@ -355,9 +361,10 @@ if ("stroke" %in% diseasestoexclude) {
   #save(healthylife.exp.stroke, file="./Output/Stroke/indiv.incid.RData")
 }
 
+
+# CVD prevalence ----------------------------------------------------------
 if ("CHD" %in% diseasestoexclude & "stroke" %in% diseasestoexclude) {
-  cat(
-    "Collecting CVD prevelence output...\n"
+  cat("Collecting CVD prevelence output...\n"
   )
   
   dir.create(
@@ -397,9 +404,10 @@ if ("CHD" %in% diseasestoexclude & "stroke" %in% diseasestoexclude) {
   )
 }
 
+
+# Gastric cancer burden ---------------------------------------------------
 if ("C16" %in% diseasestoexclude) {
-  cat(
-    "Collecting gastric ca burden output...\n"
+  cat("Collecting gastric cancer burden output...\n"
   )
   
   dir.create(
@@ -465,8 +473,9 @@ if ("C34" %in% diseasestoexclude) {
   
 }
 
-cat(
-  "Calculating life expectancy...\n"
+
+# Life expectancy ---------------------------------------------------------
+cat("Calculating life expectancy...\n"
 )
 
 all.files <- as.list(
@@ -492,7 +501,8 @@ save(life.exp0, file="./Output/Other/life.exp0.RData")
 #rm(life.exp0)
 #gc()
 
-# Life expectancy at 65
+
+# Life expectancy at 65 ---------------------------------------------------
 all.files <- as.list(
   list.files(
     path = "./Output",
@@ -516,7 +526,8 @@ save(life.exp65, file="./Output/Other/life.exp65.RData")
 #rm(life.exp65)
 #gc()
 
-# Healthy life expectancy
+
+# Healthy life expectancy -------------------------------------------------
 cat(
   "Calculating healthy life expectancy...\n"
 )
@@ -547,7 +558,8 @@ save(
 gc()
 
 
-# Export tables
+
+# Export tables -----------------------------------------------------------
 cat("Tables...\n")
 Tables <- mclapply(
   Tables.fn, 
@@ -572,7 +584,8 @@ lapply(
   )
 )
 
-# Export graphs from tables
+
+# Export graphs from tables -----------------------------------------------
 dir.create(
   path = "./Output/Graphs.tbl/", 
   recursive = T, 
@@ -592,7 +605,8 @@ mclapply(names(Graphs),
                             width = 11.69,
                             height = 8.27), mc.cores = clusternumber)
 
-# Export graphs
+
+# Export graphs -----------------------------------------------------------
 if (export.graphs == T) {
   dir.create(
     path = "./Output/Graphs/", 
@@ -664,10 +678,10 @@ if (export.graphs == T) {
 
 # Calculate DPP/CPP included in the analysis output. current code not dynamic
 
-# run validation
-loadcmp(file = "./validation.Rc")
+# Run validation ------------------------------------------------
+#loadcmp(file = "./validation.Rc")
 
-# Clear intermediate files
+# Clear intermediate files ------------------------------------------------
 if (cleardirectories == T) {
   scenarios.list <- list.files(
     path = "./Scenarios",

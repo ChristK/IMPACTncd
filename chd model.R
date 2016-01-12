@@ -1,7 +1,7 @@
 #cmpfile("./chd model.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or
@@ -20,9 +20,13 @@
 
 cat("Loading CHD (I20-I25) model...\n")
 cat(paste0(Sys.time(), "\n\n"))
-if (i == init.year - 2011) set(POP, NULL, "chd.incidence",  0L) # Only needs to run the very first time of each simulation
+if (i == init.year - 2011) {
+  set(POP, NULL, "chd.incidence",  0L) # Only needs to run the very first time of each simulation
+  if ("stroke.incidence" %!in% names(POP)) {
+    set(POP, NULL, "stroke.incidence",  0L)
+  }
+}
 POP[age == 0, chd.incidence := 0]
-
 # RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. Role of Smoking in Global and Regional 
 # Cardiovascular Mortality. Circulation. 2005 Jul 26;112(4):489–97.
 # Table 1 Model B
@@ -213,8 +217,8 @@ if (i == init.year - 2011) {
   setnames(age.structure, "N", "population")
   
   POP <- merge(POP,
-        deaths.causes.secgrad[cause == "Ischaemic heart diseases", .(agegroup, sex, qimd, sec.grad.adj)],
-        by = c("agegroup", "sex", "qimd"), all.x = T)
+               deaths.causes.secgrad[cause == "Ischaemic heart diseases", .(agegroup, sex, qimd, sec.grad.adj)],
+               by = c("agegroup", "sex", "qimd"), all.x = T)
   POP[is.na(sec.grad.adj), sec.grad.adj := 1]
   
   id.chd <- POP[age <=  ageH, 
@@ -293,8 +297,8 @@ POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradie
 
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
 Temp1 <- POP[between(age, ageL, ageH), 
-            .(after = sum(chd.incidence > 0) * mean(fatality)),
-            by = .(agegroup, sex)] #expected number of deaths
+             .(after = sum(chd.incidence > 0) * mean(fatality)),
+             by = .(agegroup, sex)] #expected number of deaths
 
 # POP[, fatality := fatality * Temp / Temp1]
 Temp[Temp1, corr := before/after, on = c("agegroup", "sex")]
@@ -346,7 +350,7 @@ indiv.incid[[which(diseasestoexclude=="CHD")]] <-
   POP[chd.incidence == 2011 + i,
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
       )][ , `:=` (
-        scenario = gsub(".R", "", scenarios.list[[iterations]]),
+        scenario = gsub(".Rc", "", scenarios.list[[iterations]]),
         mc = haha, year = 2011 + i, cause = "chd")]
 
 # output <- vector("list", 2)

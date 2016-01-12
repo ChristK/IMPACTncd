@@ -35,6 +35,7 @@ dependencies <- function(x) {
 dependencies(c("demography", 
                "truncnorm", 
                "stringr", 
+               "nnet",
                "reshape2", 
                "compiler",
                "survey",
@@ -390,7 +391,6 @@ close(fileOut)
 # Load C++ function to summarise riskfactors ------------------------------
 sourceCpp("functions.cpp")
 
-
 # Sample for parameter distributions --------------------------------------
 load(file="./Lagtimes/salt.rq.coef.rda")
 if (paired == T) { 
@@ -399,7 +399,57 @@ if (paired == T) {
   salt.rq.coef <- sample(salt.rq.coef, it, T)
 }
 
+# Load RA incid
+RAincid.rr.l <- setkey(
+    fread(
+      "./Lagtimes/RAincid.csv", 
+      stringsAsFactors = F, 
+      colClasses = c("numeric", "factor", 
+                     "numeric")
+    ),
+    age, sex, rr
+  )
 
+
+# Scenario specific uncertainties ------------------------------------------
+
+# atorvastatin effect
+# from Law MR, et al. Quantifying effect of statins on low density lipoprotein cholesterol, 
+# ischaemic heart disease, and stroke: systematic review and meta-analysis. BMJ 2003;326:1423. 
+# table 2. 43% (0.3958 - 0.46875) reduction of ldl. to convert to tc, tc/ldl = 0.27/0.36 from
+# Edwards JE, et al. Statins in hypercholesterolaemia: A dose-specific meta-analysis of lipid 
+# changes in randomised, double blind trials. BMC Family Practice 2003;4:18. 
+
+atorv.eff.l <- 
+  rnorm(ifelse(paired, numberofiterations, it),
+                     0.27*0.43/0.36,
+                     (0.27*0.46875/0.36 - 0.27*0.3958/0.36)/(2*1.96))
+
+smoking.decr.l <- 
+  rpert(ifelse(paired, numberofiterations, it),
+                         0.05, 0.13, 0.14, 4)
+
+bmi.rate.decr.l <- 
+  rpert(ifelse(paired, numberofiterations, it),
+                       0.98, 0.99, 1, 4)
+sbp.decr.l <- 
+  rpert(ifelse(paired, numberofiterations, it),
+                         0.18, 0.81, 1.10, 4)
+fv.decr.l <- 
+  rpert(ifelse(paired, numberofiterations, it),
+        0.2, 0.5, 0.8, 4)
+
+persistence.l <- 
+  rpert(ifelse(paired, numberofiterations, it),
+        0.5, 0.8, 1, 4)
+
+p1.l <- 
+  rpert(ifelse(paired, numberofiterations, it), 
+              0.2, 0.25, 0.3, 4) # proportion of 10% to 20% risk
+p2.l <- 
+  rpert(ifelse(paired, numberofiterations, it),
+              0.04, 0.05, 0.10, 4)# proportion of more than 20% risk
+  
 # CHD parameters ----------------------------------------------------------
 if ("CHD" %in% diseasestoexclude) {
   chd.ets.rr.l <-  stochRRabov1(ifelse(paired, numberofiterations, it), 1.26, 1.38)

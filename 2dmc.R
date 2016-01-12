@@ -24,6 +24,15 @@ load(file="./Lagtimes/salt.rq.coef.rda")
 salt.rq$coefficients <- salt.rq.coef[[counter[[iterations]]]]
 #salt.rq$coefficients <- apply(simplify2array(salt.rq.coef), 1:2, mean) # mean of MC
 
+atorv.eff        <- atorv.eff.l[[counter[[iterations]]]]
+smoking.decr     <- smoking.decr.l[[counter[[iterations]]]]
+bmi.rate.decr    <- bmi.rate.decr.l[[counter[[iterations]]]]
+sbp.decr         <- sbp.decr.l[[counter[[iterations]]]]
+fv.decr          <- fv.decr.l[[counter[[iterations]]]]
+persistence      <- persistence.l[[counter[[iterations]]]]
+p1               <- p1.l[[counter[[iterations]]]]
+p2               <- p2.l[[counter[[iterations]]]]
+  
 if ("CHD" %in% diseasestoexclude) {
   tobacco.rr.chd <- chd.tobacco.rr.l[.id == counter[[iterations]]]
   chd.ets.rr.mc  <- chd.ets.rr.l[[counter[[iterations]]]]

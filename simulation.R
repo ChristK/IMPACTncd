@@ -43,6 +43,7 @@ for (i in (init.year - 2011):(yearstoproject + init.year - 2012)) {
   # Estimating incidence and mortality of modelled NCDs
   indiv.mort <- vector("list", length(diseasestoexclude) + 1) # to store individual deaths
   indiv.incid <- vector("list", length(diseasestoexclude))  # to store individual incidence
+  if (paired) set.seed(seed[[counter[[iterations]]]] + i)
   lapply(sample(diseases), function(f) f()) # randomly change the order of diseases each year and run all functions in the list
   
   # Summarising individual outputs

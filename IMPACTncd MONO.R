@@ -22,7 +22,7 @@ gc()
 options(datatable.verbose = F)
 
 # User input
-init.year <- 2006
+init.year <- 2011
 
 n <- 2e5  # Define the sample size
 
@@ -41,9 +41,9 @@ qdrisk <- T # Use QDrisk score for diabetes incidence
 Fertility.Assumption <- "N"  # Select (N)ormal, (H)igh or (L)ow fertility rate asumptions based on ONS scenarios. They do matter for accurate population statistics
 
 cvd.lag <- 5L # Avoid 0
-fatality.annual.improvement.chd <- 3 # 3 means 3% annual improvement in fatality
+fatality.annual.improvement.chd    <- 3 # 3 means 3% annual improvement in fatality
 fatality.annual.improvement.stroke <- 3 # 3 means 3% annual improvement in fatality
-fatality.annual.improvement.c16 <- 2
+fatality.annual.improvement.c16    <- 2
 
 fatality.sec.gradient.chd    <- 40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
 fatality.sec.gradient.stroke <- 40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
@@ -59,7 +59,7 @@ cleardirectories <- F # If T delete auxiliary output directories when simulation
 
 export.graphs <- F
 
-diseasestoexclude <- c("CHD", "stroke", "C16")  # Define disease to be excluded from lifetables
+diseasestoexclude <- c("CHD", "stroke")  # Define disease to be excluded from lifetables
 {
   # Ischaemic heart diseases (I20-I25)
   # Stroke (I60-I69), 
