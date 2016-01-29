@@ -215,7 +215,6 @@ lapply(Tables, function(x) {
 }
 )
 x <- Tables$hle.S[, levels(scenario)]
-x <- x[!x == "Current Policy"]
 
 # appendix RF trends
 # riskfactors[, scenario := factor(scenario, 
@@ -269,15 +268,20 @@ chd.mort <- chd.mort[agegroup!="85+" & between(year, 2002, init.year + yearstopr
 
 chd.men <- ggplot(chd.mort[sex=="Men",],
                   aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
+  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
   #geom_smooth(size = 2, alpha=1/4) +
   geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller =
+               labeller(qimd = c("1" = "QIMD 1",
+                                 "2" = "QIMD 2",
+                                 "3" = "QIMD 3",
+                                 "4" = "QIMD 4",
+                                 "5" = "QIMD 5"))) +
   ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
   scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
                         labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
   theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("CHD Mortality Validation (Men)") +
+  #ggtitle("CHD Mortality Validation (Men)") +
   theme(text = element_text(family="Calibri", size = 12)) +
   theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
   theme(strip.text.x = element_text(size = 10, face = "bold"),
@@ -287,14 +291,19 @@ chd.men <- ggplot(chd.mort[sex=="Men",],
 
 chd.women <- ggplot(chd.mort[sex=="Women",],
                     aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
+  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) + 
   geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller =
+               labeller(qimd = c("1" = "QIMD 1",
+                                 "2" = "QIMD 2",
+                                 "3" = "QIMD 3",
+                                 "4" = "QIMD 4",
+                                 "5" = "QIMD 5"))) +
   ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
   scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
                         labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
   theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("CHD Mortality Validation (Women)") +
+  #ggtitle("CHD Mortality Validation (Women)") +
   theme(text = element_text(family="Calibri", size = 12)) +
   theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
   theme(strip.text.x = element_text(size = 10, face = "bold"),
@@ -305,8 +314,8 @@ chd.women <- ggplot(chd.mort[sex=="Women",],
 #print(chd.women) 
 
 
-# ggsave("./Validation/validation men chd.pdf", chd.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
-# ggsave("./Validation/validation women chd.pdf", chd.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
+# ggsave("./Validation/validation men chd.pdf", chd.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=600, width = 11.69, height = 8.27)
+# ggsave("./Validation/validation women chd.pdf", chd.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=600, width = 11.69, height = 8.27)
 
 ggsave.mine(paste0(dir, "chd men", ext), chd.men)
 ggsave.mine(paste0(dir, "chd women", ext), chd.women)
@@ -341,15 +350,20 @@ stroke.mort <- stroke.mort[agegroup!="85+" & between(year, 2002, init.year + yea
 
 stroke.men <- ggplot(stroke.mort[sex=="Men",],
                      aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position = pd, alpha=3/5) +
+  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position = pd, alpha=3/5) +
   #geom_smooth(size = 2, alpha=1/4) +
   geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller =
+               labeller(qimd = c("1" = "QIMD 1",
+                                 "2" = "QIMD 2",
+                                 "3" = "QIMD 3",
+                                 "4" = "QIMD 4",
+                                 "5" = "QIMD 5"))) +
   ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
   scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
                         labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
   theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("Stroke Mortality Validation (Men)") +
+  #ggtitle("Stroke Mortality Validation (Men)") +
   theme(text = element_text(family="Calibri", size = 12)) +
   theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
   theme(strip.text.x = element_text(size = 10, face = "bold"),
@@ -359,15 +373,20 @@ stroke.men <- ggplot(stroke.mort[sex=="Men",],
 
 stroke.women <- ggplot(stroke.mort[sex=="Women",],
                        aes(x=year, y=mean*100000, colour=Model, ymin = 0)) + 
-  #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
+  geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
   #geom_smooth(size = 2, alpha=1/4) +
   geom_line(position=pd,size= 1, alpha=3/5) +
-  facet_grid(agegroup ~ qimd, scales="free", labeller=qimd_labeller) +
+  facet_grid(agegroup ~ qimd, scales="free", labeller =
+               labeller(qimd = c("1" = "QIMD 1",
+                                 "2" = "QIMD 2",
+                                 "3" = "QIMD 3",
+                                 "4" = "QIMD 4",
+                                 "5" = "QIMD 5"))) +
   ylab("Mortality per 100,000") + scale_x_continuous(name="Year") + 
   scale_colour_discrete(breaks = c("BAMP", "IMPACTNCD"),
                         labels = c("BAMP         ", expression(IMPACT[NCD]))) + 
   theme(axis.text.x  = element_text(angle=90, vjust=0.5)) + 
-  ggtitle("Stroke Mortality Validation (Women)") +
+  #ggtitle("Stroke Mortality Validation (Women)") +
   theme(text = element_text(family="Calibri", size = 12)) +
   theme(plot.title = element_text(family="Calibri", face="bold", size=16))+ 
   theme(strip.text.x = element_text(size = 10, face = "bold"),
