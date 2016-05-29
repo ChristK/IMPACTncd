@@ -225,7 +225,6 @@ pip-log.txt
 *.tex
 *.out
 HSE.ts.RData
-SynthPop/
 Validation/
 ShinnyApp/
 Graphs for Martin/

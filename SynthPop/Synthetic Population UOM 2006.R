@@ -1,31 +1,12 @@
-#!/opt/gridware/apps/gcc/R/3.2.0/lib64/R/bin/Rscript
-## IMPACTncd: A decision support tool for primary prevention of NCDs
-## Copyright (C) 2015  Chris Kypridemos
- 
-## IMPACTncd is free software; you can redistribute it and/or modify
-## it under the terms of the GNU General Public License as published by
-## the Free Software Foundation; either version 3 of the License, or
-## (at your option) any later version.
-
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-
-## You should have received a copy of the GNU General Public License
-## along with this program; if not, see <http://www.gnu.org/licenses/>
-## or write to the Free Software Foundation, Inc., 51 Franklin Street,
-## Fifth Floor, Boston, MA 02110-1301  USA.
-
-
+#!/opt/gridware/apps/gcc/R/3.2.3/lib64/R/bin/Rscript
 # ************************************************************************************************
 #                  England's synthetic population
 # ************************************************************************************************
 
 # User input
-prop <- 0.09414919  # Set proportion of the populations to be synthesized (set 1 for total population)
-iterations <- 11 # Number of synthetic population to produce
-clusternumber <- 70 # Number of cores to be used ONLY VALID FOR LINUX
+iterations <- 50 # Number of synthetic population to produce
+prop <- 1/iterations  # Set proportion of the populations to be synthesized (set 1 for total population)
+clusternumber <- 25 # Number of cores to be used ONLY VALID FOR LINUX
 
 
 # Preample ----------------------------------------------------------------
@@ -106,37 +87,35 @@ agegroup.fn <- cmpfun(function(x, lagtime = 0) {
 options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata around the sample grand mean rather than the stratum mean)
 
 # Import datasets (household and individual files)
-# load("hse2012ai.RData")
-# HSE2012original <- clear.labels(HSE2012original)
-# HSE2012original <- data.table(HSE2012original, key="age")
-# agegroup.fn(HSE2012original)
-# 
-# load("hse2011ai.RData")
-# HSE2011original <- clear.labels(HSE.2011)
-# rm(HSE.2011)
-# HSE2011original <- data.table(HSE2011original, key="age")
-# agegroup.fn(HSE2011original)
-# 
-# load("hse2011ah.RData")
-# HSE2011hh <- clear.labels(HSE2011hh)
-# HSE2011hh <- data.table(HSE2011hh, key="age")
-# 
-# load("hse2012ah.RData")
-# HSE2012hh <- clear.labels(HSE2012hh)
-# HSE2012hh <- data.table(HSE2012hh, key="age")
-# 
-# load("hse08ai.RData")
-# HSE2008original <- clear.labels(HSE2008original)
-# HSE2008original <- setDT(HSE2008original)
-# HSE2008original =copy(HSE2008original[samptype==1,])
-# HSE2008original[, cholval1 := cholval1 + 0.1]
-# agegroup.fn(HSE2008original)
+load("hse05ai.RData")
+HSE2005original <- clear.labels(HSE2005original)
+HSE2005original <- setDT(HSE2005original, key="age")
+HSE2005original <- HSE2005original[samptype==1] 
+setnames(HSE2005original, c("imd2004", "area", "wt.bldel"), c("qimd", "psu", "wt.blood"))
+agegroup.fn(HSE2005original)
+HSE2005original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
+HSE2005original[diabete2 == 2, diabtotr := 1]
+HSE2005original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
+HSE2005original[porftvg == 0, porftvg := 1L]
+HSE2005original[porftvg <= 9L, porftvg := porftvg - 1L]
+HSE2005original[, `:=`(year=-6, a30to06 = NA, wt.urine = wt.nurse)]
+HSE2005original[, psu := paste0(psu, "2005")]
+HSE2005original[, cluster := paste0(cluster, "2005")]
+
+load(file="hse07ai.RData")
+HSE2007original <- setDT(clear.labels(HSE2007original), key = "age")
+HSE2007original <- HSE2007original[samptype == 1]
+setnames(HSE2007original, c("imd2007", "area"), c("qimd", "psu"))
+agegroup.fn(HSE2007original)
+HSE2007original[, `:=`(year=-4, diabtotr = NA, diabete2 = NA, wt.blood = 1, cholval1 = NA, a30to06 = NA, wt.urine = wt.nurse)]
+HSE2007original[, psu := paste0(psu, "2007")]
+HSE2007original[, cluster := paste0(cluster, "2007")]
 
 load("hse06ai.RData")
 HSE2006original <- clear.labels(HSE)
 rm(HSE)
 setDT(HSE2006original, key="age")
-HSE2006original <- HSE2006original[samptype != 3, ]
+HSE2006original <- HSE2006original[samptype != 3]
 setnames(HSE2006original, c("imd2004", "newsha"), c("qimd", "sha"))
 HSE2006original[, cholval1 := cholval1 + 0.1]
 agegroup.fn(HSE2006original)
@@ -145,6 +124,9 @@ HSE2006original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
 HSE2006original[, a30to06m := round(a30to06/4)]
 HSE2006original[porftvg == 0, porftvg := 1L]
 HSE2006original[porftvg <= 9L, porftvg := porftvg - 1L]
+HSE2006original[, `:=`(year=-5, wt.urine = wt.nurse)]
+HSE2006original[, psu := paste0(psu, "2006")]
+HSE2006original[, cluster := paste0(cluster, "2006")]
 
 load("hse06ah.RData")
 HSE2006hh <- clear.labels(HSE2006hh)
@@ -206,26 +188,14 @@ Na24.women.det <- function(n, Na, cre, K, bmi, age) {
            w.Na*Na + w.cre*cre + w.K*K + w.bmi*bmi + w.age * age + w.age2 * age^2)
 }
 
-# HSE2012original[age>15 & sex== "1",
-#                 Na24 := Na24.men.det(.N, sodiumval, creatin, potass, bmival, age)]
-# HSE2012original[age>15 & sex== "2",
-#                 Na24 := Na24.women.det(.N, sodiumval, creatin, potass, bmival, age)]
-# HSE2012original[, salt.intersalt := Na24 * 58.5/1000]
-# HSE2012original[salt.intersalt < 1, salt.intersalt := 1]
-# HSE2012original[, saltCat.intersalt := getCat(
-#   salt.intersalt,
-#   getBreaks(salt.intersalt, wt.urine, F, equidist = F),
-#   F, T
-# )
-# ]
-
 HSE2006original[eqv5 < 0, eqv5 := NA]
 HSE2006original[hpnssec8 > 8, hpnssec8 := NA]
 HSE2006original[is.na(porftvg) == T & age < 5, porftvg := 99]  # code ages of 0-5 as 99 = not  applicable
 
 HSE2006original[is.na(cigdyal) == T & age < 16, cigdyal := 0]  # code ages of 0-15 as non smokers
 HSE2006original[is.na(cigst1) == T & age < 16, cigst1 := 1]  # code ages of 0-15 as never smokers
-HSE2006original[is.na(endsmoke) == T & (cigst1 == 1 | cigst1 == 4), endsmoke := 0]  # code non ex smokers as 0
+HSE2006original[is.na(endsmoke) & (cigst1 == 1 | cigst1 == 4), endsmoke := 0]  # code non ex smokers as 0
+HSE2006original[is.na(numsmok) & cigst1 !=3, numsmok := 0]  # code non ex smokers as 0
 setnames(HSE2006original, "hhsize", "hsize")
 
 # Calculate actual lld prescription and overwrite "lipid" variable
@@ -246,7 +216,7 @@ HSE2006original[, lipid := as.factor(lipid)]
 # Rescale weights of the household files (page 25 of HSE2011-Methods-and-docs.pdf)
 # pop2010 <- 51818267 # Mid 2010 adjusted England's population (page 25 of
 # HSE2011-Methods-and-docs.pdf)
-pop20 <- 53107200  # Mid 2011 England's population (not adjusted) from ONS. I will use this for compatibility under the assumption that institutionalised population above 65 (excluded from original HSE) has the same characteristics as the rest of the population.
+pop20 <- 55e6  # Mid 2011 England's population (not adjusted) from ONS. I will use this for compatibility under the assumption that institutionalised population above 65 (excluded from original HSE) has the same characteristics as the rest of the population.
 d <- pop20 * prop/HSE2006hh[, sum(wt.hhld, na.rm = T)]
 HSE2006hh[, wt.hhld := wt.hhld * d]
 
@@ -374,32 +344,32 @@ SynthPOP <- function(i = 1) {
                              MaxNWts = 4000)
   
   #  For fruit portions
-  HSE2006 = copy(HSE2006original)  # initialise HSE2006
-  HSE2006[, frtpor := as.integer(frtpor)]
-  HSE2006[, frtpor := cut(frtpor, breaks = c(0, 1:8, Inf), 
-                          labels = c(0:8), include.lowest = T, 
-                          right = F, 
-                          ordered_result = TRUE)]
+  # HSE2006 = copy(HSE2006original)  # initialise HSE2006
+  # HSE2006[, frtpor := as.integer(frtpor)]
+  # HSE2006[, frtpor := cut(frtpor, breaks = c(0, 1:8, Inf), 
+  #                         labels = c(0:8), include.lowest = T, 
+  #                         right = F, 
+  #                         ordered_result = TRUE)]
   #   levels(HSE2011$frtpor) <- c(levels(HSE2011$frtpor), "99")
   #   HSE2011[is.na(frtpor)==T & age < 5, frtpor := as.factor("99")]  # code ages of 0-4 as 99 = non applicable
-  basic <- c("agegroup", "sex", "porftvg")
-  additional <- "frtpor"
-  SPOP2006 <- simCategorical(HSE2006, SPOP2006, 
-                             w = "wt.int", 
-                             strata = "qimd", 
-                             basic = basic, 
-                             additional = additional, 
-                             method = "multinom", 
-                             MaxNWts = 6000)
+  # basic <- c("agegroup", "sex", "porftvg")
+  # additional <- "frtpor"
+  # SPOP2006 <- simCategorical(HSE2006, SPOP2006, 
+  #                            w = "wt.int", 
+  #                            strata = "qimd", 
+  #                            basic = basic, 
+  #                            additional = additional, 
+  #                            method = "multinom", 
+  #                            MaxNWts = 6000)
   
   # For smoking history cigst1 will be used (D) Cigarette Smoking Status - Never/Ex-reg/Ex-occ/Current
   # cigst1 has been measured in ages >=16. I will code all ages below 16 as never smokers
   HSE2006 = copy(HSE2006original)  # initialise HSE2006
-  basic <- c("agegroup", "sex", "hpnssec8" )
+  basic <- c("agegroup", "qimd", "hpnssec8" )
   additional <- "cigst1"
   SPOP2006 <- simCategorical(HSE2006, SPOP2006, 
                              w = "wt.int", 
-                             strata = "qimd", 
+                             strata = "sex", 
                              basic = basic, 
                              additional = additional, 
                              method = "multinom", 
@@ -409,40 +379,50 @@ SynthPOP <- function(i = 1) {
   # (measured for ages <=16) I will code ages < 16 as 0 (ie non smokers) I will recode into levels by 1
   # cigar and aggregate more than 40 cigars into 40. To be named cigdyalCat
   HSE2006 = copy(HSE2006original)
-  HSE2006[cigdyal > 40, cigdyal := 40]  # code more than 40 cigars as 40
-  breaks <- c(0, seq(0.1, 39.1, 1), 40.1)
-  HSE2006[, cigdyalCat := cut(cigdyal, breaks = breaks, 
-                              labels = c(0:40), 
-                              include.lowest = TRUE, 
-                              ordered_result = TRUE)]
-  limit <- list(cigst1 = list("1" = "0", "2" = "0", "3" = "0"))
+  limit <- list(cigst1 = list("1" = 0, "2" = 0, "3" = 0))
   censor <- list("0" = list(cigst1 = "4"))
   basic <- c("agegroup", "sex", "hpnssec8", "cigst1" )
-  additional <- "cigdyalCat"
-  SPOP2006 <- simCategorical(HSE2006, SPOP2006, 
-                             w          = "wt.int", 
-                             strata     = "qimd", 
-                             basic      = basic, 
-                             additional = additional, 
-                             method     = "multinom", 
-                             limit      = limit,
-                             censor     = censor,
-                             MaxNWts    = 4000)
+  additional <- "cigdyal"
+  SPOP2006 <- simContinuous(HSE2006, SPOP2006, 
+                            w          = "wt.int", 
+                            strata     = "qimd", 
+                            basic      = basic, 
+                            additional = additional, 
+                            method     = "multinom",
+                            zeros      = T, 
+                            gpd        = F,
+                            breaks     = c(0, 1, 3, 6, 12, 17, 22, 27, 32, 37, 42, 80),
+                            upper      = 80,
+                            keep       = T,
+                            limit      = limit,
+                            censor     = censor,
+                            MaxNWts    = 6000)
   
   
   # For How long ago did you stop smoking cigarettes? (Applicable only to ex-smokers) I will use endsmoke
   HSE2006 = copy(HSE2006original)
-  basic <- c("agegroup", "sex", "hpnssec8", "cigst1")
+  breaks <- c(0, 1, 3, 6, 12, 17, 22, 27, 32, 37, 42, 80)
+  HSE2006[, cigdyalCat := cut(cigdyal, breaks = breaks, 
+                              include.lowest = F, 
+                              ordered_result = F)]
+  HSE2006[cigdyal == 0, cigdyalCat := "0"][, cigdyalCat := relevel(cigdyalCat, "0")]
+  basic <- c("agegroup", "sex", "cigst1")
   additional <- "endsmoke"
   limit <- list(cigst1 = list("1" = "0", "4" = "0"))
-  SPOP2006 <- simCategorical(HSE2006, SPOP2006, 
-                             w = "wt.int", 
-                             strata = "qimd", 
-                             basic = basic, 
-                             additional = additional, 
-                             method = "multinom", 
-                             limit = limit,
-                             MaxNWts = 6000)
+  SPOP2006 <- simContinuous(HSE2006, SPOP2006, 
+                            w          = "wt.int", 
+                            strata     = "qimd", 
+                            basic      = basic, 
+                            additional = additional, 
+                            method     = "multinom",
+                            zeros      = T, 
+                            gpd        = F,
+                            breaks     = c(0, 1, 2, 3, 4, 5, 7, 9, 13, 23, 33, 44, 55, 70),
+                            upper      = 70,
+                            keep       = T,
+                            limit      = limit,
+                            MaxNWts    = 6000)
+  
   
   # For passive smoking expsmok will be used (Number of hours/week exposed to others' smoke (c+sc)) To
   # be recoded into a categorical variable (expsmokCat)
@@ -560,64 +540,86 @@ SynthPOP <- function(i = 1) {
   SPOP2006[, sum(diabtotr==2)/.N, by=agegroup]
   #SPOP2006[diabtype == "1" & diabtotr == "1", diabtotr := "2"]
   
-  
-  # Calculate packyears
+  # Calculate numsmok (number of cigarette smoked for ex smokers)
   HSE2006 = copy(HSE2006original)
-  HSE2006[startsmk==97, startsmk := NA]
-  HSE2006[cigst1 == 4, packyears := (age - startsmk) * cigdyal / 20]  # Years smoking for smokers
-  HSE2006[cigst1 == 3, packyears := smokyrs * numsmok / 20]  # Years smoked for ex smokers
-  HSE2006[cigst1 == 2, packyears := smokyrs * 0.5 / 20]  # Years smoked for non-regular ex smokers (numsmok not available)
-  HSE2006[cigst1 == 1, packyears := 0]  # Years smoked for non smokers
-  HSE2006[packyears < 0, packyears := 0]
-  HSE2006[is.na(HSE2006[, "packyears"]) == F & HSE2006[, "packyears"] < 0, "packyears"] <- NA
-  HSE2006[cigdyal > 40, cigdyal := 40]  # code more than 40 cigars as 40
-  breaks <- c(0, seq(0.1, 39.1, 1), 40.1)
+  limit <- list(cigst1 = list("1" = 0, "2" = 0, "4" = 0))
+  censor <- list("0" = list(cigst1 = "3"))
+  basic <- c("agegroup", "sex", "hpnssec8", "cigst1" )
+  additional <- "numsmok"
+  SPOP2006 <- simContinuous(HSE2006, SPOP2006, 
+                            w          = "wt.int", 
+                            strata     = "qimd", 
+                            basic      = basic, 
+                            additional = additional, 
+                            method     = "multinom",
+                            zeros      = T, 
+                            gpd        = F,
+                            breaks     = c(0, 1, 3, 6, 12, 17, 22, 27, 32, 37, 42, 80),
+                            upper      = 80,
+                            keep       = T,
+                            limit      = limit,
+                            censor     = censor,
+                            MaxNWts    = 6000)
+  
+  # Smoking duration
+  HSE2006 = copy(HSE2006original)
+  HSE2006[startsmk==97, startsmk := NA] # 97 = "never smoke regularly"
+  HSE2006[cigst1 == 4, duration := age - startsmk]  # Years smoking for smokers
+  HSE2006[cigst1 < 4, duration := 0]  # Years smoked for non smokers
+  breaks <- c(0, 1, 3, 6, 12, 17, 22, 27, 32, 37, 42, 80)
   HSE2006[, cigdyalCat := cut(cigdyal, breaks = breaks, 
-                              labels = c(0:40), 
-                              include.lowest = T, 
-                              ordered_result = T)]
+                              include.lowest = F, 
+                              ordered_result = F)]
+  HSE2006[cigdyal == 0, cigdyalCat := "0"][, cigdyalCat := relevel(cigdyalCat, "0")]
   basic <- c("agegroup", "sex", "cigdyalCat", "cigst1")
-  additional <- c("packyears")
-  limit <- list(cigst1 = list("1" = "0"))
+  additional <- c("duration")
+  limit <- list(cigst1 = list("1" = 0, "2" = 0, "3" = 0))
+  
   SPOP2006 <- simContinuous(HSE2006, SPOP2006, 
                             w = "wt.int",
                             strata = "qimd",
                             basic = basic,
                             additional = additional, 
                             method = "multinom",
+                            breaks = c(0, 1, 3, 17, 32, 37,  42, 47,  52, 62, Inf),
                             zeros = T,
                             limit = limit, 
                             gpd = T,
-                            MaxNWts = 4000,
-                            keep = T)
+                            MaxNWts = 6000,
+                            keep = F)
   
+  HSE2006[cigst1 == 4, smokyrs := 0]  # Years smoking for smokers
+  HSE2006[cigst1 == 1, smokyrs := 0]  # Years smoked for non smokers
+  breaks <- c(0, 1, 3, 6, 12, 17, 22, 27, 32, 37, 42, 80)
+  HSE2006[, numsmokCat := cut(numsmok, breaks = breaks, 
+                              include.lowest = F, 
+                              ordered_result = F)]
+  HSE2006[cigdyal == 0, numsmokCat := "0"][, numsmokCat := relevel(numsmokCat, "0")]
+  basic <- c("agegroup", "sex", "numsmokCat", "cigst1")
+  additional <- c("smokyrs")
+  limit <- list(cigst1 = list("1" = 0, "4" = 0))
+  
+  SPOP2006 <- simContinuous(HSE2006, SPOP2006, 
+                            w = "wt.int",
+                            strata = "qimd",
+                            basic = basic,
+                            additional = additional, 
+                            method = "multinom",
+                            #breaks = c(0, 1, 2, 4, 17, 27, 47, 62, Inf),
+                            equidist = F,
+                            zeros = T,
+                            limit = limit, 
+                            gpd = T,
+                            MaxNWts = 6000,
+                            keep = F)
   
   #Sanity check
-  SPOP2006[as.numeric(as.character(age)) < 16, packyears := 0]
-  SPOP2006[as.numeric(as.character(age)) > 15 & packyears>(as.numeric(as.character(age)) - 15) * 3, 
-           packyears := (as.numeric(as.character(age)) - 15) * 3]
+  SPOP2006[cigst1 == "4" & as.numeric(as.character(age)) < (duration + 10), 
+           duration := as.numeric(as.character(age)) - 10]
+  SPOP2006[cigst1 %in% c("2", "3") & as.numeric(as.character(age)) < (smokyrs + 10), 
+           smokyrs := as.numeric(as.character(age)) - 10]
   
-  
-  # Calculate numsmok (number of cigarette smoked for ex smokers)
-  breaks <- c(0, seq(1,80,5), Inf)
-  HSE2006[, packyearsCat := cut(packyears, breaks = breaks, 
-                                include.lowest = T, 
-                                ordered_result = TRUE)]
-  SPOP2006[, packyearsCat := cut(packyears, breaks = breaks, 
-                                 include.lowest = T, 
-                                 ordered_result = TRUE)]
-  HSE2006[cigst1 != "3", numsmok := 0]
-  basic <- c("agegroup", "sex", "hpnssec8", "eqv5", "packyearsCat", "cigst1")
-  additional <- c("numsmok")
-  limit <- list(cigst1 = list("1" = 0, "2" = 0, "4" = 0))
-  SPOP2006 <- simCategorical(HSE2006, SPOP2006, 
-                             w = "wt.int",
-                             strata = "qimd",
-                             basic = basic,
-                             additional = additional, 
-                             method = "multinom",
-                             limit = limit,
-                             MaxNWts = 4000)
+  SPOP2006[cigst1 == "4", smokyrs := duration]
   
   
   # Salt --------------------------------------------------------------------
@@ -754,28 +756,33 @@ SynthPOP <- function(i = 1) {
   # Finalise SPOP2006 -------------------------------------------------------
   SPOP2006[, age := as.integer(as.character(age))]
   SPOP2006[, sex := as.factor(sex)]
-  SPOP2006[, numsmok := as.numeric(as.character(numsmok))]
-  SPOP2006[cigst1 == "2", numsmok:= 0.5]
+  SPOP2006[, numsmok := as.integer(numsmok)]
+  SPOP2006[cigst1 == "2", numsmok:= 1L]
   SPOP2006[expsmokCat != "0", expsmokCat:= "1"][,expsmokCat := factor(expsmokCat)]
   SPOP2006[, a30to06m := as.integer(as.character(a30to06m))]
-  SPOP2006[age<15, cigst1 := "1"]
+  SPOP2006[age < 15, cigst1 := "1"]
   SPOP2006[age > 99, age := 99] # for combatibility with lifetables
-  SPOP2006[, cigdyalCat := as.numeric(as.character(cigdyalCat))]
-  SPOP2006[, endsmoke := as.integer(as.character(endsmoke))]
-  SPOP2006[, frtpor := as.integer(as.character(frtpor))]
+  SPOP2006[, cigdyal := as.integer(cigdyal)]
+  SPOP2006[, endsmoke := as.integer(endsmoke)]
+  SPOP2006[, smokyrs := as.integer(smokyrs)]
+  #SPOP2006[, frtpor := as.integer(as.character(frtpor))]
   SPOP2006[, hsize := as.integer(as.character(hsize))]
   SPOP2006[, porftvg := as.integer(as.character(porftvg))]
-  SPOP2006[,  `:=` (packyearsCat = NULL, 
-                    bmivalCat = NULL, 
-                    cholvalCat = NULL,
-                    ageCat20 = NULL, 
+  SPOP2006[,  `:=` (endsmokeCat = NULL, 
+                    numsmokCat  = NULL,
+                    duration    = NULL,
+                    cigdyalCat  = NULL,
+                    bmivalCat   = NULL, 
+                    cholvalCat  = NULL,
+                    omsysvalCat = NULL,
+                    ageCat20    = NULL, 
                     qimd = ordered(qimd, levels=as.character(1:5)))]
   #SPOP2006[, bmival := round(bmival,1)]
   agegroup.fn(SPOP2006)
   setkey(SPOP2006, age, sex, agegroup, qimd)
   setcolorder(SPOP2006, SPOP2006[,order(names(SPOP2006))]) # reorder columns alphabeticaly
   # Return datatable
-  return(saveRDS(SPOP2006, file = paste("/mnt/iusers01/mhs01/mdxasck2/IMPACTncd/SynthPop/SPOP2006-", i, ".rds", sep= "")))
+  return(saveRDS(SPOP2006, file = paste("/mnt/iusers01/mhs01/mdxasck2/IMPACTncd/SynthPop/spop2006-", i, ".rds", sep= "")))
 }
 SynthPOP <- cmpfun(SynthPOP)
 
@@ -798,5 +805,5 @@ stopCluster(cl)
 
 
 # Garbage cleaning
-rm(list = ls(all = TRUE))
+rm(list = ls(all.names = TRUE))
 
