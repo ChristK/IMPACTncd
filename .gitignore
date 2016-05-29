@@ -227,6 +227,7 @@ pip-log.txt
 HSE.ts.RData
 SynthPop/
 Validation/
+ShinnyApp/
 Graphs for Martin/
 Output/
 Unused Scripts/
@@ -235,3 +236,6 @@ Scenarios (unused)/
 #!Lagtimes\produce summary files for regression.R
 bfg.jar
 .Rproj.user
+temp.cpp
+serialise synthpops.R
+analysis output results (salt).R
