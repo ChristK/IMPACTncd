@@ -1,5 +1,5 @@
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
-## Copyright (C) 2015  Chris Kypridemos
+## Copyright (C) 2015 Chris Kypridemos
  
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -8,81 +8,82 @@
 
 ## This program is distributed in the hope that it will be useful,
 ## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 ## GNU General Public License for more details.
 
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>
 ## or write to the Free Software Foundation, Inc., 51 Franklin Street,
-## Fifth Floor, Boston, MA 02110-1301  USA.
+## Fifth Floor, Boston, MA 02110-1301 USA.
 
-C16cases6 <- 
-  data.table(year = 2006,
-             site = "C16",
-             agegroup = unique(agegroup.fn(0:85)),
-             sex = rep(c("Men", "Women"), each = 19),
-             cases = c(
-               0,	0,	0,	0,	1,	0,	6,	12,	24,	58,	88,	134,	261,	351,	512,	693,	808,	638,	449,
-               0,	0,	0,	0,	1,	6,	5,	6,	28,	25,	45,	 44,	 88,	142,	208,	289,	371,	435,	488
-             )
-  )
+C34cases6 <- 
+ data.table(year = 2006,
+       site = "C34",
+       agegroup = unique(agegroup.fn(0:85)),
+       sex = rep(c("Men", "Women"), each = 19),
+       cases = c(
+        0, 1, 1, 0,	1, 1, 5, 12, 45, 137,	292, 646, 1350, 2129, 2648,	3086,	3412,	2547,	1689,
+        0, 1, 0, 1,	3, 3, 3, 13, 41, 117,	275, 519, 1056, 1387, 1743,	2111,	2380,	2039,	1433
+       )
+ )
 
-C16cases7 <- 
-  data.table(year = 2007,
-             site = "C16",
-             agegroup = unique(agegroup.fn(0:85)),
-             sex = rep(c("Men", "Women"), each = 19),
-             cases = c(
-               0,	0,	0,	0,	0,	1,	3,	7,	21,	56,	81,	128,	249,	383,	572,	724,	769,	650,	462,
-               0,	0,	0,	1,	0,	0,	8,	9,	18,	35,	44,	67,	108,	138,	206,	270,	379,	445,	496
-             )
-  )
+C34cases7 <- 
+ data.table(year = 2007,
+       site = "C34",
+       agegroup = unique(agegroup.fn(0:85)),
+       sex = rep(c("Men", "Women"), each = 19),
+       cases = c(
+        0,	0,	0,	2,	4,	3,	8,	15,	48,	114,	269,	612,	1271,	2122,	2675,	3063,	3285,	2677,	1793,
+        0,	0,	0,	0,	0,	4,	6,	14,	40,	141,	243,	513,	1026,	1579,	1814,	2084,	2327,	2108,	1662
+       )
+ )
 
-C16cases8 <- 
-  data.table(year = 2008,
-             site = "C16",
-             agegroup = unique(agegroup.fn(0:85)),
-             sex = rep(c("Men", "Women"), each = 19),
-             cases = c(
-               0,	0,	0,	0,	0,	6,	10,	13,	25,	36,	95,	149,	224,	365,	463,	662,	770,	659,	474,
-               0,	0,	0,	1,	2,	1,	7,	10,	11,	41,	44,	 61,	 92,	126,	214,	288,	363,	396,	477
-             )
-  )
+C34cases8 <- 
+ data.table(year = 2008,
+       site = "C34",
+       agegroup = unique(agegroup.fn(0:85)),
+       sex = rep(c("Men", "Women"), each = 19),
+       cases = c(
+       0, 1, 0, 3, 2, 3, 4,	25,	36,	120, 267,	617,	1222,	2111,	2756,	3256,	3325,	2641,	1993,
+       0,	0, 0,	0, 2,	6, 6,	15,	42,	97,	 286,	549,	983,	1707,	1869,	2169,	2510,	2141,	1749
+       
+       )
+ )
 
-C16cases9 <- 
-  fread("./Cancer Statistics/2009 cases.csv", header = T)
-setnames(C16cases9, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
-C16cases9[, year := 2009]
-C16cases9 <- melt(C16cases9, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C16", ]
-C16cases9[, sex := ifelse(sex=="1", "Men", "Women")]
-
-
-C16cases10 <- 
-  fread("./Cancer Statistics/2010 cases.csv", header = T)
-setnames(C16cases10, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
-C16cases10[, year := 2010]
-C16cases10 <- melt(C16cases10, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C16", ]
-C16cases10[, sex := ifelse(sex=="1", "Men", "Women")]
+C34cases9 <- 
+ fread("./Cancer Statistics/2009 cases.csv", header = T)
+setnames(C34cases9, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
+C34cases9[, year := 2009]
+C34cases9 <- melt(C34cases9, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C34", ]
+C34cases9[, sex := ifelse(sex=="1", "Men", "Women")]
 
 
-C16cases11 <- 
-  fread("./Cancer Statistics/2011 cases.csv", header = T)
-setnames(C16cases11, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
-C16cases11[, year := 2011]
-C16cases11 <- melt(C16cases11, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C16", ]
-C16cases11[, sex := ifelse(sex=="1", "Men", "Women")]
+C34cases10 <- 
+ fread("./Cancer Statistics/2010 cases.csv", header = T)
+setnames(C34cases10, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
+C34cases10[, year := 2010]
+C34cases10 <- melt(C34cases10, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C34", ]
+C34cases10[, sex := ifelse(sex=="1", "Men", "Women")]
 
-C16cases12 <- 
-  fread("./Cancer Statistics/2012 cases.csv", header = T)
-setnames(C16cases12, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
-C16cases12[, year := 2012]
-C16cases12 <- melt(C16cases12, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C16", ]
-C16cases12[, sex := ifelse(sex=="1", "Men", "Women")]
 
-C16cases <- 
-  rbind(C16cases6, C16cases7, C16cases8, C16cases9, C16cases10, C16cases11, C16cases12)
+C34cases11 <- 
+ fread("./Cancer Statistics/2011 cases.csv", header = T)
+setnames(C34cases11, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
+C34cases11[, year := 2011]
+C34cases11 <- melt(C34cases11, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C34", ]
+C34cases11[, sex := ifelse(sex=="1", "Men", "Women")]
 
-C16cases[is.na(cases), cases := 0]
+C34cases12 <- 
+ fread("./Cancer Statistics/2012 cases.csv", header = T)
+setnames(C34cases12, c("site", "sex", paste0(unique(agegroup.fn(0:85)))))
+C34cases12[, year := 2012]
+C34cases12 <- melt(C34cases12, c("site", "sex", "year"), variable.name = "agegroup", value.name = "cases")[site == "C34", ]
+C34cases12[, sex := ifelse(sex=="1", "Men", "Women")]
 
-write.csv(C16cases, "./Cancer Statistics/C16cases.csv", row.names = F)
+C34cases <- 
+ rbind(C34cases6, C34cases7, C34cases8, C34cases9, C34cases10, C34cases11, C34cases12)
+
+C34cases[is.na(cases), cases := 0]
+
+write.csv(C34cases, "./Cancer Statistics/C34cases.csv", row.names = F)
 

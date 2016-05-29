@@ -26,8 +26,9 @@ sink(file = paste0(output.dir(), "log.txt"),
 
 for (i in (init.year - 2011):(yearstoproject + init.year - 2012)) {
   cat(paste0(rep("* ", 20)), "\n\n")
-  cat(paste("Simulating mid ", 2011 + i, " to mid ", 2012 + i, "...\n", sep="")) 
-  cat(paste0(Sys.time(), "\n\n"))
+  cat(paste0("Simulating mid ", 2011 + i, " to mid ", 2012 + i, "...\n")) 
+  cat(paste0(Sys.time(), "\n"))
+  # cat(paste0("Lags:", cvd.lag, " ",cancer.lag, "\n\n"))
   cat(paste0(rep("* ", 20)), "\n\n")    
   
   # Load scenario
@@ -49,7 +50,7 @@ for (i in (init.year - 2011):(yearstoproject + init.year - 2012)) {
   # Summarising individual outputs
   loadcmp(file = "./individual summary.Rc", my.env)
   
-  cat("Advance age\n")
+  #cat("Advance age\n")
   POP[, `:=`(age = age + 1)]  # make pop older
   agegroup.fn(POP)
 }

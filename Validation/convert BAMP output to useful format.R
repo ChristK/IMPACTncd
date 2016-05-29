@@ -63,6 +63,50 @@ for (i in 6:10) {
 c16.drates <- rbindlist(c16.val.mort)
 c16.drates[, year := as.integer(year)]
 save(c16.drates, file="./Validation/c16.drates.RData")
+
+# C34 ---------------------------------------------------------------------
+all.files <- as.list(
+  list.files(
+    path = "./Validation/C34", 
+    pattern = "*pr.txt", 
+    full.names = T, 
+    recursive = T
+  )
+) 
+
+c34.val.mort <- lapply(all.files, read.table)
+c34.val.mort <- lapply(c34.val.mort, setDT)
+c34.val.mort <- lapply(c34.val.mort, setnames, paste0(2002:2112))
+
+for (i in 1:length(c34.val.mort)) {
+  lui  <-  data.table(t(c34.val.mort[[i]][1:6,]), keep.rownames = T)
+  mean2 <- data.table(t(c34.val.mort[[i]][13:18,]), keep.rownames = T)
+  uui <-  data.table(t(c34.val.mort[[i]][25:30,]), keep.rownames = T)
+  setnames(lui, c("year", "35-44", "45-54", "55-64", "65-74", "75-84", "85+"))
+  lui <- melt(lui, id.vars = "year", value.name = "lui", variable.name = "agegroup")
+  setnames(uui, c("year", "35-44", "45-54", "55-64", "65-74", "75-84", "85+"))
+  uui <- melt(uui, id.vars = "year",value.name = "uui", variable.name = "agegroup")
+  setnames(mean2, c("year", "35-44", "45-54", "55-64", "65-74", "75-84", "85+"))
+  mean2 <- melt(mean2, id.vars = "year", value.name = "mean", variable.name = "agegroup")
+  mean2 <- merge(mean2, lui, by = c("year", "agegroup"))
+  mean2 <- merge(mean2, uui, by = c("year", "agegroup"))
+  c34.val.mort[[i]] <- mean2
+  rm(mean2, lui, uui)
+}
+
+for (i in 1:5) {
+  c34.val.mort[[i]][, sex := "Women"]
+  c34.val.mort[[i]][, qimd := i]
+}
+for (i in 6:10) {
+  c34.val.mort[[i]][, sex := "Men"]
+  c34.val.mort[[i]][, qimd := i - 5]
+}
+
+c34.drates <- rbindlist(c34.val.mort)
+c34.drates[, year := as.integer(year)]
+save(c34.drates, file="./Validation/c34.drates.RData")
+
 # Stroke ------------------------------------------------------------------
 
 

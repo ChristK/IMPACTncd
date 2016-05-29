@@ -21,28 +21,37 @@
 cat("Estimating deaths from other causes...\n")
 cat(paste0(Sys.time(), "\n\n"))
 
-POP <- merge(POP, 
-             setnames(
-               Lifetable[, c("age", "sex", "qimd", paste0(i + 2011)), with = F],
-               paste0(i + 2011), "qx"), 
-             by = c("age", "sex", "qimd"), 
-             all.x = T)
-
 cat("Inflate mortality for diabetics and smokers...\n\n")
-POP[diabtotr.cvdlag == "2", qx := 1.6 * qx] # Increase the mortality of diabetics DECODE study
-POP[diabtotr.cvdlag != "2", qx := qx * (1 - 1.6 * POP[group==.BY[[1]], prop.table(table(diabtotr.cvdlag))[2]]) / 
-      (.N / POP[group==.BY[[1]], .N]), by=group] # Decrease the mortality of non-diabetics 
+#Doll R, et al. Mortality in relation to smoking: 50 years’ observations on male
+#British doctors. BMJ 2004;328:1519. doi:10.1136/bmj.38142.554479.AE table 1
+set(POP, NULL, "death.tob.rr", 1)
+POP[cigst1.cvdlag == "4", death.tob.rr := smokriskofdeath]
 
-#1 Doll R, Peto R, Boreham J, et al. Mortality in relation to smoking: 50 years’ observations on male British doctors. 
-#BMJ 2004;328:1519. doi:10.1136/bmj.38142.554479.AE table 1
-# POP[cigst1 == "4", `:=` (qx = 1.8 * qx)] # Increase the mortality of smokers
-# POP[cigst1 != "4", `:=` (qx = qx * (1 - 1.8 * POP[,.SD[cigst1 == "4", .N]/.N]) / POP[,.SD[cigst1 != "4", .N]/.N])] 
-POP[cigst1.cvdlag == "4", `:=` (qx = smokriskofdeath * qx), by=group]
-POP[cigst1.cvdlag != "4", `:=` (qx = qx * (1 - smokriskofdeath * 
-                                             POP[group==.BY[[1]], prop.table(table(cigst1.cvdlag))][4]) / 
-                                  (.N / POP[group==.BY[[1]], .N])), by=group]
+set(POP, NULL, "death.diab.rr", 1)
+POP[diabtotr.cvdlag == "2", death.diab.rr := 1.6] #rr from DECODE study
 
-POP[, `:=`(dead = dice(.N) < qx, qx = NULL)]  # mark deaths from lifetable
+deathpaf <- 
+  POP[between(age, ageL, ageH), 
+      .(paf = 1 - 1 / (sum(death.tob.rr * death.diab.rr) / .N)), 
+      by = .(age, sex, qimd)
+      ]
+setkey(deathpaf, age, sex, qimd)
+
+deathrate <- setnames(
+  Lifetable[, c("age", "sex", "qimd", as.character(i + 2011)), with = F],
+  as.character(i + 2011), "qx")
+setkey(deathrate, age, sex, qimd)
+
+deathrate[deathpaf, qx := qx * (1 - paf)]
+
+POP[deathrate, qx := qx, on = c("age", "sex", "qimd")]
+
+
+POP[dice(.N) < qx * death.tob.rr * death.diab.rr, `:=`(dead = 1L)]  # mark deaths from lifetable
+
+POP[, `:=` (qx = NULL,
+            death.tob.rr = NULL,
+            death.diab.rr = NULL)]
 
 cat("Export Other mortality summary...\n\n")
 if (i == init.year-2011) other.mortal <- vector("list", yearstoproject * 4)
@@ -66,12 +75,12 @@ if (i == yearstoproject + init.year - 2012) {
 
 cat("Export Other mortality individuals...\n\n")
 indiv.mort[[1]] <- 
-  POP[dead == T, 
+  POP[dead == 1L, 
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
       )][,`:=` (year = 2011 + i, 
                 cause = "other", 
                 scenario = gsub(".R", "", scenarios.list[[iterations]]), 
                 mc = haha)]
 
-POP = POP[dead == F,]  # remove dead 
-
+POP = POP[is.na(dead)]  # remove dead 
+POP[, dead := NULL]

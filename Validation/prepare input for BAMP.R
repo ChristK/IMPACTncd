@@ -22,7 +22,7 @@
 
 
 gc()
-options(datatable.verbose=TRUE)
+options(datatable.verbose= F)
 
 # User input
 init.year <- 2011
@@ -56,7 +56,7 @@ clusternumber <- 4 # Change to your number of CPU cores
 
 cleardirectories <- F # If T delete auxiliary output directories when simulation finish
 
-diseasestoexclude <- c("CHD", "stroke", "C16")  # Define disease to be excluded from lifetables
+diseasestoexclude <- c("CHD", "stroke", "C34", "C16")  # Define disease to be excluded from lifetables
 {
 # Ischaemic heart diseases (I20-I25)
 # Stroke (I60-I69), 
@@ -132,6 +132,8 @@ population[agegroup  %in% unique(agegroup.fn(75:84)), agegroup := "75-84"]
 population[agegroup  %in% c("85-89", "90+"),          agegroup := "85+"]
 population[, agegroup := ordered(agegroup)]
 
+
+# Gastric cancer --------------------------------------------------------------------
 foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
   foreach(
     l = 1:5,
@@ -154,7 +156,6 @@ foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
 
 acast(population[sex == k & qimd == l,],
       year ~ agegroup, sum, value.var = "pop")
-# Gastric cancer --------------------------------------------------------------------
 
 deaths.causes <-
   fread(
@@ -196,6 +197,73 @@ foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
       
     write.table(xx,
                 file = paste0("./Validation/C16/", ss,l, "/Deaths.txt"),
+                append = F, sep = "\t",  row.names = F, col.names = F)
+  }
+
+# Gastric cancer --------------------------------------------------------------------
+foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
+  foreach(
+    l = 1:5,
+    .inorder = F,
+    .packages = c("demography", "reshape2", "data.table")
+  ) %do% {
+    ss <- ifelse(k==1, "M", "F")
+    xx <- acast(population[sex == k & qimd == l,],
+                year ~ agegroup, sum, value.var = "pop")
+    dir.create(
+      path = paste0("./Validation/C34/", ss,l), 
+      recursive = T, 
+      showWarnings = F
+    )
+    
+    write.table(xx,
+                file = paste0("./Validation/C34/", ss, l, "/Pop.txt"),
+                append = F, sep = "\t",  row.names = F, col.names = F)
+  }
+
+acast(population[sex == k & qimd == l,],
+      year ~ agegroup, sum, value.var = "pop")
+
+deaths.causes <-
+  fread(
+    "./LifeTables/deaths from selected causes by quintile_final_tcm77-388639.csv",
+    header = T,
+    skip = 0
+  )
+setnames(deaths.causes, names(deaths.causes), str_trim(names(deaths.causes)))
+deaths.causes <- deaths.causes[cause %in% "Malignant neoplasm of trachea, bronchus and lung",]
+deaths.causes <-
+  melt(
+    deaths.causes, id.vars = c("year", "sex", "qimd", "cause"), 
+    variable.name = "agegroup", 
+    value.name = "disease"
+  )
+deaths.causes <- deaths.causes[agegroup %in% c(as.character(unique(agegroup.fn(35:84))), "85-89", "90+"),]
+deaths.causes[agegroup  %in% unique(agegroup.fn(35:44)), agegroup := "35-44"]
+deaths.causes[agegroup  %in% unique(agegroup.fn(45:54)), agegroup := "45-54"]
+deaths.causes[agegroup  %in% unique(agegroup.fn(55:64)), agegroup := "55-64"]
+deaths.causes[agegroup  %in% unique(agegroup.fn(65:74)), agegroup := "65-74"]
+deaths.causes[agegroup  %in% unique(agegroup.fn(75:84)), agegroup := "75-84"]
+deaths.causes[agegroup  %in% c("85-89", "90+"),          agegroup := "85+"]
+deaths.causes[, agegroup := ordered(agegroup)]
+
+foreach(k = 1:2, .inorder = F, .combine = 'c') %:% # sex
+  foreach(
+    l = 1:5,
+    .inorder = F,
+    .packages = c("demography", "reshape2", "data.table")
+  ) %do% {
+    ss <- ifelse(k==1, "M", "F")
+    xx <- acast(deaths.causes[sex == k & qimd == l,],
+                year ~ agegroup, sum, value.var = "disease")
+    dir.create(
+      path = paste0("./Validation/C34/", ss,l), 
+      recursive = T, 
+      showWarnings = F
+    )
+    
+    write.table(xx,
+                file = paste0("./Validation/C34/", ss,l, "/Deaths.txt"),
                 append = F, sep = "\t",  row.names = F, col.names = F)
   }
 

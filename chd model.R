@@ -30,44 +30,50 @@ POP[age == 0, chd.incidence := 0]
 # RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. Role of Smoking in Global and Regional 
 # Cardiovascular Mortality. Circulation. 2005 Jul 26;112(4):489–97.
 # Table 1 Model B
-cat("smoking RR\n")
+#cat("smoking RR\n")
 set(POP, NULL, "chd.tob.rr",  1)
-setkey(POP, agegroup, sex, cigst1.cvdlag)
+setkey(POP, age, sex, cigst1.cvdlag)
 POP[tobacco.rr.chd, chd.tob.rr := rr]
-
+POP[is.na(chd.tob.rr), chd.tob.rr := 1]
 # RR for ex-smokers from Huxley RR, Woodward M. 
 # Cigarette smoking as a risk factor for coronary heart disease
 # in women compared with men: a systematic review and meta-analysis of prospective cohort studies. 
 # The Lancet. 2011 Oct 14;378(9799):1297–305. 
 # Appendix webfigure 8
-
+# POP[sex=="1"&qimd=="2", mean(chd.tob.rr), by = age][, plot(age, V1)]
+# POP[, sm := predict(loess(chd.tob.rr~age, span=0.40)), by = .(sex, qimd)]
+# POP[, rr:= scale(chd.tob.rr, unique(sm)), by=.(age, sex, qimd)]
+# POP[sex=="1"&qimd=="2", mean(rr), by = age][, lines(age, V1)]
 
 # RR for ETS He J, Vupputuri S, Allen K, Prerost MR, Hughes J, Whelton PK. Passive Smoking and the Risk of 
 # Coronary Heart Disease — A Meta-Analysis of Epidemiologic Studies. New England Journal of Medicine. 1999;340(12):920–6. 
 # Table 3. Adjusted RR
 set(POP, NULL, "chd.ets.rr",  1)
-POP[cigst1 %in% c("1", "2", "3") & expsmokCat == "1", chd.ets.rr := chd.ets.rr.mc]
+POP[cigst1 != "4" & expsmok.cvdlag == "1", chd.ets.rr := chd.ets.rr.mc]
+POP[age > 69, chd.ets.rr := chd.ets.rr * (1-(age-69)/100)] # decrease risk for elderly
+POP[chd.ets.rr < 1, chd.ets.rr := 1]
+POP[is.na(chd.ets.rr), chd.ets.rr := 1]
 
 # RR for SBP from Optimal SBP level at 115mmHg and RR(HR) of dying from CHD was taken from "Age-specific relevance of
 # usual blood pressure to vascular mortality: 
 # a meta-analysis of individual data for one million adults in 61 prospective studies. 
 # The Lancet. 2002 Dec 14;360(9349):1903–1913" 
 # Figure 5
-cat("sbp RR\n")
+#cat("sbp RR\n")
 set(POP, NULL, "chd.sbp.rr",  1)
-setkey(POP, agegroup, sex)
-POP[sbp.rr.chd, chd.sbp.rr := rr^((115 - omsysval.cvdlag)/20)]
-POP[chd.sbp.rr<1, chd.sbp.rr := 1]
+setkey(POP, age, sex)
+POP[sbp.rr.chd, chd.sbp.rr := bound(rr^((115 - omsysval.cvdlag)/20), 1, Inf)]
+POP[is.na(chd.sbp.rr), chd.sbp.rr := 1]
 
 # RR for Chol from "Blood cholesterol and 
 # vascular mortality by age, sex, and blood pressure: a meta-analysis of individual data from 61 prospective studies 
 # with 55.000 vascular deaths. The Lancet. 2007 Dec 7;370(9602):1829–39. 
 # Appendix Webtable 6  fully adjusted
-cat("chol RR\n")
+#cat("chol RR\n")
 set(POP, NULL, "chd.chol.rr",  1)
-setkey(POP, agegroup)
-POP[chol.rr.chd, chd.chol.rr := rr^(3.8 - cholval.cvdlag)]
-POP[chd.chol.rr < 1, chd.chol.rr := 1]
+setkey(POP, age)
+POP[chol.rr.chd, chd.chol.rr := bound(rr^(3.8 - cholval.cvdlag), 1, Inf)]
+POP[is.na(chd.chol.rr), chd.chol.rr := 1]
 
 # RR for BMI from "The Emerging Risk Factors Collaboration.
 # Separate and combined associations of body-mass index and abdominal adiposity with cardiovascular disease:
@@ -75,140 +81,66 @@ POP[chd.chol.rr < 1, chd.chol.rr := 1]
 # The Lancet 2011;377:1085–95. doi:10.1016/S0140-6736(11)60105-0
 # Table 1 (Adjusted for age, sex, smoking status, systolic blood pressure, history of diabetes, and total and HDL cholesterol)
 # and figure 2 for age specific gradient
-cat("bmi RR\n")
+#cat("bmi RR\n")
 set(POP, NULL, "chd.bmi.rr",  1)
-POP[chd.bmi.rr.mc, chd.bmi.rr := rr^((bmival.cvdlag - 20)/4.56)]
-POP[chd.bmi.rr < 1, chd.bmi.rr := 1]
+POP[chd.bmi.rr.mc, chd.bmi.rr := bound(rr^((bmival.cvdlag - 20)/4.56), 1, Inf)]
+POP[is.na(chd.bmi.rr), chd.bmi.rr := 1]
 
 # RR for diab from The Emerging Risk Factors Collaboration. Diabetes mellitus, fasting blood glucose concentration, 
 # and risk of vascular disease: a collaborative 
 # meta-analysis of 102 prospective studies. The Lancet 2010;375:2215–22. doi:10.1016/S0140-6736(10)60484-9
 # figure 2 (HRs were adjusted for age, smoking status, body-mass index, and  systolic blood pressure)
-cat("diab RR\n")
+#cat("diab RR\n")
 set(POP, NULL, "chd.diab.rr",  1)
-setkey(POP, agegroup, diabtotr.cvdlag)
+setkey(POP, age, diabtotr.cvdlag)
 POP[chd.diab.rr.mc, chd.diab.rr := rr]
+POP[is.na(chd.diab.rr), chd.diab.rr := 1]
 
 # RR for F&V from From Dauchet L, Amouyel P, Hercberg S, Dallongeville J. Fruit and Vegetable Consumption and Risk of Coronary Heart Disease: 
 # A Meta-Analysis of Cohort Studies. J Nutr. 2006 Oct 1;136(10):2588–93. 
 # To avoid negative PAF an optimal level of F&V has to be set arbitrarily. I set it to 10 
 # when convert porftvg from categorical to numeric I create bias. eg 1=less than 1 portion
-cat("fv RR\n")
+#cat("fv RR\n")
 set(POP, NULL, "chd.fv.rr",  1)
-POP[porftvg.cvdlag > 0, chd.fv.rr := chd.fv.rr.mc^(porftvg.cvdlag)] # x^0 is 1 anyway
+POP[porftvg.cvdlag < 8L, chd.fv.rr := bound(chd.fv.rr.mc^(porftvg.cvdlag - 7L), 1, Inf)] # x^0 is 1 anyway
+POP[age > 69, chd.fv.rr := chd.fv.rr * (1-(age-69)/100)] # decrease risk for elderly
+POP[chd.fv.rr < 1, chd.fv.rr := 1]
+POP[is.na(chd.fv.rr), chd.fv.rr := 1]
+POP[is.na(chd.fv.rr), chd.fv.rr := 1]
 
 # RR for PA 1. WHO | Comparative Quantification of Health Risks [Internet]. 
 # WHO [cited 2014 Jan 30];Available from: http://www.who.int/publications/cra/en/
 # Table 10.19 (with adjustment for measurement error)
-cat("pa RR\n")
+#cat("pa RR\n")
 set(POP, NULL, "chd.pa.rr",  1)
-setkey(POP, agegroup, a30to06m.cvdlag)
+setkey(POP, age, a30to06m.cvdlag)
 POP[pa.rr.chd, chd.pa.rr := rr]
+POP[is.na(chd.pa.rr), chd.pa.rr := 1]
 
 # Estimate PAF ------------------------------------------------------------
-cat("Estimating CHD PAF...\n")
 if (i == init.year - 2011) {
-  chdtobpaf <- 
+  #cat("Estimating CHD PAF...\n")
+  chdpaf <- 
     POP[between(age, ageL, ageH), 
-        .(tobpaf = 
-            (sum(chd.tob.rr - 1, na.rm = T) / .N) / 
-            ((sum(chd.tob.rr - 1, na.rm = T) / .N) + 1)
-        ), 
-        by = .(agegroup, sex)
+        .(paf = 1 - 1 / (sum(chd.tob.rr * chd.ets.rr *
+                               chd.sbp.rr * chd.chol.rr * 
+                               chd.bmi.rr * chd.diab.rr * chd.fv.rr *
+                               chd.pa.rr) / .N)), 
+        by = .(age, sex)
         ]
-  setkey(chdtobpaf, agegroup, sex)
-  
-  chdetspaf <- 
-    POP[between(age, ageL, ageH), 
-        .(etspaf = 
-            (sum(chd.ets.rr - 1, na.rm = T) / .N) / 
-            ((sum(chd.ets.rr - 1, na.rm = T) / .N) + 1)
-        ), 
-        by = .(agegroup, sex)
-        ]
-  setkey(chdetspaf, agegroup, sex)
-  
-  chdsbppaf <- 
-    POP[between(age, ageL, ageH), 
-        .(sbppaf = 
-            (sum(chd.sbp.rr - 1, na.rm = T) / .N) / 
-            ((sum(chd.sbp.rr - 1, na.rm = T) / .N) + 1)
-        ), 
-        by = .(agegroup, sex)
-        ]
-  setkey(chdsbppaf, agegroup, sex)
-  
-  chdcholpaf <- 
-    POP[between(age, ageL, ageH), 
-        .(cholpaf = 
-            (sum(chd.chol.rr - 1, na.rm = T) / .N) / 
-            ((sum(chd.chol.rr - 1, na.rm = T) / .N) + 1)
-        ), 
-        by = .(agegroup, sex)
-        ]
-  setkey(chdcholpaf, agegroup, sex)
-  
-  chdbmipaf <- 
-    POP[between(age, ageL, ageH), 
-        .(bmipaf = 
-            (sum(chd.bmi.rr - 1, na.rm = T) / .N) / 
-            ((sum(chd.bmi.rr - 1, na.rm = T) / .N) + 1)
-        ), 
-        by = .(agegroup, sex)
-        ]
-  setkey(chdbmipaf, agegroup, sex)
-  
-  chddiabpaf <- 
-    POP[between(age, ageL, ageH), 
-        .(diabpaf = 
-            (sum(chd.diab.rr - 1, na.rm = T) / .N) / 
-            ((sum(chd.diab.rr - 1, na.rm = T) /.N) + 1)
-        ), 
-        by = .(agegroup, sex)
-        ]
-  setkey(chddiabpaf, agegroup, sex)
-  
-  chdfvpaf <- 
-    POP[between(age, ageL, ageH), 
-        .(fvpaf = 
-            (sum((chd.fv.rr^-1) - 1, na.rm = T) / .N) / 
-            ((sum((chd.fv.rr^-1) - 1, na.rm = T) /.N ) + 1)
-        ), 
-        by = .(agegroup, sex)
-        ]
-  setkey(chdfvpaf, agegroup, sex)
-  
-  chdpapaf <- 
-    POP[between(age, ageL, ageH), 
-        .(papaf = 
-            (sum(chd.pa.rr - 1, na.rm = T) / .N) / 
-            ((sum(chd.pa.rr - 1, na.rm = T) /.N ) + 1)
-        ), 
-        by = .(agegroup, sex)
-        ]
-  setkey(chdpapaf, agegroup, sex)
-  
-  CHDincid[, agegroup := agegroup.fn(age)]
-  setkey(CHDincid, agegroup, sex)
-  CHDincid[chdbmipaf[chdcholpaf[chddiabpaf[chdetspaf[chdfvpaf[chdsbppaf[chdtobpaf[chdpapaf]]]]]]], 
-           p0 := incidence * (1 - bmipaf) *
-             (1 - cholpaf) * (1 - diabpaf) * 
-             (1 - etspaf)  * (1 - fvpaf) * 
-             (1 - sbppaf)  * (1 - tobpaf) *
-             (1 - papaf)]
+  setkey(chdpaf, age, sex)
+  #chdpaf[, paf := predict(loess(paf~age, span=0.20)), by = .(sex)]
+  setkey(CHDincid, age, sex)
+  CHDincid[chdpaf, p0 := incidence * (1 - paf)]
   CHDincid[is.na(p0), p0 := incidence]
-  CHDincid[, agegroup := NULL]
-  rm(chdbmipaf,chdcholpaf,chddiabpaf,chdetspaf,chdfvpaf,chdsbppaf,chdtobpaf,chdpapaf)
-  setkey(CHDincid, NULL)
 }
 
 setkey(POP, age, sex)
 POP[CHDincid, p0 := p0]
 
-
 # Estimate prevalence -----------------------------------------------------
 if (i == init.year - 2011) {
-  cat(paste0("Estimating CHD prevalence in ", init.year, " ...\n\n"))
+  #cat(paste0("Estimating CHD prevalence in ", init.year, " ...\n\n"))
   age.structure <- setkey(POP[age <= ageH, .N, by = .(age, sex)], age, sex)
   age.structure[CHDpreval[age <= ageH], Nprev := rbinom(.N, N, prevalence)]
   age.structure[CHDincid[age <= ageH],  Nprev := Nprev - rbinom(.N, N - Nprev, incidence)]
@@ -217,19 +149,20 @@ if (i == init.year - 2011) {
   setnames(age.structure, "N", "population")
   
   POP <- merge(POP,
-               deaths.causes.secgrad[cause == "Ischaemic heart diseases", .(agegroup, sex, qimd, sec.grad.adj)],
+               deaths.causes.secgrad[cause == "Ischaemic heart diseases", 
+                                     .(agegroup, sex, qimd, sec.grad.adj)],
                by = c("agegroup", "sex", "qimd"), all.x = T)
   POP[is.na(sec.grad.adj), sec.grad.adj := 1]
   
   id.chd <- POP[age <=  ageH, 
-                sample_n(.SD, age.structure[sex == .BY[[2]] & age == .BY[[1]],
+                sample(id, age.structure[sex == .BY[[2]] & age == .BY[[1]],
                                             Nprev], 
-                         weight = chd.tob.rr * chd.ets.rr * 
+                         prob = chd.tob.rr * chd.ets.rr * 
                            chd.sbp.rr * chd.chol.rr * chd.bmi.rr * 
                            chd.diab.rr * chd.fv.rr * chd.pa.rr * 
                            sec.grad.adj, 
                          replace = F), 
-                by = .(age, sex)][, id]
+                by = .(age, sex)][, V1]
   
   POP[id %in% id.chd, chd.incidence := init.year - 1] # and then we assign
   # these ids to the population
@@ -237,47 +170,28 @@ if (i == init.year - 2011) {
   rm(id.chd)
 }
 
-# correction factor NEED TO make it work only for i==0
-if (alignment == T) {
-  if (i == init.year-2011) {
-    corr.factor.chd <- merge(
-      POP[between(age, ageL, ageH) & chd.incidence == 0,
-          mean(p0 * chd.tob.rr * chd.ets.rr * 
-                 chd.sbp.rr * chd.chol.rr * 
-                 chd.bmi.rr * chd.diab.rr * 
-                 chd.fv.rr * chd.pa.rr),
-          by = .(age, sex)],
-      CHDincid,
-      by = c("age", "sex"), all.x = T)
-    corr.factor.chd[, b := incidence/V1]
-    corr.factor.chd[, `:=` (p0 = NULL, incidence = NULL, V1 = NULL)]
-    POP <- merge(POP, corr.factor.chd, by = c("age", "sex"), all.x = T)
-  } else {
-    POP <- merge(POP, corr.factor.chd, by = c("age", "sex"), all.x = T)
-  }
-} else set(POP, NULL, "b", 1)
-
-# P= p0 * chd.tob.rr * chd.ets.rr * chd.sbp.rr * chd.chol.rr * chd.bmi.rr * chd.diab.rr * chd.fv.rr
-cat("Estimating CHD incidence...\n\n")
-if (alignment == T) cat("Alignment will be performed\n\n")
+#cat("Estimating CHD incidence...\n\n")
 POP[between(age, ageL, ageH) & 
       chd.incidence == 0L &
       dice(.N) < p0 * chd.tob.rr * chd.ets.rr *
       chd.sbp.rr * chd.chol.rr * 
       chd.bmi.rr * chd.diab.rr * chd.fv.rr *
-      chd.pa.rr * b,
-    chd.incidence := 2011 + i] # b is the correction factor
+      chd.pa.rr,
+    chd.incidence := 2011 + i]
 #POP[,summary(as.factor(v))]
 
 #setkey(Out.Inc.CHD, agegroup, sex)
 
 # Estimate CHD mortality 
-cat("Estimating CHD mortality...\n\n")
+#cat("Estimating CHD mortality...\n\n")
 
 # Apply assumptions about improvement of fatality by year
 # ie 3% improvemnt by year (as supportet by BHF)
 
-if (i > init.year - 2011) CHDsurv[, fatality := fatality * (100 - fatality.annual.improvement.chd)/100]
+if (i > init.year - 2011) {
+  CHDsurv[, fatality := fatality * (100 - fatality.annual.improvement.chd)/100]
+  fatality.annual.improvement.chd <- fatality.annual.improvement.chd * 0.98
+}
 setkey(POP, age, sex)
 POP[CHDsurv, fatality := fatality]
 
@@ -322,8 +236,8 @@ POP[chd.incidence == 2011 + i, dead:= dice(.N) <= fatality30] # 30 days mortalit
 
 POP[chd.incidence > 0 & dead == F, dead:= dice(.N) <= fatality2] # T = dead, F = alive 
 
-cat("Export CHD burden summary...\n\n")
-cat(paste0(Sys.time(), "\n\n"))
+#cat("Export CHD burden summary...\n\n")
+#cat(paste0(Sys.time(), "\n\n"))
 if (i == init.year-2011) chd.burden <- vector("list", yearstoproject * 5)
 
 chd.burden[[(2011 - init.year + i) * 5 + 1]] <-
@@ -345,7 +259,7 @@ if (i == yearstoproject + init.year - 2012) {
   saveRDS(rbindlist(chd.burden, T, T), file = paste0(output.dir(), "chd.burden.rds"))
 }
 
-cat("Export CHD burden individuals...\n\n")
+#cat("Export CHD burden individuals...\n\n")
 indiv.incid[[which(diseasestoexclude=="CHD")]] <- 
   POP[chd.incidence == 2011 + i,
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
@@ -365,15 +279,17 @@ indiv.incid[[which(diseasestoexclude=="CHD")]] <-
 #   saveRDS(chd.ind.preval.rds, file = paste0(output.dir(), "chd.ind.preval.rds"))
 # }
 
-indiv.mort[[which(diseasestoexclude=="CHD") + 1]] <- POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
-                                                         ][,`:=` (year = 2011 + i, cause = "chd", scenario = gsub(".R", "", scenarios.list[[iterations]]), 
-                                                                  mc = haha)]
+indiv.mort[[which(diseasestoexclude=="CHD") + 1]] <-
+  POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
+      ][,`:=` (year = 2011 + i, cause = "chd",
+               scenario = gsub(".Rc", "", scenarios.list[[iterations]]), 
+               mc = haha)]
 
 POP = copy(POP[dead == F | is.na(dead)== T,])
 
 rm(Temp, Temp1)
 
 POP[, `:=` (chd.tob.rr = NULL, p0 = NULL,
-            chd.ets.rr = NULL, chd.sbp.rr = NULL, fatality2 = NULL, b = NULL ,
+            chd.ets.rr = NULL, chd.sbp.rr = NULL, fatality2 = NULL,
             chd.chol.rr = NULL, chd.bmi.rr = NULL, chd.diab.rr = NULL, chd.pa.rr = NULL,
             chd.fv.rr = NULL, dead = NULL, fatality = NULL, fatality30 = NULL)] 

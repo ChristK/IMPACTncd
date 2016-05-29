@@ -16,7 +16,6 @@
 ## or write to the Free Software Foundation, Inc., 51 Franklin Street,
 ## Fifth Floor, Boston, MA 02110-1301  USA.
 
-
 # preample ----------------------------------------------------------------
 gc()
 dependencies <- function(x) {
@@ -274,6 +273,7 @@ HSE2004original[, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
 agegroup.fn(HSE2004original)
 HSE2004original[diabete2 == 2, diabtotr := 1]
 HSE2004original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
+HSE2004original[, `:=` (wt.int = wt.int / 10)]
 HSE2004original[, `:=` (wt.blood = wt.int, wt.nurse = wt.int)]
 #HSE7.srv.blood <- svydesign(id=~psu, strata=~cluster, weights=~wt.blood, nest=F, data=HSE2004original[wt.blood>0], check.strata = T)
 #HSE7.srv.nurse <- svydesign(id=~psu, strata=~cluster, weights=~wt.nurse, nest=F, data=HSE2004original[wt.nurse>0], check.strata = T)
@@ -454,7 +454,7 @@ HSE.ts[age>85, age:= 85]
 
 # ignore survey effects and match with 24h known distributions
 HSE = copy(HSE.ts[between(age, 19, 64) & !is.na(qimd) & !is.na(sodium) & !is.na(bmival), ])
-HSE <- rbindlist(sample(list(HSE), 500, T),idcol = T)
+HSE <- rbindlist(sample(list(HSE), 1000, T),idcol = T)
 HSE[age>15 & sex== "1", Na24 := Na24.men(.N, sodium, creatin, potass, bmival, age)]
 HSE[age>15 & sex== "2", Na24 := Na24.women(.N, sodium, creatin, potass, bmival, age)]
 HSE[, salt := Na24 * 58.5/1000]
@@ -936,6 +936,8 @@ tmp4[, `:=` (grp = NULL, salt24h.rank = NULL)]
 # combine all
 HSE.salt <- setkey(rbind(tmp1, tmp2, tmp3, tmp4, use.names = T), age, sex, qimd, year)
 rm(tmp1, tmp2, tmp3, tmp4, tmp, HSE, HSE.ts)
+HSE.salt[salt24h <1, salt24h := 1] 
+HSE.salt[salt24h > 30, salt24h := 30] 
 gc()
 
 # explore salt correlations
@@ -1016,13 +1018,13 @@ if (Sys.info()[1] == "Linux") {
   registerDoParallel(30) # used for forking. only linux
 }
 if (Sys.info()[1] == "Windows") {
-  cl <- makeCluster(6) # used for clustering. win compatible
+  cl <- makeCluster(4) # used for clustering. win compatible
   registerDoParallel(cl) 
 }
 
-salt.rq.coef <- vector("list", 500)
+salt.rq.coef <- vector("list", 1000)
 salt.rq.coef <- 
-  foreach(jj = 1 : 500,
+  foreach(jj = 1 : 1000,
           .inorder = F,
           .verbose = T,
           .packages = c("data.table",
@@ -1051,11 +1053,11 @@ View(apply(simplify2array(salt.rq.coef), 1:2, quantile, c(0.025, 0.5, 0.975)))
 q2 <- salt.rq
 # When I use 100 percentiles, give some wrong values. eg pct .4 gives salt 5 and 
 # pct .41 gives salt 4.9 (should be above 5). The -tiles I used seems the best option
-salt.rq.old <- rq(salt24h ~ log(year+14) + log(age) + sex + qimd + log(age):sex, 
-                  tau = c(0.01, 1:19/20, 0.99),
-                  data = HSE.salt,
-                  weights = wt.urine,
-                  method = "fn")
+# salt.rq.old <- rq(salt24h ~ log(year+14) + log(age) + sex + qimd + log(age):sex, 
+#                   tau = c(0.01, 1:19/20, 0.99),
+#                   data = HSE.salt,
+#                   weights = wt.urine,
+#                   method = "fn")
 # log(year + 14). 14 was selected so median salt for an 85 yo woman of qimd=1 is
 # above 3gr in 2111. See below. Other wise linear decrease is too steep and produces 
 # unrealistic results. 
@@ -1089,10 +1091,15 @@ pred.s <- cmpfun(function(year, age, sex, qimd) {
 )
 q2$coefficients <- sample(salt.rq.coef, 1)[[1]][,11]
 plot (pred.s(-10:30, 30:70, 1, 1), ylim=c(0,12))
-abline(h=3)
+abline(h=6)
 lines(pred.s(-10:30, 30:70, 1, 3), col = "blue")
 lines(pred.s(-10:30, 30:70, 1, 5), col = "red")
 lines(pred.s(-10:30, 30:70, 1, 1), col = "green")
+
+salt.rq$y <- NULL
+salt.rq$x <- NULL
+salt.rq$residuals <- NULL
+salt.rq$fitted.values <- NULL
 #save(salt.rq, file="./Lagtimes/salt.rq.rda")
 #save(salt.rq.coef, file="./Lagtimes/salt.rq.coef.rda")
 
@@ -1107,8 +1114,10 @@ HSE.ts[bmival<16 & age>19, bmival := 16]
 HSE.ts[bmival>50 & age>19, bmival := 50]
 HSE.ts[age>85, age := 85]
 HSE.ts[, a30to06m := ordered(a30to06m)]
-HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
-HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>19 & year > -7 & wt.int>0 & is.na(a30to06m)== F & is.na(qimd)==F) # years before 2006 were excluded for more realistic projections   
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F,
+                            data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>19 &  wt.int>0 & !is.na(a30to06m) &
+                           !is.na(qimd))   
 # repwtdesign <- as.svrepdesign(HSE.ts.srv.int)
 # ologit <- 
 #   withReplicates(
@@ -1136,18 +1145,18 @@ HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>19 & year > -7 & wt.int>0 & is.na(a
 
 
 tt = copy(HSE.ts[age > 19 & 
-                   year > -7 &
+                   #year > -7 &
                    wt.int > 0 & 
                    is.na(a30to06m)== F & 
                    is.na(qimd) == F, ])
 tt[, a30to06m := ordered(a30to06m)]
 
 pp <- svyby(~a30to06m, by=~age, design=HSE.ts.srv.int, svymean)
-scatter.smooth(pp, family = "gaussian", ylim=c(0,6))
-lines(y=predict(svyglm(a30to06m~age + I(age^3)+ I(age^2), family=quasipoisson(), design=HSE.ts.srv.int), data.frame(age=20:100), type="response"), x=20:100, col="red")
+scatter.smooth(pp, family = "gaussian", ylim=c(0,1))
+lines(y=predict(svyglm(as.integer(a30to06m)~age + I(age^3)+ I(age^2), family=quasipoisson(), design=HSE.ts.srv.int), data.frame(age=20:100), type="response"), x=20:100, col="red")
 
 pp <- svyby(~a30to06m, by=~year, design=HSE.ts.srv.int, svymean)
-scatter.smooth(pp, family = "gaussian", ylim=c(0,6), xlim=c(-10,1))
+scatter.smooth(pp, family = "gaussian", ylim=c(0,1), xlim=c(-10,1))
 lines(y=predict(svyglm(a30to06m~year, family=quasipoisson(), design=HSE.ts.srv.int), data.frame(year=-10:50), type="response"), x=-10:50, col="red")
 scatter.smooth(pp, family = "gaussian", ylim=c(0,6), xlim=c(-10,50))
 lines(y=predict(svyglm(a30to06m~year, family=quasipoisson(), design=HSE.ts.srv.int), data.frame(year=-10:50), type="response"), x=-10:50, col="red")
@@ -1155,8 +1164,9 @@ lines(y=predict(svyglm(a30to06m~year, family=quasipoisson(), design=HSE.ts.srv.i
 # fit ordinal multinomial regression model and ignore sampling design
 # I need to scale count vars for stepaic to work
 # also tried with rcs and ns and got worse predictions
-ttt <-data.frame(a30to06m=tt[,a30to06m],scale(tt[,.(year,age)]), tt[,.(sex,qimd,wt.int)]) 
-mod1 <- polr(a30to06m~(year + age + I(age^2) + I(age^3) + sex + qimd)^2,
+ttt <-data.frame(a30to06m=tt[,a30to06m],scale(tt[,.(year,age)]), 
+                 tt[,.(sex,qimd,wt.int)]) 
+mod1 <- polr(a30to06m~log(year + 25) * age * sex * qimd + I(age^2) + I(age^3),
              data = ttt, 
              weights = wt.int,
              method = "logistic",
@@ -1164,11 +1174,11 @@ mod1 <- polr(a30to06m~(year + age + I(age^2) + I(age^3) + sex + qimd)^2,
 summary(mod1)
 mod2 <- stepAIC(mod1)
 
-mod2 <- # best model based on aic
+mod3 <- # best model based on aic
   polr(
-    a30to06m ~ year + age + I(age^2) + I(age^3) + 
-      sex + qimd + year:qimd + age:I(age^3) + age:sex + age:qimd + 
-      I(age^2):I(age^3) + I(age^2):sex + I(age^3):qimd,
+    a30to06m ~ log(year + 25) + age + sex + qimd + 
+      I(age^2) + I(age^3) + age:sex + log(year + 25):qimd + age:qimd + 
+      sex:qimd + age:sex:qimd,
     data = tt, 
     weights = wt.int,
     method = "logistic",
@@ -1176,17 +1186,20 @@ mod2 <- # best model based on aic
 
 pa.svylr <- #apply formula of mod2 to svy 
   svyolr(
-    a30to06m ~ year + age + I(age^2) + I(age^3) + 
-      sex + qimd + year:qimd + age:I(age^3) + age:sex + age:qimd + 
-      I(age^2):I(age^3) + I(age^2):sex + I(age^3):qimd, 
+    a30to06m ~ log(year + 25) + age + sex + qimd + 
+      I(age^2) + I(age^3) + age:sex + log(year + 25):qimd + age:qimd + 
+      sex:qimd + age:sex:qimd, 
     design = HSE.ts.srv.int, 
     method = "logistic")
 
 # copy parameters of svy model to polr model so predict can work
-for (k in intersect(names(mod2),  names(pa.svylr))) mod2[k] <- pa.svylr[k]
+for (k in intersect(names(mod3),  names(pa.svylr))) mod3[k] <- pa.svylr[k]
 
-pa.svylr <- mod2
+pa.svylr <- mod3
 
+pa.svylr$data <- NULL
+pa.svylr$lp <- NULL
+pa.svylr$fitted.values <- NULL
 #save(pa.svylr, file="./Models/IMPACTncd/Lagtimes/pa.svylr.rda")
 #save(pa.svylr, file="./Lagtimes/pa.svylr.rda")
 
@@ -1199,12 +1212,12 @@ HSE.ts[age>85, age:= 85]
 HSE.ts.srv.nurse <- svydesign(id = ~psu, strata = ~cluster, 
                               weights = ~wt.nurse, nest = F,
                               data=HSE.ts, check.strata = T)
-HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age>19 & wt.nurse > 0 &
-                             is.na(qimd) == F & is.na(bmival) == F &
-                             is.na(a30to06m.imp)== F)
-dt <- subset(HSE.ts, age>19 & wt.nurse > 0 &
-               is.na(qimd) == F & is.na(bmival) == F &
-               is.na(a30to06m.imp)== F)
+HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, age > 19 & wt.nurse > 0 &
+                             !is.na(qimd) & !is.na(bmival) &
+                             !is.na(a30to06m.imp))
+dt <- subset(HSE.ts, age > 19 & wt.nurse > 0 &
+               !is.na(qimd) & !is.na(bmival) &
+               !is.na(a30to06m.imp))
 dt[between(age, 20, 84), hist(bmival)]
 dt[between(age, 20, 84), plot(density(log(bmival), na.rm = T))]
 dt[between(age, 20, 84), plot(sort(log(bmival)), pch = ".")]
@@ -1213,80 +1226,49 @@ dt[between(age, 20, 84), boxplot(log(bmival) ~ year)]
 dt[between(age, 20, 84), boxplot(log(bmival) ~ a30to06m.imp)]
 dt[between(age, 20, 84), boxplot(log(bmival) ~ qimd)]
 
-# The rms-setup
-fitr <- glm(bmival~(rcs(age, 4) + sex + qimd +
-                      year + rcs(a30to06m.imp, 4))^2, 
-            weights = wt.nurse, 
-            family = gaussian(link = "log"),
-            data = dt)
-layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
-plot(fitr)
-anova(fitr)
-
-
-fitr2 <- stepAIC(fitr)
-summary(fitr2)
-layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
-plot(fitr2)
-
 pp <- svyby(~bmival, by=~age, design=HSE.ts.srv.nurse, svymean)
 scatter.smooth(pp, ylim=c(0,30), family="gaussian", span = 1/3)
 lines(y=predict(svyglm(bmival~age + I(age^2), family=gaussian(link="inverse"), design=HSE.ts.srv.nurse), data.frame(age=20:100), type="response"), x=20:100, col="green")
 lines(y=predict(svyglm(bmival~age + I(age^2), family=gaussian(link="identity"), design=HSE.ts.srv.nurse), data.frame(age=20:100), type="response"), x=20:100, col="red")
 lines(y=predict(svyglm(bmival~age + I(age^2), family=inverse.gaussian, design=subset(HSE.ts.srv.nurse, sex == 1)), data.frame(age=20:100), type="response"), x=20:100, col="blue")
 
-scatter.smooth(svyby(~bmival, by=~year, design=HSE.ts.srv.nurse, svymean), ylim=c(25,30), xlim=c(-10, 50))
+scatter.smooth(svyby(~bmival, by=~year, design=HSE.ts.srv.nurse, svymean), ylim=c(26.8,28), xlim=c(-10, 1))
 lines(y=predict(svyglm(bmival~year, design=HSE.ts.srv.nurse), data.frame(year=-10:50), type="response"), x=-10:50, col="red")
-lines(y=predict(svyglm(bmival~I(exp(-year))+year, family=gaussian(link="identity"), design=HSE.ts.srv.nurse), data.frame(year=-10:50), type="response"), x=-10:50, col="green")
+lines(y=predict(svyglm(bmival~log(year+25), family=gaussian(link="identity"), design=HSE.ts.srv.nurse), data.frame(year=-10:50), type="response"), x=-10:50, col="green")
 lines(y=predict(svyglm(bmival~year, family=inverse.gaussian, design=HSE.ts.srv.nurse), data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
 lines(y=predict(svyglm(bmival~year, family=gaussian(link="inverse"), design=HSE.ts.srv.nurse), data.frame(year=-10:50), type="response"), x=-10:50, col="purple")
 
 scatter.smooth(svyby(~bmival, by=~a30to06m.imp, design=HSE.ts.srv.nurse, svymean), ylim=c(25,30), xlim=c(0, 7))
-lines(y=predict(svyglm(bmival~a30to06m.imp + I(a30to06m.imp^2) + I(a30to06m.imp^3), design=HSE.ts.srv.nurse), data.frame(a30to06m.imp=0:7), type="response"), x=0:7, col="red")
+lines(y=predict(svyglm(bmival~a30to06m.imp , design=HSE.ts.srv.nurse), data.frame(a30to06m.imp=0:7), type="response"), x=0:7, col="red")
 
 scatter.smooth(svyby(~bmival, by=~porftvg, design=HSE.ts.srv.nurse, svymean), ylim=c(25,30), xlim=c(0, 8))
 
-bmi.svylm <- svyglm(bmival~year + age + sex + qimd + a30to06m.imp + I(age^2) + I(a30to06m.imp^2) + I(a30to06m.imp^3),
+mod1 <- svyglm(bmival~ log(year+25)*age*sex*qimd + a30to06m.imp + I(age^2),
                     method = "glm.fit2",
-                    family=gaussian,
+                    family=gaussian(link = "log"),
                     design = HSE.ts.srv.nurse) 
-anova(bmi.svylm) # fv are not significant. literature support this
+anova(mod1) # fv are not significant. literature support this
 
-bmi.svylm1 <- svyglm( bmival ~ rcs(age, 4) + sex + qimd + year +
-                        rcs(a30to06m.imp,4) + rcs(age, 4):sex + 
-                        rcs(age, 4):qimd + rcs(age, 4):rcs(a30to06m.imp,4) +
-                        sex:qimd + sex:year + sex:rcs(a30to06m.imp, 4) +
-                        qimd:rcs(a30to06m.imp,4) + year:rcs(a30to06m.imp, 4),
-                      method = "glm.fit2",
-                      family=gaussian(link="log"),
-                      design = HSE.ts.srv.nurse) 
-anova(bmi.svylm1) 
-AIC(bmi.svylm, bmi.svylm1)
+mod2 <- stepAIC(mod1)
+anova(mod2, mod1)
+AIC(mod2, mod1)
 
-bmi.svylm2 <- svyglm(bmival~year + age + sex + qimd + a30to06m.imp + I(age^2)+
-                       year:age + year:qimd + age:sex + sex:qimd + sex:a30to06m.imp,
-                     method = "glm.fit2",
-                     family=gaussian,
-                     design = HSE.ts.srv.nurse) 
-anova(bmi.svylm2)
-AIC(bmi.svylm, bmi.svylm1, bmi.svylm2)
-
-bmi.svylm3 <- svyglm(bmival~year + year:qimd + (age + sex + qimd + a30to06m.imp)^2 + I(age^2) -
-                       age:qimd - qimd:a30to06m.imp,
-                     method = "glm.fit2",
-                     family=gaussian,
-                     design = HSE.ts.srv.nurse) 
-anova(bmi.svylm3)
-
-anova(bmi.svylm2, bmi.svylm3)
-AIC(bmi.svylm, bmi.svylm1, bmi.svylm2, bmi.svylm3)
-
-bmi.svylm <- bmi.svylm2 
+bmi.svylm <- mod2
 bmi.svylm$deviance/bmi.svylm$df.null
 1-bmi.svylm$deviance/bmi.svylm$null.deviance # R^2
+
+bmi.svylm$data <- NULL
+bmi.svylm$survey.design <- NULL
+bmi.svylm$qr <- NULL
+bmi.svylm$residuals <- NULL
+bmi.svylm$y <- NULL
+bmi.svylm$linear.predictors <- NULL
+bmi.svylm$fitted.values <- NULL
+bmi.svylm$effects <- NULL
+bmi.svylm$weights <- NULL
+bmi.svylm$prior.weights <- NULL
 #save(bmi.svylm, file="./Lagtimes/bmi.svylm.rda")
 #save(bmi.svylm, file="./Models/IMPACTncd/Lagtimes/bmi.svylm.rda")
-
 
 # sbp model ---------------------------------------------------------------
 #load(file="./Lagtimes/HSE.ts.RData")
@@ -1296,41 +1278,42 @@ HSE.ts[bmival>50 & age>19, bmival := 50]
 HSE.ts[age>85, age:= 85]
 HSE.ts[is.na(cigst1) == F, cigst2:= ifelse((cigst1 == "4"), "1", "0")]
 HSE.ts[, cigst2 := factor(cigst2)]
-HSE.ts.srv.nurse <- svydesign(id=~psu, strata =~cluster, weights = ~wt.nurse, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.nurse <- svydesign(id=~psu, strata =~cluster, weights = ~wt.nurse, 
+                              nest=F, data=HSE.ts, check.strata = T)
 HSE.ts.srv.nurse <- subset(HSE.ts.srv.nurse, 
-                           age>19 & wt.nurse>0 & is.na(omsysval)== F & 
-                             is.na(qimd)== F & is.na(bmival)== F &
-                             is.na(cigst2)== F & year > -7 & 
-                             is.na(a30to06m.imp) == F)
+                           age>19 & wt.nurse>0 & !is.na(omsysval) & 
+                             !is.na(qimd) & !is.na(bmival) &
+                             !is.na(cigst2) & 
+                             !is.na(a30to06m.imp))
 
-tt <- HSE.ts[age>19 & wt.nurse>0 & is.na(omsysval)== F & 
-               is.na(qimd)== F & is.na(bmival)== F &
-               is.na(cigst2)== F & year > -7 & 
-               is.na(a30to06m.imp) == F, ]
-
-mod1 <- glm(omsysval~  (I(age^3) +I(age^2) +year + age + sex + qimd + 
-                          log(bmival) + I(log(bmival)^2) +
-                          cigst2)^2 + a30to06m.imp - I(age^2):age,
-            data = tt,
-            weights = wt.nurse,
-            method = "glm.fit2")
-
-mod2 <- stepAIC(mod1)
-
-sbp.svylm <- svyglm(omsysval ~ I(age^3) + I(age^2) + year + age + sex + 
-                      qimd + log(bmival) + I(log(bmival)^2) + cigst2 + a30to06m.imp + 
-                      I(age^3):I(age^2) + I(age^3):year + I(age^3):age + I(age^3):sex + 
-                      I(age^3):qimd + I(age^2):sex + I(age^2):log(bmival) + I(age^2):I(log(bmival)^2) + 
-                      I(age^2):cigst2 + age:sex + age:qimd + age:log(bmival) + 
-                      age:I(log(bmival)^2) + sex:log(bmival) + sex:I(log(bmival)^2) + 
-                      sex:cigst2 + log(bmival):I(log(bmival)^2) + log(bmival):cigst2, 
-                    family = gaussian(link="identity"),
-                    method = "glm.fit2",
-                    design = HSE.ts.srv.nurse)
+tt <- HSE.ts[age>19 & wt.nurse>0 & !is.na(omsysval) & 
+               !is.na(qimd) & !is.na(bmival) &
+               !is.na(cigst2) & 
+               !is.na(a30to06m.imp), ]
+tt[, hist(omsysval)]
+tt[, hist(log(omsysval))]
 
 pp <- svyby(~omsysval, by=~age, design=HSE.ts.srv.nurse, svymean)
-scatter.smooth(pp, ylim=c(100,150))
-lines(y=predict(svyglm(omsysval~age + I(age^2) + I(age^3), family=gaussian(link="identity"), design=HSE.ts.srv.nurse), data.frame(age=20:100), type="response"), x=20:100, col="green")
+scatter.smooth(pp, ylim=c(100,150), family="gaussian", span = 1/3)
+lines(y=predict(svyglm(omsysval~age + I(age^2), family=gaussian(link="log"), design=HSE.ts.srv.nurse), data.frame(age=20:100), type="response"), x=20:100, col="green")
+lines(y=predict(svyglm(omsysval~age + I(age^2)+ I(age^3), family=gaussian(link="log"), design=HSE.ts.srv.nurse), data.frame(age=20:100), type="response"), x=20:100, col="red")
+
+scatter.smooth(svyby(~omsysval, by=~year, design=HSE.ts.srv.nurse, svymean), ylim=c(120,140), xlim=c(-10, 40))
+lines(y=predict(svyglm(omsysval~I((log(year+17))^-1), family=gaussian(link="log"), design=HSE.ts.srv.nurse), data.frame(year=-10:50), type="response"), x=-10:50, col="red")
+lines(y=predict(svyglm(omsysval~log(log(year + 17)), family=gaussian(link="log"), design=HSE.ts.srv.nurse), data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
+
+mod1 <- svyglm(omsysval~  I((log(year+17))^-1) * age * sex * qimd + 
+                          log(bmival) + cigst2 + a30to06m.imp +
+                          I(log(bmival)^2) + I(age^3) + I(age^2),
+            design = HSE.ts.srv.nurse,
+            family=gaussian(link = "log"),
+            method = "glm.fit2")
+mod2 <- stepAIC(mod1)
+anova(mod2)
+AIC(mod2, mod1)
+sbp.svylm <- mod2
+sbp.svylm$deviance/sbp.svylm$df.null
+1-sbp.svylm$deviance/sbp.svylm$null.deviance
 
 
 bb <- svyby(~omsysval, by=~round(bmival), design=HSE.ts.srv.nurse, svymean)
@@ -1362,9 +1345,18 @@ sbp.svylm$coefficients[grep("a30to06m.imp", names(sbp.svylm$coefficients))]
 #sbp.svylm$coefficients["a30to06m.imp"] <- -0.5*sbp.svylm$coefficients["a30to06m.imp"] # TO BE PERFORMED when
 # scenario involves excersize
 
+sbp.svylm$data <- NULL
+sbp.svylm$survey.design <- NULL
+sbp.svylm$qr <- NULL
+sbp.svylm$residuals <- NULL
+sbp.svylm$y <- NULL
+sbp.svylm$linear.predictors <- NULL
+sbp.svylm$fitted.values <- NULL
+sbp.svylm$effects <- NULL
+sbp.svylm$weights <- NULL
+sbp.svylm$prior.weights <- NULL
 # save(sbp.svylm, file="./Models/IMPACTncd/Lagtimes/sbp.svylm.rda")
 # save(sbp.svylm, file="./Lagtimes/sbp.svylm.rda")
-
 
 # chol model --------------------------------------------------------------
 # load(file="./Lagtimes/HSE.ts.RData")
@@ -1373,7 +1365,7 @@ HSE.ts[bmival<16 & age>19, bmival := 16]
 HSE.ts[bmival>40 & age>19, bmival := 40]
 HSE.ts[age>85, age:= 85]
 HSE.ts.srv.blood <- svydesign(id=~psu, strata =~cluster, weights = ~wt.blood, nest=F, data=HSE.ts, check.strata = T)
-HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age>19 & wt.blood>0 & is.na(cholval1)== F & is.na(qimd)== F & is.na(bmival)== F & year!=-7 & year!=-6 & is.na(a30to06m.imp)==F & is.na(porftvg.imp)==F & year!=-8) # year -7 excluded due to heavy influence on regression (minorities). Year -6 blood sample only above 65
+HSE.ts.srv.blood <- subset(HSE.ts.srv.blood, age>19 & wt.blood>0 & !is.na(cholval1) & !is.na(qimd) & !is.na(bmival) & !is.na(a30to06m.imp) & !is.na(porftvg.imp)) # year -7 excluded due to heavy influence on regression (minorities). Year -6 blood sample only above 65
 # year -8 excluded due to heavy influence on time projections
 
 scatter.smooth(svyby(~cholval1, by=~age, design=HSE.ts.srv.blood, svymean), ylim=c(3,7))
@@ -1385,18 +1377,18 @@ lines(y=predict(svyglm(cholval1~bmival + I(1/bmival), family=gaussian, design=HS
 lines(y=predict(svyglm(cholval1~bmival + I(1/bmival) + I(exp(-bmival)), family=gaussian, design=HSE.ts.srv.blood), data.frame(bmival=10:80), type="response"), x=10:80, col="green")
 
 
-scatter.smooth(svyby(~cholval1, by=~year, design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,7), xlim=c(-6, 1))
+scatter.smooth(svyby(~cholval1, by=~year, design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,7), xlim=c(-10, 1))
 
-scatter.smooth(svyby(~cholval1, by=~year, design=HSE.ts.srv.blood, svymean), family="gaussian",ylim=c(3,7), xlim=c(-5, 50))
+scatter.smooth(svyby(~cholval1, by=~year, design=HSE.ts.srv.blood, svymean), family="gaussian",ylim=c(3,7), xlim=c(-10, 40))
 
 lines(y=predict(svyglm(cholval1~year, design=HSE.ts.srv.blood), data.frame(year=-10:100), type="response"), x=-10:100, col="red")
-lines(y=predict(svyglm(cholval1~exp(-year)+year, design=HSE.ts.srv.blood), data.frame(year=-10:100), type="response"), x=-10:100, col="blue")
+lines(y=predict(svyglm(cholval1~log(year + 25), design=HSE.ts.srv.blood), data.frame(year=-10:100), type="response"), x=-10:100, col="blue")
 
 scatter.smooth(svyby(~cholval1, by=~porftvg.imp, design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,7), xlim=c(0, 8))
 
 scatter.smooth(svyby(~cholval1, by=~a30to06m.imp, design=subset(HSE.ts.srv.blood, sex == 1), svymean), family="gaussian", ylim=c(3,7), xlim=c(0, 7))
 
-chol.svylm <- svyglm(cholval1~year + age + sex + qimd + porftvg.imp + a30to06m.imp +
+chol.svylm <- svyglm(cholval1~log(year + 25) + age + sex + qimd + porftvg.imp + a30to06m.imp +
                        bmival + I(age^2) + I(bmival^2), 
                      family = gaussian(link="identity"),
                      method = "glm.fit2",
@@ -1404,13 +1396,16 @@ chol.svylm <- svyglm(cholval1~year + age + sex + qimd + porftvg.imp + a30to06m.i
 anova(chol.svylm)
 
 
-chol.svylm1 <- svyglm(cholval1~(
-  year + age + sex + qimd + a30to06m.imp + bmival + porftvg.imp)^2 +
+mod1 <- svyglm(cholval1~
+  log(year+25) * age * sex * qimd + bmival + a30to06m.imp + porftvg.imp +
     I(age^2) + I(bmival^2), 
   family = gaussian(link="identity"),
   method = "glm.fit2",
   design = HSE.ts.srv.blood)
-anova(chol.svylm1)
+anova(mod1)
+mod2 <- stepAIC(mod1)
+anova(mod2)
+mod2$coefficients[grep("a30to06m.imp", names(mod2$coefficients))]
 
 chol.svylm2 <- svyglm(cholval1~year + year:age + age + sex + qimd +
                         a30to06m.imp + bmival + porftvg.imp + I(age^2) + I(bmival^-1) +
@@ -1420,8 +1415,8 @@ chol.svylm2 <- svyglm(cholval1~year + year:age + age + sex + qimd +
                       design = HSE.ts.srv.blood)
 anova(chol.svylm2)
 
-anova(chol.svylm, chol.svylm2)
-chol.svylm <- chol.svylm2
+AIC(mod2, mod1)
+chol.svylm <- mod2
 
 chol.svylm$deviance/chol.svylm$df.null
 1-chol.svylm$deviance/chol.svylm$null.deviance
@@ -1432,6 +1427,17 @@ chol.svylm$coefficients["age:a30to06m.imp"] <- 0
 plot(pred.chol(0, 45,1,1,20,5,0:7,0))
 plot(pred.chol(0, 50,1,1,20,5,0:7,0))
 plot(pred.chol(0:50, 30,1,1,40,0,0,0), ylim = c(3,6))
+
+chol.svylm$data <- NULL
+chol.svylm$survey.design <- NULL
+chol.svylm$qr <- NULL
+chol.svylm$residuals <- NULL
+chol.svylm$y <- NULL
+chol.svylm$linear.predictors <- NULL
+chol.svylm$fitted.values <- NULL
+chol.svylm$effects <- NULL
+chol.svylm$weights <- NULL
+chol.svylm$prior.weights <- NULL
 #save(chol.svylm, file="./Models/IMPACTncd/Lagtimes/chol.svylm.rda")
 #save(chol.svylm, file="./Lagtimes/chol.svylm.rda")
 
@@ -1489,9 +1495,11 @@ anova(tctohdl.svylm2)
 tctohdl.svylm <- tctohdl.svylm2
 tctohdl.svylm$deviance/tctohdl.svylm$df.null
 1-tctohdl.svylm$deviance/tctohdl.svylm$null.deviance
+
+tctohdl.svylm$data <- NULL
+tctohdl.svylm$survey.design$variables <- NULL
 #save(tctohdl.svylm, file="./Models/IMPACTncd/Lagtimes/tctohdl.svylm.rda")
 #save(tctohdl.svylm, file="./Lagtimes/tctohdl.svylm.rda")
-
 
 # diab model --------------------------------------------------------------
 # diab model (no time trend as will consider diabetes is totally dependant to BMI and age)
@@ -1552,195 +1560,561 @@ diab.svylr$deviance/diab.svylr$df.null
 
 plot(pred.diab(20:85, 1, 5, 28, 7), xlim=c(0, 65), ylim=c(0,0.5))
 pred.diab(80:81,1,5, 30,7)
+
+diab.svylr$data <- NULL
+diab.svylr$survey.design <- NULL
+diab.svylr$qr <- NULL
+diab.svylr$residuals <- NULL
+diab.svylr$y <- NULL
+diab.svylr$linear.predictors <- NULL
+diab.svylr$fitted.values <- NULL
+diab.svylr$effects <- NULL
+diab.svylr$weights <- NULL
+diab.svylr$prior.weights <- NULL
 #save(diab.svylr, file="./Models/IMPACTncd/Lagtimes/diab.svylr.rda")
 #save(diab.svylr, file="./Lagtimes/diab.svylr.rda")
 
-
-# smoking start model -----------------------------------------------------
+# smoking initiation model -----------------------------------------------------
 #load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
 #load(file="./Lagtimes/HSE.ts.RData")
-HSE.ts[,wt.int := wt.int*10000/sum(wt.int), by=year] # make pop of each hse =10000
-HSE.ts[,sum(wt.int), by=year]
-HSE.ts[cigst1==4 & between(age-startsmk,0,2), `:=`(year = year - (age-startsmk))]
-HSE.ts[cigst1==4 & between(age-startsmk,0,2), `:=`(age = startsmk, smok.incid = 1)]
-HSE.ts[between(cigst1, 2, 3) & between(endsmoke + smokyrs,0,2), `:=`(age = age - endsmoke - smokyrs, year = year - endsmoke - smokyrs, smok.incid = 1)]
-HSE.ts[cigst1==1, smok.incid:= 0]
-HSE.ts[age>85, age:= 85]
-HSE.ts[qimd %in% c("3", "4", "5"), qimd:="2"]
-HSE.ts[, qimd:= ordered(qimd, levels=c(1,2))]
+#HSE.ts[, wt.int := wt.int * 10000 / sum(wt.int), by = year] # make pop of each hse =10000 (harmonisation)
+HSE.ts[, sum(wt.int), by = year]
+HSE.ts[startsmk == 97, startsmk:=NA]
+HSE.ts[cigst1 == 4 & between(age - startsmk, 0, 1),
+       `:=`(#year       = year - (age - startsmk),
+         #age        = startsmk,
+         smok.incid = 1L)]
+
+# HSE.ts[cigst1 == 3 & between(endsmoke + smokyrs, 0, 1),
+#        `:=`(#age        = age - endsmoke - smokyrs,
+#             #year       = year - endsmoke - smokyrs,
+#             smok.incid = 1L)]
+
+HSE.ts[cigst1 == 1, smok.incid:= 0L]
+HSE.ts[age > 50, age:= 50]
+#HSE.ts[qimd %in% c("3", "4", "5"), qimd:= "2"]
+#HSE.ts[, qimd:= ordered(qimd, levels = c(1, 2))]
 HSE.ts[, smok.incid:= factor(smok.incid)]
-HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, 
-                            data=HSE.ts, check.strata = T)
-HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>15 & wt.int>0 & is.na(qimd)== F &
-                           is.na(smok.incid) == F & year>-7 & year<0 & age<60)
+agecut <- function(age) cut(age, c(-Inf, 22, 30, 35, 50))
+HSE.ts[, age2:= agecut(age)]
+
+HSE.ts.srv.int <- 
+  svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, 
+            data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- 
+  subset(HSE.ts.srv.int, age > 19 & wt.int > 0 & !is.na(qimd) &
+           !is.na(smok.incid) & year < 2 & year > -11)
 #HSE.ts.srv.int <- subset(HSE.ts.srv.int,qimd=="5")
-# year -7 was removed as highly influential 'outlier'
-# this gives the probability of a never smoker to become a smoker
-# I had to do it this way because of the way the question was asked in HSE
+
 pp <- svyby(~smok.incid, by=~age, design=HSE.ts.srv.int, svymean)
 
-scatter.smooth(y=pp[[3]], x=as.numeric(pp[[1]]), ylim=c(0, 0.2), family = "gaussian")
+scatter.smooth(y=pp[[3]], x=as.numeric(pp[[1]]), ylim=c(0, 0.02), family = "gaussian")
 
-lines(y=predict(svyglm(smok.incid~age , family=quasibinomial(link="probit"), design=HSE.ts.srv.int), data.frame(age=18:100), type="response"), x=18:100, col="red")
-lines(y=predict(svyglm(smok.incid~age+ I(age^4)+ I(age^3) + I(age^2) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), data.frame(age=16:100), type="response"), x=16:100, col="blue")
-
-pp <- svyby(~smok.incid, by=~qimd, design=HSE.ts.srv.int, svymean)
-scatter.smooth(pp[3], ylim=c(0, 0.1), family = "gaussian")
-lines(y=predict(svyglm(smok.incid~qimd , family=quasibinomial(link="probit"), design=HSE.ts.srv.int), data.frame(qimd=ordered(1:2)), type="response"), x= 1:2, col="red")
-lines(y=predict(svyglm(smok.incid~qimd , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), data.frame(qimd=ordered(1:2)), type="response"), x= 1:2, col="blue")
+lines(y=predict(svyglm(smok.incid~ age2, family=quasibinomial(link="logit"), design=HSE.ts.srv.int), data.frame(age2=agecut(16:50)), type="response"), x=16:50, col="red")
+lines(y=predict(svyglm(smok.incid~age + I(age^2) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), data.frame(age=16:50), type="response"), x=16:50, col="blue")
 
 pp <- svyby(~smok.incid, by=~year, design=HSE.ts.srv.int, svymean)
-scatter.smooth(pp[[1]], pp[[3]], ylim=c(0, 0.1), family = "gaussian", xlim=c(-10, 50))
-lines(y=predict(svyglm(smok.incid~year , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), data.frame(year=-10:50), type="response"), x=-10:50, col="red")
-lines(y=predict(svyglm(smok.incid~year , family=quasibinomial(link="probit"), design=subset(HSE.ts.srv.int, qimd==1)), data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
-lines(y=predict(svyglm(smok.incid~year , family=quasibinomial(link="probit"), design=subset(HSE.ts.srv.int, qimd==2)), data.frame(year=-10:50), type="response"), x=-10:50, col="green")
-lines(y=predict(svyglm(smok.incid~year , family=quasibinomial(link="probit"), design=subset(HSE.ts.srv.int, qimd==3)), data.frame(year=-10:50), type="response"), x=-10:50, col="yellow")
-lines(y=predict(svyglm(smok.incid~year , family=quasibinomial(link="probit"), design=subset(HSE.ts.srv.int, qimd==4)), data.frame(year=-10:50), type="response"), x=-10:50, col="gray")
-lines(y=predict(svyglm(smok.incid~year , family=quasibinomial(link="probit"), design=subset(HSE.ts.srv.int, qimd==5)), data.frame(year=-10:50), type="response"), x=-10:50, col="pink")
+scatter.smooth(pp[[1]], pp[[3]], ylim=c(0, 0.01), family = "gaussian", xlim=c(-10, 10))
+lines(y=predict(svyglm(smok.incid~year, family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), data.frame(year=-10:10), type="response"), x=-10:10, col="red")
+lines(y=predict(svyglm(smok.incid~I((year+25)^-2)+I((year+25)^-1), family=quasibinomial(link="logit"), design=HSE.ts.srv.int), data.frame(year=-10:10), type="response"), x=-10:10, col="green")
 
 
-smok.start.svylr <- svyglm(smok.incid~ year + sex + age + qimd, design = HSE.ts.srv.int, 
+smok.start.svylr <- svyglm(smok.incid~ (year + age2 + sex + qimd)^2,
+                           design = HSE.ts.srv.int, 
                            family=quasibinomial(link="logit"), 
                            method = "glm.fit2")
 anova(smok.start.svylr)
 
-smok.start.svylr <- svyglm(smok.incid~ year + (sex + age + I(age^4) + qimd)^2, design = HSE.ts.srv.int, 
-                           family=quasibinomial(link="logit"), 
-                           method = "glm.fit2")
-anova(smok.start.svylr)
+require(MASS)
+# fit1 <- smok.start.svylr
+# fit2 <- svyglm(smok.incid~ 1,
+#                 design = HSE.ts.srv.int, 
+#                 family=quasibinomial(link="logit"), 
+#                 method = "glm.fit2")
+# stepAIC(fit1,direction="backward", scope=list(upper=fit1,lower=fit2))
+# stepAIC(fit2,direction="forward",scope=list(upper=fit1,lower=fit2))
+# stepAIC(fit2,direction="both",scope=list(upper=fit1,lower=fit2))
+mod2 <- stepAIC(smok.start.svylr)
+anova(mod2)
 
-smok.start.svylr2 <- svyglm(smok.incid~ year + age + sex + qimd, design = HSE.ts.srv.int, # year not signifficant but included for scenarios
+smok.start.svylr2 <- svyglm(smok.incid~ year + age + sex + qimd,
+                            design = HSE.ts.srv.int, # year not signifficant but included for scenarios
                             family=quasibinomial(link="logit"), 
                             method = "glm.fit2")
-anova(smok.start.svylr2)
 
+anova(mod2, smok.start.svylr2)
 
-anova(smok.start.svylr, smok.start.svylr2)
-
-smok.start.svylr <- smok.start.svylr2
+smok.start.svylr <- mod2
 smok.start.svylr$deviance/smok.start.svylr$df.null
 1-smok.start.svylr$deviance/smok.start.svylr$null.deviance
+
+smok.start.svylr$data <- NULL
+smok.start.svylr$survey.design <- NULL
+smok.start.svylr$qr <- NULL
+smok.start.svylr$residuals <- NULL
+smok.start.svylr$y <- NULL
+smok.start.svylr$linear.predictors <- NULL
+smok.start.svylr$fitted.values <- NULL
+smok.start.svylr$effects <- NULL
+smok.start.svylr$weights <- NULL
+smok.start.svylr$prior.weights <- NULL
 #save(smok.start.svylr, file="./Models/IMPACTncd/Lagtimes/smok.start.svylr.rda")
 #save(smok.start.svylr, file="./Lagtimes/smok.start.svylr.rda")
 
+
+# smoking cessation -----------------------------------------------------------
 # load(file="./Lagtimes/HSE.ts.RData")
 # load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
-HSE.ts[endsmoke<1, smok.cess:=1]
-HSE.ts[cigst1==4, smok.cess:=0]
-HSE.ts[age>85, age := 85]
-HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
-HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>15 & wt.int>0 & is.na(qimd)==F & is.na(smok.cess)==F & year!=-7)
+#HSE.ts[, wt.int := wt.int * 10000 / sum(wt.int), by = year] # make pop of each hse =10000 (harmonisation)
+HSE.ts[, sum(wt.int), by = year]
+HSE.ts[startsmk == 97, startsmk:=NA]
+HSE.ts[cigst1 == 3 & between(endsmoke, 0, 1),
+       `:=`(#year       = year - endsmoke,
+         #age        = age - endsmoke,
+         smok.cess = 1L)]
+HSE.ts[cigst1 == 4, smok.cess:= 0L]
+HSE.ts[age > 75, age := 75]
+#HSE.ts[qimd %in% c("3", "4", "5"), qimd:= "2"]
+#HSE.ts[, qimd:= ordered(qimd, levels = c(1, 2))]
+HSE.ts[, smok.cess:= factor(smok.cess)]
+agecut <- function(age) cut(age, c(-Inf, seq(20, 85, 5)))
+HSE.ts[, age2:= agecut(age)]
+HSE.ts.srv.int <- 
+  svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, 
+            data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- 
+  subset(HSE.ts.srv.int, age > 19 & wt.int > 0 & !is.na(qimd) &
+           !is.na(smok.cess) & year < 2 & year > -11)
 
-pp<- svyby(~smok.cess, by=~year, design=HSE.ts.srv.int, svymean, na.rm=T)
-scatter.smooth(pp, ylim=c(0, 0.4), xlim=c(-10,50), family = "gaussian")
-lines(y=predict(svyglm(smok.cess~year , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
-                data.frame(year=-10:50), type="response"), x=-10:50, col="red")
-lines(y=predict(svyglm(smok.cess~year+I(year^2) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+pp <- svyby(~smok.cess, by=~year, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(pp[[1]], pp[[3]], ylim=c(0, 0.2), xlim=c(-10,10), family = "gaussian")
+
+lines(y=predict(svyglm(smok.cess~ year, family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), data.frame(year=-10:50),
+                type="response"), x=-10:50, col="green")
+lines(y=predict(svyglm(smok.cess~I((year+25)^-2),
+                       family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), data.frame(year=-10:50),
+                type="response"), x=-10:50, col="red")
+lines(y=predict(svyglm(smok.cess~log(year+16) + I(log(year+16)^2), 
+                       family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
                 data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
 
 aa<- svyby(~smok.cess, by=~age, design=HSE.ts.srv.int, svymean, na.rm=T)
-scatter.smooth(aa, ylim=c(0, 0.2), xlim=c(10,100), family = "gaussian")
-lines(y=predict(svyglm(smok.cess~age , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
-                data.frame(age=10:100), type="response"), x=10:100, col="red")
-lines(y=predict(svyglm(smok.cess~age + I(age^2), family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
-                data.frame(age=10:100), type="response"), x=10:100, col="blue")
-lines(y=predict(svyglm(smok.cess~age + (I(age^2) + I(age^3) + I(age^4))^2, family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+scatter.smooth(aa[[1]], aa[[3]], ylim=c(0, 0.2), xlim=c(20,85), family = "gaussian")
+lines(y=predict(svyglm(smok.cess~age + I(age^2) + I(age^3) + I(age^4), 
+                       family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), 
+                data.frame(age=10:85), type="response"), x=10:85, col="red")
+lines(y=predict(svyglm(smok.cess~age2,
+                       family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), 
+                data.frame(age2=agecut(20:85)), type="response"), x=20:85, col="blue")
+lines(y=predict(svyglm(smok.cess~log(age), 
+                       family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
                 data.frame(age=10:100), type="response"), x=10:100, col="green")
 
-smok.cess.svylr <- svyglm(factor(smok.cess)~ year + age + sex + qimd +
+smok.cess.svylr <- svyglm(factor(smok.cess)~ I((year+25)^-2) + age + sex + qimd +
                             I(age^2) + I(age^3) + I(age^4),
                           design = HSE.ts.srv.int, 
                           family=quasibinomial(link="logit"), 
                           method = "glm.fit2")
 anova(smok.cess.svylr)
 
-smok.cess.svylr <- svyglm(factor(smok.cess)~ (year + age + I(age^2) + I(age^3) + I(age^4) + sex + qimd)^2 - 
-                            age:I(age^2) - age:I(age^3)- age:I(age^4),
-                          design = HSE.ts.srv.int, 
-                          family=quasibinomial(link="logit"), 
-                          method = "glm.fit2")
-anova(smok.cess.svylr)
+smok.cess.svylr2 <- svyglm(
+  factor(smok.cess)~(I((year + 25)^-2) + I(age^-2) +
+                       sex + qimd)^2 + I(age^-1) + I(age^-3) + I(age^-4),
+  design = HSE.ts.srv.int, 
+  family=quasibinomial(link="logit"), 
+  method = "glm.fit2")
+require(MASS)
+mod2 <- stepAIC(smok.cess.svylr2)
+anova(mod2)
 
-smok.cess.svylr2 <- svyglm(smok.cess ~ year + age  + sex + qimd + I(age^2) + I(age^3) + I(age^4) + 
-                             year:qimd + age:sex +I(age^2):I(age^3)+ I(age^2):sex,
-                           design = HSE.ts.srv.int, 
-                           family=quasibinomial(link="logit"), 
-                           method = "glm.fit2")
+anova(smok.cess.svylr2, mod2)
 anova(smok.cess.svylr2)
-anova(smok.cess.svylr, smok.cess.svylr2)
-smok.cess.svylr <- smok.cess.svylr2
+smok.cess.svylr <- mod2
 smok.cess.svylr$deviance/smok.cess.svylr$df.null
+
+smok.cess.svylr$data <- NULL
+smok.cess.svylr$survey.design <- NULL
+smok.cess.svylr$qr <- NULL
+smok.cess.svylr$residuals <- NULL
+smok.cess.svylr$y <- NULL
+smok.cess.svylr$linear.predictors <- NULL
+smok.cess.svylr$fitted.values <- NULL
+smok.cess.svylr$effects <- NULL
+smok.cess.svylr$weights <- NULL
+smok.cess.svylr$prior.weights <- NULL
 #save(smok.cess.svylr, file="./Models/IMPACTncd/Lagtimes/smok.cess.svylr.rda")
 #save(smok.cess.svylr, file="./Lagtimes/smok.cess.svylr.rda")
+
+
+# smoking relapse ---------------------------------------------------------
+# Assuming perfecr representation of hse with no sampling error,
+# no deaths
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[, sum(wt.int), by=year]
+HSE.ts[, wt.int := wt.int*10000/sum(wt.int), by=year] # make pop of each hse =10000
+HSE.ts[, sum(wt.int), by=year]
+#HSE.ts[endsmoke>10, endsmoke := 11]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, 
+                            nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, age > 15 & wt.int > 0 & 
+                           !is.na(qimd) & endsmoke >= 0 & cigst1 == 3)
+#xx<- as.data.table(prop.table(svytable(~endsmoke+year+sex+qimd, HSE.ts.srv.int),2)) 
+# Above was tested and year is not significant in the regression (and also too complicated)
+pp <- as.data.table(svytable(~sex+qimd, HSE.ts.srv.int))
+pp[, sex := as.factor(sex)]
+pp[, qimd := as.ordered(qimd)]
+xx <- as.data.table(svytable(~endsmoke+sex+qimd, HSE.ts.srv.int))
+xx[, endsmoke:=as.numeric(endsmoke)]
+xx[, sex := as.factor(sex)]
+xx[, qimd := as.ordered(qimd)]
+xx <- merge(xx, pp, by = c("sex", "qimd"),  all.x = T)
+setkey(xx, sex, qimd, endsmoke)
+xx[, pct:= N.x/N.y]
+# smoothing to adjust for round number bias
+xx[sex==1 & qimd == 1, plot(N.x)]
+xx[sex==1 & qimd == 1 & endsmoke<20, lines(shift(predict(glm(N.x ~ log(endsmoke+1))), type = "lead"))]
+
+xx[endsmoke<10, sm := predict(glm(N.x ~ log(endsmoke + 1))), by = .(sex, qimd)]
+xx[endsmoke == 0 & sm < N.x, sm := N.x]
+
+xx[, failure := shift(sm) - sm, by=.(sex,qimd)]
+
+xx[,pct:=sm/(sm+failure)]
+xx[sex==1 & qimd == 5, plot(failure)]
+xx[sex==1 & qimd == 5,
+   lines(predict(glm(failure ~ poly(log(endsmoke+1), 2) + endsmoke)))]
+xx <- xx[endsmoke<10, ]
+smok.cess.success <- glm(cbind(round(sm), round(failure))~ (poly(log(endsmoke), 2) + endsmoke +
+                                                              sex + qimd)^2, xx[endsmoke > 0], family="binomial"(link="logit"))
+require(MASS)
+mod2 <- stepAIC(smok.cess.success)
+predict(smok.cess.success, data.frame(endsmoke = 1:9, sex = factor(1, levels = c(1:2)), qimd = ordered(1, levels = c(1:5))), type="response", se.fit=F)
+predict(mod2, data.frame(endsmoke = 1:9, sex = factor(1, levels = c(1:2)), qimd = ordered(1, levels = c(1:5))), type="response", se.fit=F)
+
+xx[sex==2 & qimd==5, scatter.smooth(endsmoke,pct, ylim=c(0,1))]
+lines(x=c(0:20), predict(smok.cess.success, data.frame(endsmoke = 0:20, sex = factor(2, levels = c(1:2)), qimd = ordered(5, levels = c(1:5))), type="response"), col="red")
+smok.cess.success.log <- mod2
+smok.cess.success.log$data <- NULL
+#save(smok.cess.success.log, file="./Models/IMPACTncd/Lagtimes/smok.cess.success.log.rda")
+#save(smok.cess.success.log, file="./Lagtimes/smok.cess.success.log.rda")
 
 # load(file="./Lagtimes/HSE.ts.RData")
 # load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
 HSE.ts[,sum(wt.int), by=year]
 HSE.ts[,wt.int := wt.int*10000/sum(wt.int), by=year] # make pop of each hse =10000
 HSE.ts[,sum(wt.int), by=year]
-HSE.ts[endsmoke>10, endsmoke := 11]
-HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
-HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>15 & wt.int>0 & is.na(qimd)==F & endsmoke>=0 & year>-7)
-#xx<- as.data.table(prop.table(svytable(~endsmoke+year+sex+qimd, HSE.ts.srv.int),2)) 
-# Above was tested and year is not significant in the regression (and also too complicated)
-
-xx<- as.data.table(svytable(~endsmoke+sex+qimd, HSE.ts.srv.int))
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, 
+                            nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, age > 15 & wt.int > 0 & 
+                           !is.na(qimd) & endsmoke >= 0 & cigst1 == 3)
+pp <- as.data.table(svytable(~sex+qimd, HSE.ts.srv.int))
+pp[, sex := as.factor(sex)]
+pp[, qimd := as.ordered(qimd)]
+xx <- as.data.table(svytable(~endsmoke+sex+qimd, HSE.ts.srv.int))
 xx[, endsmoke:=as.numeric(endsmoke)]
 xx[, sex := as.factor(sex)]
 xx[, qimd := as.ordered(qimd)]
-xx = copy(xx[endsmoke<7])
-xx[, failure := .SD[endsmoke==0, N] - N, by=.(sex,qimd)]
-xx[failure<0, failure := NA]
-xx=copy(xx[endsmoke %!in% c(2,5)])
-xx[,pct:=N/(N+failure)]
-smok.cess.success <- glm(cbind(N, failure)~ I(1/(endsmoke+1)^2) + sex + qimd, xx, family="quasibinomial"(link="logit"))
-predict(smok.cess.success, data.frame(endsmoke = 1:9, sex = factor(1, levels = c(1:2)), qimd = ordered(1, levels = c(1:5))), type="response", se.fit=F)
-xx[sex==1 & qimd==1, scatter.smooth(endsmoke,pct, ylim=c(0,1))]
-lines(x=c(0:9), predict(smok.cess.success, data.frame(endsmoke = 0:9, sex = factor(1, levels = c(1:2)), qimd = ordered(1, levels = c(1:5))), type="response"), col="red")
-#save(smok.cess.success, file="./Models/IMPACTncd/Lagtimes/smok.cess.success.rda")
-#save(smok.cess.success, file="./Lagtimes/smok.cess.success.rda")
+xx <- merge(xx, pp, by = c("sex", "qimd"),  all.x = T)
+setkey(xx, sex, qimd, endsmoke)
+xx[, pct:= N.x/N.y]
+# smoothing to edjust for round number bias
+xx[sex==1 & qimd == 5, plot(N.x)]
+xx[endsmoke > 0 & sex==1 & qimd == 5, lines(predict(glm(N.x ~ poly(endsmoke^-1, 1))))]
+xx[endsmoke > 0 & sex==1 & qimd == 5, lines(predict(glm(N.x ~ log(endsmoke))))]
 
+xx[, sm := N.x]
+xx[endsmoke > 0, sm := shift(predict(glm(N.x ~ I(endsmoke^-1))), type = "lead"), by = .(sex, qimd)]
+
+xx[, failure := shift(sm) - sm, by=.(sex,qimd)]
+
+xx[,pct:=sm/(sm+failure)]
+xx <- xx[endsmoke < 10, ]
+
+smok.cess.success.parabola <- glm(cbind(sm, failure)~ I(endsmoke^-1) +
+                                    endsmoke + sex + qimd, xx[endsmoke > 0], family="quasibinomial"(link="logit"))
+
+predict(smok.cess.success.parabola, data.frame(endsmoke = 0:9, sex = factor(1, levels = c(1:2)), qimd = ordered(1, levels = c(1:5))), type="response", se.fit=F)
+
+xx[sex==2 & qimd==1, scatter.smooth(endsmoke,pct, ylim=c(0,1))]
+lines(x=c(0:20), predict(smok.cess.success.parabola, data.frame(endsmoke = 0:20, sex = factor(2, levels = c(1:2)), qimd = ordered(1, levels = c(1:5))), type="response"), col="red")
+
+smok.cess.success.parabola$data <- NULL
+#save(smok.cess.success.parabola, file="./Models/IMPACTncd/Lagtimes/smok.cess.success.parabola.rda")
+#save(smok.cess.success.parabola, file="./Lagtimes/smok.cess.success.parabola.rda")
+
+# smoking prevalence ------------------------------------------------------
 # load(file="./Lagtimes/HSE.ts.RData")
 # load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
-HSE.ts[cigst1==4, smok.active:=1]
-HSE.ts[cigst1<4, smok.active:=0]
+HSE.ts[cigst1 == 4, smok.active:=1]
+HSE.ts[cigst1 < 4, smok.active:=0]
 HSE.ts[age>85, age := 85]
 HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
-HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>15 & wt.int>0 & is.na(qimd)==F & is.na(smok.active)==F)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>19 & age <21 & wt.int>0 & !is.na(qimd) & !is.na(smok.active))
 
 pp<- svyby(~smok.active, by=~year, design=HSE.ts.srv.int, svymean, na.rm=T)
-scatter.smooth(pp, ylim=c(0, 0.3), xlim=c(-10,50), family = "gaussian")
+scatter.smooth(pp, ylim=c(0, 0.4), xlim=c(-10,30), family = "gaussian")
 lines(y=predict(svyglm(smok.active~year , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
                 data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
 lines(y=predict(svyglm(smok.active~year+I(year^2) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
-                data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
+                data.frame(year=-10:50), type="response"), x=-10:50, col="red")
+lines(y=predict(svyglm(smok.active~log(year+25) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+                data.frame(year=-10:50), type="response"), x=-10:50, col="green")
 
 aa<- svyby(~smok.active, by=~age, design=HSE.ts.srv.int, svymean, na.rm=T)
-scatter.smooth(aa, ylim=c(0, 0.8), xlim=c(10,100), family = "gaussian")
-lines(y=predict(svyglm(smok.active~age , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+scatter.smooth(aa, ylim=c(0, 0.4), xlim=c(15,30), family = "gaussian")
+lines(y=predict(svyglm(smok.active~ log(age) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
                 data.frame(age=10:100), type="response"), x=10:100, col="red")
-lines(y=predict(svyglm(smok.active~age + I(age^2), family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+lines(y=predict(svyglm(smok.active~log(age) + I(log(age)^2) + age, family=quasibinomial(link="logit"), 
+                       design=HSE.ts.srv.int), 
                 data.frame(age=10:100), type="response"), x=10:100, col="blue")
-lines(y=predict(svyglm(smok.active~age + I(age^2)+ I(age^3), family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+lines(y=predict(svyglm(smok.active~I(age^-1) + I(age^2), family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), 
                 data.frame(age=10:100), type="response"), x=10:100, col="green")
 
-smok.active.svylr <- svyglm(smok.active~ year + age + I(age^2) + sex + qimd + age:sex + I(age^2):sex + I(age^2):qimd, design = HSE.ts.srv.int, 
+smok.active.svylr <- svyglm(smok.active~ log(year+25) + log(age) + I(log(age)^2) + age + sex + qimd, 
+                            design = HSE.ts.srv.int, 
                             family=quasibinomial(link="logit"), 
                             method = "glm.fit2")
 anova(smok.active.svylr)
 
-smok.active.svylr2 <- svyglm(smok.active~ (year + age + I(age^2) + sex + qimd)^2 - 
-                               year:I(age^2) - sex:qimd - age:I(age^2),
+smok.active.svylr2 <- svyglm(smok.active~ (log(year+25) + sex + qimd)^2,
                              design = HSE.ts.srv.int, 
                              family=quasibinomial(link="logit"), 
                              method = "glm.fit2")
-anova(smok.active.svylr2)
-anova(smok.active.svylr, smok.active.svylr2)
-smok.active.svylr <- smok.active.svylr2
+require(MASS)
+mod2 <- stepAIC(smok.active.svylr2)
+
+anova(mod2)
+anova(mod2, smok.active.svylr2)
+smok.active.svylr <- mod2
 smok.active.svylr$deviance/smok.active.svylr$df.null
+
+smok.active.svylr$data <- NULL
+smok.active.svylr$survey.design <- NULL
+smok.active.svylr$qr <- NULL
+smok.active.svylr$residuals <- NULL
+smok.active.svylr$y <- NULL
+smok.active.svylr$linear.predictors <- NULL
+smok.active.svylr$fitted.values <- NULL
+smok.active.svylr$effects <- NULL
+smok.active.svylr$weights <- NULL
+smok.active.svylr$prior.weights <- NULL
 #save(smok.active.svylr, file="./Models/IMPACTncd/Lagtimes/smok.active.svylr.rda")
 #save(smok.active.svylr, file="./Lagtimes/smok.active.svylr.rda")
 
+# ex-smoking prevalence ------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[, smok.active := 0]
+HSE.ts[between(cigst1, 2, 3), smok.active := 1]
+HSE.ts[age>85, age := 85]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>19 & age <21 & wt.int>0 & !is.na(qimd) & !is.na(smok.active))
+
+pp <- svyby(~smok.active, by=~year, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(pp, ylim=c(0, 0.25), xlim=c(-10,30), family = "gaussian")
+lines(y=predict(svyglm(smok.active~year , family=quasibinomial(link="logit"), 
+                       design=HSE.ts.srv.int), 
+                data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
+lines(y=predict(svyglm(smok.active~year+I(year^2) , family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), 
+                data.frame(year=-10:50), type="response"), x=-10:50, col="red")
+lines(y=predict(svyglm(smok.active~log(year+25) , family=quasibinomial(link="logit"), 
+                       design=HSE.ts.srv.int), 
+                data.frame(year=-10:50), type="response"), x=-10:50, col="green")
+
+aa<- svyby(~smok.active, by=~qimd, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(aa, ylim=c(0, 0.4), xlim=c(1,5), family = "gaussian")
+lines(y=predict(svyglm(smok.active~ log(age) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+                data.frame(age=10:100), type="response"), x=10:100, col="red")
+lines(y=predict(svyglm(smok.active~log(age) + I(log(age)^2) + age, family=quasibinomial(link="logit"), 
+                       design=HSE.ts.srv.int), 
+                data.frame(age=10:100), type="response"), x=10:100, col="blue")
+lines(y=predict(svyglm(smok.active~I(age^-1) + I(age^2), family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), 
+                data.frame(age=10:100), type="response"), x=10:100, col="green")
+
+smok.exactive.svylr <- svyglm(smok.active~ log(year+25) + log(age) + I(log(age)^2) + age + sex + qimd, 
+                              design = HSE.ts.srv.int, 
+                              family=quasibinomial(link="logit"), 
+                              method = "glm.fit2")
+anova(smok.active.svylr)
+
+smok.exactive.svylr2 <- svyglm(smok.active~ (log(year+25) + sex + qimd)^2,
+                               design = HSE.ts.srv.int, 
+                               family=quasibinomial(link="logit"), 
+                               method = "glm.fit2")
+require(MASS)
+mod2 <- stepAIC(smok.exactive.svylr2)
+
+anova(mod2)
+anova(mod2, smok.exactive.svylr2)
+smok.exactive.svylr <- mod2
+smok.exactive.svylr$deviance/smok.exactive.svylr$df.null
+
+smok.exactive.svylr$data <- NULL
+smok.exactive.svylr$survey.design <- NULL
+smok.exactive.svylr$qr <- NULL
+smok.exactive.svylr$residuals <- NULL
+smok.exactive.svylr$y <- NULL
+smok.exactive.svylr$linear.predictors <- NULL
+smok.exactive.svylr$fitted.values <- NULL
+smok.exactive.svylr$effects <- NULL
+smok.exactive.svylr$weights <- NULL
+smok.exactive.svylr$prior.weights <- NULL
+#save(smok.exactive.svylr, file="./Models/IMPACTncd/Lagtimes/smok.exactive.svylr.rda")
+#save(smok.exactive.svylr, file="./Lagtimes/smok.exactive.svylr.rda")
+
+
+# nev-smoking prevalence ------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[, smok.nev := 0]
+HSE.ts[cigst1 == 1, smok.nev := 1]
+HSE.ts[age>80, age := 80]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, age>19 & wt.int>0 & !is.na(qimd) & !is.na(smok.nev))
+
+pp <- svyby(~smok.nev, by=~year, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(pp, ylim=c(0, 0.55), xlim=c(-10,30), family = "gaussian")
+lines(y=predict(svyglm(smok.nev~year , family=quasibinomial(link="logit"), 
+                       design=HSE.ts.srv.int), 
+                data.frame(year=-10:50), type="response"), x=-10:50, col="blue")
+lines(y=predict(svyglm(smok.nev~year+I(year^2) , family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), 
+                data.frame(year=-10:50), type="response"), x=-10:50, col="red")
+lines(y=predict(svyglm(smok.nev~log(year+25) , family=quasibinomial(link="logit"), 
+                       design=HSE.ts.srv.int), 
+                data.frame(year=-10:50), type="response"), x=-10:50, col="green")
+
+aa<- svyby(~smok.nev, by=~age, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(aa, ylim=c(0, 0.6), xlim=c(20,80), family = "gaussian")
+lines(y=predict(svyglm(smok.nev~ log(age) , family=quasibinomial(link="logit"), design=HSE.ts.srv.int), 
+                data.frame(age=10:100), type="response"), x=10:100, col="red")
+lines(y=predict(svyglm(smok.nev~log(age) + I(log(age)^2) + age, family=quasibinomial(link="logit"), 
+                       design=HSE.ts.srv.int), 
+                data.frame(age=10:100), type="response"), x=10:100, col="blue")
+lines(y=predict(svyglm(smok.nev~I(age^-1) + I(age^2), family=quasibinomial(link="logit"),
+                       design=HSE.ts.srv.int), 
+                data.frame(age=10:100), type="response"), x=10:100, col="green")
+
+smok.nev.svylr <- svyglm(smok.nev~ log(year+25) + log(age) + sex + qimd, 
+                         design = HSE.ts.srv.int, 
+                         family=quasibinomial(link="logit"), 
+                         method = "glm.fit2")
+anova(smok.nev.svylr)
+
+smok.nev.svylr2 <- svyglm(smok.nev~ (log(year+25) + log(age) + sex + qimd)^2,
+                          design = HSE.ts.srv.int, 
+                          family=quasibinomial(link="logit"), 
+                          method = "glm.fit2")
+require(MASS)
+mod2 <- stepAIC(smok.nev.svylr2)
+
+anova(mod2)
+anova(mod2, smok.nev.svylr2)
+smok.nev.svylr <- mod2
+smok.nev.svylr$deviance/smok.nev.svylr$df.null
+
+smok.nev.svylr$data <- NULL
+smok.nev.svylr$survey.design <- NULL
+smok.nev.svylr$qr <- NULL
+smok.nev.svylr$residuals <- NULL
+smok.nev.svylr$y <- NULL
+smok.nev.svylr$linear.predictors <- NULL
+smok.nev.svylr$fitted.values <- NULL
+smok.nev.svylr$effects <- NULL
+smok.nev.svylr$weights <- NULL
+smok.nev.svylr$prior.weights <- NULL
+#save(smok.nev.svylr, file="./Models/IMPACTncd/Lagtimes/smok.exactive.svylr.rda")
+#save(smok.nev.svylr, file="./Lagtimes/smok.exactive.svylr.rda")
+
+
+# smoking cigdyal ---------------------------------------------------------
+# load(file="./Lagtimes/HSE.ts.RData")
+# load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
+HSE.ts[startsmk == 97, startsmk := NA]
+HSE.ts[cigst1 == 4, smokyrs:= age - startsmk]
+HSE.ts[smokyrs <0, smokyrs := 0L]
+HSE.ts[age > 85, age := 85L]
+HSE.ts[, year := as.integer(year)]
+HSE.ts[cigst1 == 3, `:=` (year = year - endsmoke,
+                          cigdyal = as.numeric(numsmok),
+                          cigst1 = 4L)]
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, 
+                            nest=F, data=HSE.ts, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, age > 15 & wt.int > 0 & !is.na(smokyrs) &
+                           !is.na(qimd) & cigdyal >= 0 & cigst1 == 4)
+
+pp<- svyby(~cigdyal, by=~year, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(pp, ylim=c(0, 30), xlim=c(-80,50), family = "gaussian")
+lines(y=predict(svyglm(cigdyal~year, design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(year=-80:50), type="response"), x=-80:50, col="blue")
+lines(y=predict(svyglm(cigdyal~year + I(year^2), design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(year=-80:50), type="response"), x=-80:50, col="red")
+lines(y=predict(svyglm(cigdyal~log(year+90) + I(log(year+90)^2), design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(year=-80:50), type="response"), x=-80:50, col="green")
+
+pp<- svyby(~cigdyal, by=~age, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(pp, ylim=c(0, 30), xlim=c(0,84), family = "gaussian")
+lines(y=predict(svyglm(cigdyal~age, design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(age=15:84), type="response"), x=15:84, col="blue")
+lines(y=predict(svyglm(cigdyal~age+I(age^2), design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(age=15:84), type="response"), x=15:84, col="red")
+lines(y=predict(svyglm(cigdyal~log(age) + I(log(age)^2), design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(age=15:84), type="response"), x=15:84, col="green")
+
+pp<- svyby(~cigdyal, by=~smokyrs, design=HSE.ts.srv.int, svymean, na.rm=T)
+scatter.smooth(pp, ylim=c(0, 20), xlim=c(15,84), family = "gaussian")
+lines(y=predict(svyglm(cigdyal~smokyrs, design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(smokyrs=15:84), type="response"), x=15:84, col="blue")
+lines(y=predict(svyglm(cigdyal~smokyrs+I(smokyrs^2), design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(smokyrs=15:84), type="response"), x=15:84, col="red")
+lines(y=predict(svyglm(cigdyal~log(smokyrs+1) + I(log(smokyrs+1)^2), design=HSE.ts.srv.int, family = "quasipoisson"), 
+                data.frame(smokyrs=15:84), type="response"), x=15:84, col="green")
+
+smok.cigdyal.svylm <- svyglm(cigdyal~ log(year+90) + sex + qimd + smokyrs + I(smokyrs^2) + I(log(year+90)^2),# age excluded due to colinearity
+                             design = HSE.ts.srv.int,
+                             family = "quasipoisson",
+                             method = "glm.fit2")
+anova(smok.cigdyal.svylm)
+
+smok.cigdyal.svylm2 <- svyglm(cigdyal~ (log(year+90) + sex + qimd + smokyrs + I(smokyrs^2))^2 + I(log(year+90)^2),
+                              design = HSE.ts.srv.int, 
+                              family = "quasipoisson",
+                              method = "glm.fit2")
+
+require(MASS)
+mod3 <- stepAIC(smok.cigdyal.svylm2)
+smok.cigdyal.svylm <- mod3
+smok.cigdyal.svylm$deviance/smok.cigdyal.svylm$df.null
+
+smok.cigdyal.svylm$data <- NULL
+smok.cigdyal.svylm$survey.design <- NULL
+smok.cigdyal.svylm$qr <- NULL
+smok.cigdyal.svylm$residuals <- NULL
+smok.cigdyal.svylm$y <- NULL
+smok.cigdyal.svylm$linear.predictors <- NULL
+smok.cigdyal.svylm$fitted.values <- NULL
+smok.cigdyal.svylm$effects <- NULL
+smok.cigdyal.svylm$weights <- NULL
+smok.cigdyal.svylm$prior.weights <- NULL
+#save(smok.cigdyal.svylm, file="./Models/IMPACTncd/Lagtimes/smok.cigdyal.svylm.rda")
+#save(smok.cigdyal.svylm, file="./Lagtimes/smok.cigdyal.svylm.rda")
+
+HSE.ts[cigst1 == 4, meansd(cigdyal)]
+HSE.ts[cigst1 == 4, plot(density(cigdyal, na.rm = T))]
+meansd(rnbinom(1e5, mu = 13.3, size = 2.9))
+plot(density(rnbinom(1e5, mu = 13.3, size = 2.9)))
+meansd(c(rnbinom(1e5, mu = 11.3, size = 2.9), rnbinom(1e5, mu = 15.3, size = 2.9)))
+HSE.ts[cigst1 == 4 & qimd == "5", meansd(cigdyal)]
+meansd(rnbinom(1e5, mu = 14.26, size = 2.9))
 
 
 # F&V ---------------------------------------------------------------------
@@ -1762,7 +2136,7 @@ tt[, porftvg := ordered(porftvg)]
 require(MASS)
 # I need to scale count vars for stepaic to work
 ttt <-data.frame(porftvg=tt[,porftvg],scale(tt[,.(year,age)]), tt[,.(sex,qimd,wt.int)]) 
-mod1 <- polr(porftvg~(year + age + I(age^2) + sex + qimd)^2,
+mod1 <- polr(porftvg~log(year + 25) * age * sex * qimd + I(age^2),
              data = ttt, 
              weights = wt.int,
              method = "logistic",
@@ -1772,7 +2146,9 @@ mod2 <- stepAIC(mod1)
 
 mod2 <- # best model based on aic
   polr(
-    porftvg~(year + age + I(age^2) + sex + qimd)^2,
+    porftvg~log(year + 25) + age + sex + qimd + 
+      I(age^2) + log(year + 25):age + age:sex + log(year + 25):qimd + 
+      age:qimd + sex:qimd + age:sex:qimd,
     data = tt, 
     weights = wt.int,
     method = "logistic",
@@ -1780,7 +2156,9 @@ mod2 <- # best model based on aic
 
 fv.svylr <- #apply formula of mod2 to svy 
   svyolr(
-    porftvg~(year + age + I(age^2) + sex + qimd)^2, 
+    porftvg~log(year + 25) + age + sex + qimd + 
+      I(age^2) + log(year + 25):age + age:sex + log(year + 25):qimd + 
+      age:qimd + sex:qimd + age:sex:qimd, 
     design = HSE.ts.srv.int, 
     method = "logistic")
 
@@ -1807,10 +2185,12 @@ lines(y=predict(svyglm(porftvg~bmival + I(bmival^2) , family=quasipoisson(), des
 
 fv.svylr$deviance/fv.svylr$df.null
 1-fv.svylr$deviance/fv.svylr$null.deviance
+
+fv.svylr$data <- NULL
+fv.svylr$lp <- NULL
+fv.svylr$fitted.values <- NULL
 #save(fv.svylr, file="./Models/IMPACTncd/Lagtimes/fv.svylr.rda")
 #save(fv.svylr, file="./Lagtimes/fv.svylr.rda")
-
-
 
 # F/V ratio ----------------------------------------------------------------
 # load(file="./Lagtimes/HSE.ts.RData")
@@ -1848,9 +2228,11 @@ anova(fvrate.svylr)
 
 fvrate.svylr$deviance/fvrate.svylr$df.null
 1-fvrate.svylr$deviance/fvrate.svylr$null.deviance
+
+fvrate.svylr$data <- NULL
+fvrate.svylr$survey.design$variables <- NULL
 #save(fvrate.svylr, file="./Models/IMPACTncd/Lagtimes/fvrate.svylr.rda")
 #save(fvrate.svylr, file="./Lagtimes/fvrate.svylr.rda")
-
 
 # Ethnicity -------------------------------------------------------------
 # load(file="./Lagtimes/HSE.ts.RData")
@@ -1879,7 +2261,6 @@ origin.multinom <- mod1
 #save(origin.multinom, file="./Models/IMPACTncd/Lagtimes/origin.multinom.rda")
 #save(origin.multinom, file="./Lagtimes/origin.multinom.rda")
 
-
 # FamCVD ------------------------------------------------------------------
 # load(file="./Lagtimes/HSE.ts.RData")
 # load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
@@ -1890,11 +2271,14 @@ HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & !is.na(famcvd) & !is.na(qimd)) 
 
 famcvd.svylr <- svyglm(famcvd~age + I(age^2) + qimd,
-                     design = HSE.ts.srv.int, 
-                     family=quasibinomial,
-                     method = "glm.fit2")
+                       design = HSE.ts.srv.int, 
+                       family=quasibinomial,
+                       method = "glm.fit2")
 anova(famcvd.svylr)
 1-famcvd.svylr$deviance/famcvd.svylr$null.deviance
+
+famcvd.svylr$data <- NULL
+famcvd.svylr$survey.design$variables <- NULL
 #save(famcvd.svylr, file="./Models/IMPACTncd/Lagtimes/famcvd.svylr.rda")
 #save(famcvd.svylr, file="./Lagtimes/famcvd.svylr.rda")
 
@@ -1909,11 +2293,13 @@ HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & !is.na(iregdef) & !is.na(qimd) & !is.na(cigst1)) 
 
 af.svylr <- svyglm(iregdef~ age + qimd + ordered(cigst1),
-                     design = HSE.ts.srv.int, 
-                     family=quasibinomial,
-                     method = "glm.fit2")
+                   design = HSE.ts.srv.int, 
+                   family=quasibinomial,
+                   method = "glm.fit2")
 anova(af.svylr) #omsysval non significant. ?? missing values ?? small sample
 
+af.svylr$data <- NULL
+af.svylr$survey.design$variables <- NULL
 #save(af.svylr, file="./Models/IMPACTncd/Lagtimes/af.svylr.rda")
 #save(af.svylr, file="./Lagtimes/af.svylr.rda")
 
@@ -1927,11 +2313,13 @@ HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F
 HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & !is.na(kiddiag) & !is.na(qimd) & !is.na(sex)) 
 
 kiddiag.svylr <- svyglm(kiddiag~ age + sex + qimd,
-                     design = HSE.ts.srv.int, 
-                     family=quasibinomial,
-                     method = "glm.fit2")
+                        design = HSE.ts.srv.int, 
+                        family=quasibinomial,
+                        method = "glm.fit2")
 anova(kiddiag.svylr) #omsysval non significant. ?? missing values ?? small sample
 
+kiddiag.svylr$data <- NULL
+kiddiag.svylr$survey.design$variables <- NULL
 #save(kiddiag.svylr, file="./Models/IMPACTncd/Lagtimes/kiddiag.svylr.rda")
 #save(kiddiag.svylr, file="./Lagtimes/kiddiag.svylr.rda")
 
@@ -1946,23 +2334,33 @@ svytable(~bpmedd, subset(HSE.ts.srv.nurse, age > 30 & age < 84))
 
 bpmed.svylr <- svyglm(bpmedd~ age + I(age^2) + sex + qimd + omsysval +
                         age:sex + age:omsysval,
-                     design = HSE.ts.srv.nurse, 
-                     family=quasibinomial,
-                     method = "glm.fit2")
+                      design = HSE.ts.srv.nurse, 
+                      family=quasibinomial,
+                      method = "glm.fit2")
 anova(bpmed.svylr) # year non significant
 
 bpmed.svylr <- svyglm(bpmedd~ (age + I(age^2) + sex + qimd + omsysval)^2,
-                     design = HSE.ts.srv.nurse, 
-                     family=quasibinomial,
-                     method = "glm.fit2")
+                      design = HSE.ts.srv.nurse, 
+                      family=quasibinomial,
+                      method = "glm.fit2")
 bpmed.svylr2 <- stepAIC(bpmed.svylr)
 anova(bpmed.svylr2) # year non significant
 
 bpmed.svylr <- bpmed.svylr2
 1-bpmed.svylr$deviance/bpmed.svylr$null.deviance
+
+bpmed.svylr$data <- NULL
+bpmed.svylr$survey.design <- NULL
+bpmed.svylr$qr <- NULL
+bpmed.svylr$residuals <- NULL
+bpmed.svylr$y <- NULL
+bpmed.svylr$linear.predictors <- NULL
+bpmed.svylr$fitted.values <- NULL
+bpmed.svylr$effects <- NULL
+bpmed.svylr$weights <- NULL
+bpmed.svylr$prior.weights <- NULL
 #save(bpmed.svylr, file="./Models/IMPACTncd/Lagtimes/bpmed.svylr.rda")
 #save(bpmed.svylr, file="./Lagtimes/bpmed.svylr.rda")
-
 
 # Undiagnosed diab --------------------------------------------------------
 # load(file="./Lagtimes/HSE.ts.RData")
@@ -1984,9 +2382,44 @@ scatter.smooth(x=pp$year, y=pp$undiag.diab1, family = "gaussian")
 undiag.diab.svylr <- svyglm(undiag.diab ~ qimd, #no other factors were signif. 
                             # nor interactions. Year is signif but data not suitable for 
                             # longitudianal analysis
-                      design = HSE.ts.srv.blood, 
-                      family=quasibinomial,
-                      method = "glm.fit2")
+                            design = HSE.ts.srv.blood, 
+                            family=quasibinomial,
+                            method = "glm.fit2")
 anova(undiag.diab.svylr) # year non significant
+
+undiag.diab.svylr$data <- NULL
+undiag.diab.svylr$survey.design$variables <- NULL
 #save(undiag.diab.svylr, file="./Models/IMPACTncd/Lagtimes/undiag.diab.svylr.rda")
 #save(undiag.diab.svylr, file="./Lagtimes/undiag.diab.svylr.rda")
+
+# COPD Prevalence model ---------------------------------------------------
+setwd("E:/Dropbox/PhD/")
+load(file="./Datasets/Health Survey for England/2010/hse10ai.RData")
+HSE2010original <- setDT(clear.labels(HSE2010original))
+HSE2010original <- filter(HSE2010original, samptype==1)
+setnames(HSE2010original, "imd2007", "qimd")
+HSE2010original[cholflag == 1, `:=` (cholval1 = cholval1 + 0.1, hdlval1 = hdlval1 - 0.1)]
+HSE2010original[is.na(wt.nurse), wt.nurse := 0]
+HSE2010original[is.na(wt.blood), wt.blood := 0]
+agegroup.fn(HSE2010original)
+HSE2010original[diabete2 == 2, diabtotr := 1]
+HSE2010original[diabete2 == 1 | glyhbval > 6.5, diabtotr := 2]
+HSE2010original[copd == 2, copd := 0L]
+HSE2010original[, sex := factor(sex)]
+HSE2010original[, qimd := ordered(qimd)]
+HSE2010original[, cigst1 := factor(cigst1)]
+
+HSE.ts.srv.int <- svydesign(id=~psu, strata =~cluster, weights = ~wt.int, nest=F,
+                            data=HSE2010original, check.strata = T)
+HSE.ts.srv.int <- subset(HSE.ts.srv.int, wt.int>0 & !is.na(copd) & !is.na(qimd) &
+                           !is.na(sex) & age >= 30 & age <= 84 & !is.na(cigst1))
+
+copd.svylr <- svyglm(copd~ age + qimd + cigst1,
+                     design = HSE.ts.srv.int, 
+                     family=quasibinomial)
+
+anova(copd.svylr)
+copd.svylr$data <- NULL
+copd.svylr$survey.design$variables <- NULL
+#save(copd.svylr, file="./Models/IMPACTncd/copd.svylr.rda")
+#save(copd.svylr, file="./Lagtimes/copd.svylr.rda")

@@ -1,7 +1,7 @@
 #cmpfile("./cluster functions.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or
@@ -21,7 +21,12 @@
 if (paired == T) {
   haha <- counter[[iterations]] + paired.mem
 } else {
-  haha <- paste(sample(c(rep(0:9,each=5),LETTERS,letters),12,replace=T),collapse='')   
+  haha <- paste0(
+    sample(
+      c(rep(0:9, each = 5), LETTERS, letters), 
+      12,
+      replace = T), 
+    collapse = "")   
 }
 
 # Define function for output dir
@@ -50,147 +55,113 @@ salt.sbp.reduct <- cmpfun(
   }
 )
 
-diseases <- list(
-  chd = function() 
-    if ("CHD" %in% get("diseasestoexclude", parent.frame())) loadcmp(file = "./chd model.Rc", my.env),
-  stroke = function() 
-    if ("stroke" %in% get("diseasestoexclude", parent.frame())) loadcmp(file = "./stroke model.Rc", my.env),
-  lung.ca = function() 
-    if ("C34" %in% get("diseasestoexclude", parent.frame())) loadcmp(file = "./lung cancer model.Rc", my.env),
-  gastric.ca = function() 
-    if ("C16" %in% get("diseasestoexclude", parent.frame())) loadcmp(file = "./gastric cancer model.Rc", my.env),
-  other = function() 
-    loadcmp(file = "./other model.Rc", my.env)
-)
-
-# Define function to match continuous distributions of each group with the one in SPOP2011 to simulate ageing 
-# ageing.distr <- cmpfun(function(risk.factor, env = my.env) {
-#   risk.factor <- substitute(risk.factor)
-#   temp <- SPOP2011[eval(risk.factor)>0, list(eval(risk.factor), group)]
-#   nam <- paste0(risk.factor, ".rank")
-#   temp[, (nam) := (frank(eval(risk.factor), na.last = F, ties.method="random")-1)/(.N - 1),
-#        by = group]
-#   setkeyv(temp, c("group", nam))
-#   
-#   POP[, (nam) := (frank(eval(risk.factor), na.last = F, ties.method="random")-1)/(.N - 1),
-#       by = group]
-#   POP[, eval(risk.factor) := NULL]
-#   setkeyv(POP, c("group", nam))
-#   POP <- temp[POP, roll = "nearest"]
-#   assign("POP", POP, envir = env)
-# }
-# )
+diseases <- vector("list", length(diseasestoexclude) + 1)
+names(diseases) <- c(diseasestoexclude, "other")
+if ("CHD" %in% diseasestoexclude) diseases$CHD <- function() loadcmp(file = "./chd model.Rc", my.env)
+if ("stroke" %in% diseasestoexclude) diseases$stroke <- function() loadcmp(file = "./stroke model.Rc", my.env)
+if ("C34" %in% diseasestoexclude) diseases$C34 <- function() loadcmp(file = "./lung cancer model.Rc", my.env)
+if ("C16" %in% diseasestoexclude) diseases$C16 <- function() loadcmp(file = "./gastric cancer model.Rc", my.env)
+diseases$other <- function() loadcmp(file = "./other model.Rc", my.env)
 
 ageing.distr <- # smaller fortune increase the variability of the join
   cmpfun(
-    function(DT.ref, risk.factor, fortune = 0.001, DT = POP, env = my.env) {
-      risk.factor <- substitute(risk.factor)
-      nam  <- paste0(risk.factor, ".rank")
-      DT[, (nam) := 
-           (frank(
-             eval(risk.factor),
-             na.last = F, 
-             ties.method = "random") -1) / (.N - 1),
-         by = group]
-      DT[, eval(risk.factor) := NULL]
-      setkeyv(DT, c("group", nam))
-      if (paired) set.seed(seed[[counter[[iterations]]]])
-      DT.ref <- DT.ref[, sample_frac(.SD, fortune, T), by = group]
-      setkeyv(DT.ref, c("group", nam))
-      assign("POP", DT.ref[DT, roll = "nearest"], envir = env)
+    function(DT.ref, risk.factor, fortune = 0.05) {
+      if (risk.factor == "cholval") {
+        wtr <- quote((frank(cholval,
+                            na.last = F, 
+                            ties.method = "random") - 1) / (.N - 1))
+      }
+      if (risk.factor == "omsysval") {
+        wtr <- quote((frank(omsysval,
+                            na.last = F, 
+                            ties.method = "random") - 1) / (.N - 1))
+      }
+      if (risk.factor == "bmival") {
+        wtr <- quote((frank(bmival,
+                            na.last = F, 
+                            ties.method = "random") - 1) / (.N - 1))
+      }
+      nam  <- paste0(substitute(risk.factor), ".rank")
+      POP[, (nam) := 
+            eval(wtr),
+          by = group]
+      POP[, (risk.factor) := NULL]
+      setkeyv(POP, c("group", nam))
+      tt <- DT.ref[, .SD[sample(.N, .N*fortune)], by = group]
+      setkeyv(tt, c("group", nam))
+      assign("POP", tt[POP, roll = "nearest"], envir = my.env)
     }
   )
 
 # Define function to export annual summaries of RF
-pop.summ <-  cmpfun(function(N, ...) {
-  return(list("year" = 2011 + i,
-              "scenario" = gsub(".Rc", "", scenarios.list[[iterations]]),
-              "mc" = haha,
-              "pop" = N))
-}
-)
-
-cont.summ <- cmpfun(
-  function(rf, name, ...) {
-  mylist <- list()
-  mylist[[paste0(name, ".mean")]] <- mean(rf, na.rm = T, trim = 0.05)
-  mylist[[paste0(name, ".sd")]] <- stats::sd(rf, na.rm = T)
-  #mylist[[paste0(name, ".median")]] <- median(rf, na.rm=T) # disabled to improve spead
-  #mylist[[paste0(name, ".mad")]] <- mad(rf, na.rm=T)
-  #mylist[[paste0(name, ".iqr")]] <- IQR(rf, na.rm=T)
-  return(mylist)
-}
-)
-
-cat.summ <- cmpfun(
-  function(rf, name, ...) {
-  absol <- table(factor(rf, exclude = c(NA, NaN, "99", "999"), ...))
-  #pct <- prop.table(absol)
-  absol <- absol[names(absol)!="NA's"]
-  #ct <- pct[names(pct)!="NA's"]
-  names(absol) <- paste0(name, ".", names(absol))
-  #names(pct) <- paste0(name, ".", names(pct), ".pct")
-  #return(as.list(c(absol, pct)))
-  return(as.list(absol))
-}
+pop.summ <-  cmpfun(
+  function(N, ...) {
+    return(list("year" = 2011 + i,
+                "scenario" = gsub(".Rc", "", scenarios.list[[iterations]]),
+                "mc" = haha,
+                "pop" = N))
+  }
 )
 
 output.rf  <- cmpfun(
   function(dt, strata, l = 0, h = 100, ...) {
-  dt[between(age, l, h), c(2011 + i,
-                           gsub(".Rc", "", scenarios.list[[iterations]]),
-                           haha,
-                           .N,
-                           meansd(bmival.cvdlag),
-                           meansd(bmival.calag),
-                           meansd(omsysval.cvdlag),
-                           meansd(cholval.cvdlag),
-                           meansd(salt24h.cvdlag),
-                           meansd(salt24h.calag),
-                           meansd(packyears),
-                           fvsum(porftvg.cvdlag, porftvg.calag),
-                           smoksum(cigst1.cvdlag, cigst1.calag,
-                                   expsmokCat, diabtotr.cvdlag, a30to06m.cvdlag)),
-     by = strata]
-}
+    dt[between(age, l, h), c(2011 + i,
+                             gsub(".Rc", "", scenarios.list[[iterations]]),
+                             haha,
+                             .N,
+                             meansd(bmival.cvdlag),
+                             meansd(bmival.calag),
+                             meansd(omsysval.cvdlag),
+                             meansd(cholval.cvdlag),
+                             meansd(salt24h.cvdlag),
+                             meansd(salt24h.calag),
+                             meansd(packyears),
+                             meansd(packyears.cvdlag),
+                             fvsum(porftvg.cvdlag, porftvg.calag),
+                             smoksum(cigst1.cvdlag, cigst1,
+                                     expsmok.cvdlag, diabtotr.cvdlag,
+                                     a30to06m.cvdlag)),
+       by = strata]
+  }
 )
 
 output.rf.names <- 
   c("year", "scenario", "mc" , "pop", "bmi.cvd.mean", "bmi.cvd.sd", "bmi.ca.mean",
     "bmi.ca.sd", "sbp.cvd.mean", "sbp.cvd.sd", "tc.cvd.mean", "tc.cvd.sd",
     "salt.cvd.mean", "salt.cvd.sd", "salt.ca.mean", "salt.ca.sd",
-    "packyears.mean", "packyears.sd", paste0("fv.cvd.", 0:8), 
+    "packyears.mean", "packyears.sd", "packyears.cvd.mean",
+    "packyears.cvd.sd", paste0("fv.cvd.", 0:8), 
     paste0("fv.ca.", 0:8), "smok.cvd.never", "smok.cvd.active",
-    "smok.ca.never", "smok.ca.active", "ets.yes", "diab.cvd.yes", 
+    "smok.curr.never", "smok.curr.active", "ets.yes", "diab.cvd.yes", 
     paste0("pa.cvd.", 0:7)  
   )
 
 output.chd  <- cmpfun(
   function(dt, strata, l = ageL, h = ageH, ...
-           ) {
-  dt[between(age, l, h), 
-     list("year"              = 2011 + i,
-          "scenario"          = gsub(".Rc", "", scenarios.list[[iterations]]),
-          "mc"                = haha,
-          "pop"               = .N,
-          "chd.incidence"     = sum(chd.incidence == 2011 + i, na.rm = T),
-          "chd.incidence.cvd" = sum(chd.incidence == 2011 + i & 
-                                      stroke.incidence == 0, na.rm = T),
-          "chd.prevalence"    = sum(chd.incidence > 0, na.rm = T),
-          "chd.mortality"     = sum(dead, na.rm = T)
-     ), by = strata]
-}
+  ) {
+    dt[between(age, l, h), 
+       list("year"              = 2011 + i,
+            "scenario"          = gsub(".Rc", "", scenarios.list[[iterations]]),
+            "mc"                = haha,
+            "pop"               = .N,
+            "chd.incidence"     = sum(chd.incidence == 2011 + i, na.rm = T),
+            "chd.incidence.cvd" = sum(chd.incidence == 2011 + i & 
+                                        stroke.incidence == 0, na.rm = T),
+            "chd.prevalence"    = sum(chd.incidence > 0, na.rm = T),
+            "chd.mortality"     = sum(dead, na.rm = T)
+       ), by = strata]
+  }
 )
 output.stroke  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"                 = 2011 + i,
           "scenario"             = gsub(".Rc", "", scenarios.list[[iterations]]
-                                        ),
+          ),
           "mc"                   = haha,
           "pop"                  = .N,
           "stroke.incidence"     = sum(stroke.incidence == 2011 + i, na.rm = T),
           "stroke.incidence.cvd" = sum(stroke.incidence == 2011 + i & 
-                                      chd.incidence == 0, na.rm = T),
+                                         chd.incidence == 0, na.rm = T),
           "stroke.prevalence"    = sum(stroke.incidence > 0, na.rm = T),
           "stroke.mortality"     = sum(dead, na.rm = T)
      ), by = strata]
@@ -215,8 +186,21 @@ output.c16  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
           "mc"              = haha,
           "pop"             = .N,
           "c16.incidence"   = sum(c16.incidence == 2011 + i, na.rm = T),
-          "c16.prevalence"  = sum(c16.incidence > 0, na.rm = T),
+          "c16.prevalence"  = sum(c16.incidence > 0 & is.na(c16.remission), na.rm = T),
           "c16.mortality"   = sum(dead, na.rm = T)
+     ), by = strata]
+}
+)
+
+output.c34  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
+  dt[between(age, l, h), 
+     list("year"            = 2011 + i,
+          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
+          "mc"              = haha,
+          "pop"             = .N,
+          "c34.incidence"   = sum(c34.incidence == 2011 + i, na.rm = T),
+          "c34.prevalence"  = sum(c34.incidence > 0 & is.na(c34.remission), na.rm = T),
+          "c34.mortality"   = sum(dead, na.rm = T)
      ), by = strata]
 }
 )

@@ -1,7 +1,7 @@
-cat("Loading lung cancer (C34) model...\n\n")
+#cmpfile("./lung cancer model.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
- 
+
 ## IMPACTncd is free software; you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
 ## the Free Software Foundation; either version 3 of the License, or
@@ -17,149 +17,226 @@ cat("Loading lung cancer (C34) model...\n\n")
 ## or write to the Free Software Foundation, Inc., 51 Franklin Street,
 ## Fifth Floor, Boston, MA 02110-1301  USA.
 
+# RF to RR  ---------------------------------------------------------------
+cat("Loading lung cancer (C34) model...\n")
+cat(paste0(Sys.time(), "\n\n"))
+if (i == init.year - 2011) set(POP, NULL, "c34.incidence",  0) # Only needs to run the very first time of each simulation
+POP[age == 0, c34.incidence := 0]
 
-if (i == 0) POP[, lung.ca.incidence := 0] # Only needs to run the very first time of each simulation
-length.of.POP <- length(POP)
-POP <- merge(POP, C34incid, by = c("agegroup", "sex"), all.x = T)
-setkey(POP, cigst1)
+# PLCO model to estimate risk from: Tammemägi M, et al. Evaluation of the Lung
+# Cancer Risks at which to Screen Ever- and Never-Smokers: Screening Rules
+# Applied to the PLCO and NLST Cohorts. PLoS medicine. 2014;11(12): e1001764.
+# I intentionally used cvdlag because it is closer to 6 years that was the duration of the study
+set(POP, NULL, "c34.tob.rr", 1)
+POP[cigst1 != "1" & between(age, ageL, ageH),
+    c34.tob.rr := bound(tob.cum.risk(age - cvd.lag, sex, qimd,
+                               bmival.cvdlag, cigst1.cvdlag,
+                               cigdyal.cvdlag, numsmok.cvdlag, smokyrs.cvdlag,
+                               endsmoke.cvdlag, origin, i - cvd.lag), 1, Inf)]
+POP[age > 69, c34.tob.rr := (c34.tob.rr-1) * (1-(age-69)/100)+1] # decrease risk for elderly
 
-# Define OR smoking function from Lubin JH, Caporaso N, Wichmann HE, et al. Cigarette Smoking and Lung Cancer: 
-# Modeling Effect Modification of Total Exposure and Intensity. Epidemiology 2007;18:639–48. doi:10.1097/EDE.0b013e31812717fe
-# Table 2, for GRS
-cumulative.risk <- function(packyears, cigdyalCat, b = 0.0146, f1 = 2.86, f2 = -0.495) {
-    return(1 + b * packyears * exp(f1 * log(cigdyalCat) + f2 * (log(cigdyalCat))^2))
+
+# RR for ETS from Kim CH, et al. Exposure to secondhand tobacco smoke and lung
+# cancer by histological type: A pooled analysis of the International Lung
+# Cancer Consortium (ILCCO). Int J Cancer 2014;135:1918–30.
+# doi:10.1002/ijc.28835
+# Very similar to Taylor R, et al. Meta-analysis of studies of passive smoking and lung cancer:
+# effects of study type and continent. Int J Epidemiol. 2007 Jan
+# 10;36(5):1048–59. Table 4 for Europe
+set(POP, NULL, "c34.ets.rr", 1)
+POP[expsmok.calag == "1" & cigst1 == "1", c34.ets.rr := c34.ets.rr.mc]
+POP[age > 69, c34.ets.rr := (c34.ets.rr-1) * (1-(age-69)/100)+1] # decrease risk for elderly
+
+# RR for fruit from Vieira AR, et al. Fruits, vegetables and lung cancer risk: a
+# systematic review and meta-analysis. Ann Oncol 2016;27:81–96. 
+# doi:10.1093/annonc/mdv381
+# Very similar to Wang Y, et al. Fruit and vegetable
+# consumption and risk of lung cancer: A dose–response meta-analysis of
+# prospective cohort studies. Lung Cancer 2015;88:124–30.
+# doi:10.1016/j.lungcan.2015.02.015
+set(POP, NULL, "c34.fv.rr", 1)
+POP[porftvg.calag < 6L, c34.fv.rr := c34.fv.rr.mc^(porftvg.calag - 5L)] # No benefit from >5 portions
+POP[age > 69, c34.fv.rr := (c34.fv.rr-1) * (1-(age-69)/100)+1] # decrease risk for elderly
+
+# PAF estimation ----------------------------------------------------------
+if (i == init.year - 2011) {
+  #cat("Estimating lung cancer PAF...\n")
+  c34paf <- 
+    POP[between(age, ageL, ageH), 
+        .(paf = 1 - 1 / (sum(c34.tob.rr * c34.fv.rr * c34.ets.rr) / .N)), 
+        by = .(age, sex)
+        ]
+  setkey(c34paf, age, sex)
+  c34paf[, paf := predict(loess(paf~age, span=0.75)), by = .(sex)]
+  #c34paf[sex == "2" & between(age, 60, 79), paf := paf.sm]
+  #c34paf[, paf := rollmean(paf, 5, fill = "extend", align = "center"), by = .(sex)]
+
+  setkey(C34incid, age, sex)
+  C34incid[c34paf, p0 := incidence * (1 - paf)]
+  C34incid[is.na(p0), p0 := incidence]
 }
 
-cumulative.risk.ex <- function(packyears, cigdyalCat, b = 0.0107, f1 = 2.72, f2 = -0.501) {
-    return(1 + b * packyears * exp(f1 * log(cigdyalCat) + f2 * (log(cigdyalCat))^2))
+setkey(POP, age, sex)
+POP[C34incid, p0 := p0]
+
+# Prevalence of C34 only in first run  ------------------------------------
+if (i == init.year - 2011) {
+  #cat(paste0("Estimating lung cancer prevalence in ",
+            # init.year - 1L, " ...\n\n"))
+  age.structure <- setkey(POP[age <= ageH, .N, by = .(age, sex)], age, sex)
+  Temp <- merge(C34preval[age <= ageH], C34incid[age <= ageH], by = c("age", "sex"))
+  Temp[, prevalence := prevalence - incidence]
+  Temp[prevalence < 0, prevalence := 0]
+  age.structure[Temp, Nprev := rbinom(.N, N, prevalence)]
+  
+  # dismod calculates fatality/remission from 
+  # the prevalent cases and not the prevalent + incident cases 
+  setnames(age.structure, "N", "population")
+  POP <- merge(POP,
+               deaths.causes.secgrad[
+                 cause == "Malignant neoplasm of trachea, bronchus and lung",
+                 .(agegroup, sex, qimd, sec.grad.adj)],
+               by = c("agegroup", "sex", "qimd"), all.x = T)
+  POP[is.na(sec.grad.adj), sec.grad.adj := 1]
+  
+  Temp <- POP[age <= ageH, 
+              sample(id, 
+                     age.structure[age == .BY[[1]] & sex == .BY[[2]] , Nprev], 
+                     prob = c34.tob.rr * c34.fv.rr * c34.ets.rr * sec.grad.adj, 
+                     replace = F), 
+              by = .(age, sex)][, V1]
+  POP[id %in% Temp, c34.incidence := init.year - 1L] # and then we assign these ids to the population
+  POP[, sec.grad.adj := NULL]
 }
 
-# Define function to convert OR to RR from Zhang J, Yu KF. What’s the relative risk?: A method of correcting the odds ratio in
-# cohort studies of common outcomes. JAMA. 1998 Nov 18;280(19):1690–1.
-ORtoRR <- function(OR, p0) {OR / (1 - p0 + p0 *OR)}
+# Incidence of C34  ------------------------------------
+#cat("Estimating lung cancer incidence...\n\n")
+POP[between(age, ageL, ageH) &
+      c34.incidence == 0 &
+      dice(.N) < p0 * c34.tob.rr * c34.fv.rr * c34.ets.rr, 
+    c34.incidence := 2011 + i] 
 
-# RR for tobacco from Gandini S, Botteri E, Iodice S, Boniol M, Lowenfels AB, Maisonneuve P, et al.
-# Tobacco smoking and cancer: A meta-analysis. Int J Cancer. 2008 Jan 1;122(1):155–64.
-POP[, lung.ca.tob.rr := 1]
-
-# OR taken from table 4 in Khuder SA. Effect of cigarette smoking on major histological types of lung
-# cancer: a meta-analysis. Lung Cancer. 2001 Mar;31(2–3):139–48.  
-# POP[cigst1 == "4" & between(packyears, 1, 19), lung.ca.tob.rr := stochRR(.N, ORtoRR(6.79, p0tobonly), ORtoRR(7.94, p0tobonly))]
-# POP[cigst1 == "4" & between(packyears, 19, 56), lung.ca.tob.rr := stochRR(.N, ORtoRR(16.99, p0tobonly), ORtoRR(26.38, p0tobonly))]
-# POP[cigst1 == "4" & packyears > 56, lung.ca.tob.rr := stochRR(.N, ORtoRR(109.3, p0tobonly), ORtoRR(298.1, p0tobonly))]
-POP[cigst1 == "4" & age < 50, lung.ca.tob.rr := ORtoRR(cumulative.risk(packyears, cigdyalCat, 0.0043, 3.42, -0.523), p0tobonly)]
-POP[cigst1 == "4" & between(age, 50, 59), lung.ca.tob.rr := ORtoRR(cumulative.risk(packyears, cigdyalCat, 0.0031, 3.68, -0.593), p0tobonly)]
-POP[cigst1 == "4" & between(age, 60, 69),lung.ca.tob.rr := ORtoRR(cumulative.risk(packyears, cigdyalCat, 0.0222, 2.82, -0.517), p0tobonly)]
-POP[cigst1 == "4" & age >70, lung.ca.tob.rr := ORtoRR(cumulative.risk(packyears, cigdyalCat, 0.0342, 2.27, -0.427), p0tobonly)]
-
-# RR for ex-smokers decrease by exp(-0.06) per year of absense. 0.06 was set arbitrarily but roughly based on
-# 1 Khuder SA, Mutgi AB. Effect of smoking cessation on major histologic types of lung cancer*. Chest 2001;120:1577–83. doi:10.1378/chest.120.5.1577
-# table 4
-# POP[cigst1 == "3" & between(packyears, 1, 19), lung.ca.tob.rr := exp(- endsmoke * 0.06) * stochRR(.N, ORtoRR(6.79, p0tobonly), ORtoRR(7.94, p0tobonly))]
-# POP[cigst1 == "3" & between(packyears, 19, 56), lung.ca.tob.rr := exp(- endsmoke * 0.06) *  stochRR(.N, ORtoRR(16.99, p0tobonly), ORtoRR(26.38, p0tobonly))]
-# POP[cigst1 == "3" & packyears > 56, lung.ca.tob.rr := exp(- endsmoke * 0.06) * stochRR(.N, ORtoRR(109.3, p0tobonly), ORtoRR(298.1, p0tobonly))]
-POP[cigst1 == "3" & endsmoke < 5 , lung.ca.tob.rr := ORtoRR(cumulative.risk.ex(packyears, cigdyalCat, 0.0150, 2.81, -0.485), p0tobonly)]
-POP[cigst1 == "3" & between(endsmoke, 5, 14), lung.ca.tob.rr := ORtoRR(cumulative.risk.ex(packyears, cigdyalCat, 0.0107, 2.72, -0.501), p0tobonly)]
-POP[cigst1 == "3" & endsmoke >= 15 , lung.ca.tob.rr := ORtoRR(cumulative.risk.ex(packyears, cigdyalCat, 0.0033, 3.50, -0.716), p0tobonly)]
-
-POP[cigst1 == "2" & endsmoke < 5 , lung.ca.tob.rr := ORtoRR(cumulative.risk.ex(packyears, 0.5, 0.0150, 2.81, -0.485), p0tobonly)]
-POP[cigst1 == "2" & between(endsmoke, 5, 14), lung.ca.tob.rr := ORtoRR(cumulative.risk.ex(packyears, 0.5, 0.0107, 2.72, -0.501), p0tobonly)]
-POP[cigst1 == "2" & endsmoke >= 15 , lung.ca.tob.rr := ORtoRR(cumulative.risk.ex(packyears, 0.5, 0.0033, 3.50, -0.716), p0tobonly)]
-
-# POP[cigst1 == "2", lung.ca.tob.rr := stochRR(.N, 1.31, 1.52)] # Set arbitrarily as ETS risk
-
-# RR for ETS from Taylor R, Najafi F, Dobson A. Meta-analysis of studies of passive smoking and lung
-# cancer: effects of study type and continent. Int J Epidemiol. 2007 Jan 10;36(5):1048–59. Table 4
-# for Europe
-POP[, `:=`(lung.ca.ets.rr = 1)]
-POP[cigst1 %!in% c("4") & expsmokCat != "0", lung.ca.ets.rr := stochRR(.N, 1.31, 1.52)]
-
-
-# RR for fruit from Norat T, Aune D, Chan D, Romaguera D. Fruits and Vegetables: Updating the
-# Epidemiologic Evidence for the WCRF/AICR Lifestyle Recommendations for Cancer Prevention. In:
-# Zappia V, Panico S, Russo GL, Budillon A, Ragione FD, editors. Advances in Nutrition and Cancer
-# [Internet]. Springer Berlin Heidelberg; 2014 [cited 2014 Mar 21]. Available from:
-# http://link.springer.com/chapter/10.1007/978-3-642-38007-5_3. p97
-POP[, `:=`(lung.ca.fru.rr = 1)]  # It seems that Parkin used a recommended level of about 2 portions of fruit
-POP[frtpor < 97, lung.ca.fru.rr := stochRR(.N, 0.94^ (frtpor - 2), 0.97^ (frtpor - 2)), by = frtpor]
-
-
-# Estimate prevalence of lung cancer only in first run when i does not exist yet
-if (!exists("i")){
-    cat("Estimating lung cancer prevalence since 2002...\n\n")
-    casesM <- list(18397, 18080, 18597, 18501, 18951, 18736, 19081, 18830, 19129) # create list with annual new cases since 2002 from males
-    names(casesM) <- c(2002 : 2010)
-    casesF <- list(12229, 12722, 12794, 13420, 13852, 14181, 14789, 15010, 15324) # create list with annual new cases since 2002 from female
-    names(casesF) <- c(2002 : 2010)
-    
-    for (j in 1:9) {
-        POP[lung.ca.incidence == 0, v:= dice(.N) <= (3 * p0 * lung.ca.tob.rr * lung.ca.ets.rr * lung.ca.fru.rr)] # select people of all ages to assign them as lung ca prevalence from 2010 (I tripled p0 to allow for an overhead)
-        TempM = copy(POP[v == T & sex == "1"]) # create a temporary data.table for men
-        TempF = copy(POP[v == T & sex == "2"]) # create a temporary data.table for women
-        TempM = copy(sample.df(TempM, (casesM[[j]] * pop.fraction))) # Multiplying with 2010 pop.fraction for all years since 2002 is wrong but the error is negligible
-        TempF = copy(sample.df(TempF, (casesF[[j]] * pop.fraction))) # as above
-        Temp <- data.table(rbind_all(list(TempM, TempF)), key=c("agegroup", "sex")) # compine males and females
-        rm(TempM, TempF)
-        Temp <- Temp[between(age, ageL, ageH)] # restrict their age to user specified limits
-        Temp <- merge(Temp, C34surv, by = c("agegroup", "sex"), all.x = T)
-        Temp[, v:= dice(.N) <= .SD[,length.of.POP + 17 - j,with = F]] # Mark those who died (==F) before 2011. For j=9 X1 is used
-        Temp <- Temp[v==T] # and keep only the alive (==T) ones
-        setkey(Temp, id)
-        Temp = Temp[Temp, list(id)] # keep only their ids
-        setkey(POP, id)
-        POP[Temp, lung.ca.incidence:= 2001 + j] # Finally assign these ids to lung.ca.incidence as the actual year
-    }
-    rm(casesM, casesF)
-    POP[, v:= NULL]
+# Estimate C34 mortality --------------------------------------------------
+#cat("Estimating lung cancer mortality...\n\n")
+# Apply assumptions about improvement of fatality by year
+if (i > init.year - 2011) {
+  C34fatal[, fatality  := fatality  * (100 - fatality.annual.improvement.c34)/100]
+  C34remis[, remission := remission * (100 + fatality.annual.improvement.c34)/100]
+  # It make sense when fatality decreasing remission to increase and vice versa. 
 }
 
+setkey(POP, age, sex)
+POP[C34fatal, fatality := fatality]
 
-# P= P0 * lung.ca.tob.rr * lung.ca.ets.rr * lung.ca.fru.rr
-cat("Estimating lung cancer incidence...\n\n")
-POP[between(age, ageL, ageH) & lung.ca.incidence == 0, v := dice(.N) <= (p0 * lung.ca.tob.rr * lung.ca.ets.rr * 
-    lung.ca.fru.rr)]  # v is a temporary var because data.table cannot assign a number to a logical column. ??is this a bug?
+Temp <- POP[between(age, ageL, ageH), 
+            .(before = sum(c34.incidence > 0) * mean(fatality)),
+            by = .(agegroup, sex)] #expected number of deaths
 
-if (!exists("i")) {
-    POP[v == T, lung.ca.incidence := 2011]
-} else {
-    POP[v == T, lung.ca.incidence := 2011+i]  
+POP[between(age, ageL, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.c34 / 2) * fatality/100]
+POP[between(age, ageL, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.c34 / 4) * fatality/100]
+POP[between(age, ageL, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.c34 / 4) * fatality/100]
+POP[between(age, ageL, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.c34 / 2) * fatality/100]
+# POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.c34 / 1) * fatality/100]
+# POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.c34 / 2) * fatality/100]
+# POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.c34 / 2) * fatality/100]
+# POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.c34 / 1) * fatality/100]
+
+#expected number of deaths after gradient and needs to be corrected by Temp/Temp1
+Temp1 <- POP[between(age, ageL, ageH), 
+             .(after = sum(c34.incidence > 0) * mean(fatality)),
+             by = .(agegroup, sex)] #expected number of deaths
+
+Temp[Temp1, corr := before/after, on = c("agegroup", "sex")]
+Temp[is.na(corr), corr := 1]
+POP[Temp, fatality := fatality * corr, on = c("agegroup", "sex")]
+POP[fatality > 1, fatality := 0.99]
+
+# Mortality and remission need to be calculated on the same step
+# I NEED TO implement also decreasing probability of death by duration
+POP[C34remis, `:=` (remission = remission)]
+
+Temp <- POP[between(age, ageL, ageH), 
+            .(before = sum(c34.incidence > 0) * mean(remission)),
+            by = .(agegroup, sex)] #expected number of deaths
+
+POP[between(age, ageL, ageH) & qimd == "1", remission := (100 + fatality.sec.gradient.c34 / 2) * remission/100]
+POP[between(age, ageL, ageH) & qimd == "2", remission := (100 + fatality.sec.gradient.c34 / 4) * remission/100]
+POP[between(age, ageL, ageH) & qimd == "4", remission := (100 - fatality.sec.gradient.c34 / 4) * remission/100]
+POP[between(age, ageL, ageH) & qimd == "5", remission := (100 - fatality.sec.gradient.c34 / 2) * remission/100]
+# POP[between(age, 70, ageH) & qimd == "1", remission := (100 + fatality.sec.gradient.c34 / 2) * remission/100]
+# POP[between(age, 70, ageH) & qimd == "2", remission := (100 + fatality.sec.gradient.c34 / 4) * remission/100]
+# POP[between(age, 70, ageH) & qimd == "4", remission := (100 - fatality.sec.gradient.c34 / 4) * remission/100]
+# POP[between(age, 70, ageH) & qimd == "5", remission := (100 - fatality.sec.gradient.c34 / 2) * remission/100]
+#expected number of deaths after gradient and needs to be corrected by Temp/Temp1
+
+Temp1 <- POP[between(age, ageL, ageH), 
+             .(after = sum(c34.incidence > 0) * mean(remission)),
+             by = .(agegroup, sex)] #expected number of deaths
+
+Temp[Temp1, corr := before/after, on = c("agegroup", "sex")]
+Temp[is.na(corr), corr := 1]
+POP[Temp, remission := remission * corr, on = c("agegroup", "sex")]
+POP[remission > 1, remission := 0.99]
+
+POP[c34.incidence > 0, 
+    `:=` (v = dice(.N) <= fatality + remission, # T = dead or cured (F = diseased)
+          dc = dice(.N) <= fatality / (remission + fatality))] # T = dead (F = cured)
+
+#POP[c34.incidence > 0 & v == T & dc == T, .N] # dead
+#POP[c34.incidence > 0 & v == T & dc == F, .N] # cured
+
+POP[, dead := as.logical(v * dc)]
+POP[v == T & dead == F, 
+    `:=` (c34.remission = paste0(c34.incidence, " - ", i + 2011))]
+if ("c34.remission" %!in% names(POP)) set(POP, NULL, "c34.remission", NA_character_)
+
+#cat("Export lung cancer burden summary...\n\n")
+#cat(paste0(Sys.time(), "\n\n"))
+if (i == init.year - 2011) c34.burden <- vector("list", yearstoproject * 5)
+
+c34.burden[[(2011 - init.year + i) * 5 + 1]] <-
+  output.c34(POP, c("qimd", "sex", "agegroup"))
+
+c34.burden[[(2011 - init.year + i) * 5 + 2]] <- 
+  output.c34(POP, c("sex", "agegroup"))
+
+c34.burden[[(2011 - init.year + i) * 5 + 3]] <-
+  output.c34(POP, c("qimd", "sex"))
+
+c34.burden[[(2011 - init.year + i) * 5 + 4]] <- 
+  output.c34(POP, c("sex"))
+
+c34.burden[[(2011 - init.year + i) * 5 + 5]] <- 
+  output.c34(POP, c())
+
+if (i == yearstoproject + init.year - 2012) {
+  saveRDS(rbindlist(c34.burden, T, T)
+          , file = paste0(output.dir(), "c34.burden.rds"))
 }
 
-POP[, v := NULL]
+#cat("Export lung cancer burden individuals...\n\n")
+indiv.incid[[which(diseasestoexclude=="C34")]] <- 
+  POP[c34.incidence == 2011 + i,
+      .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
+      ][, `:=` (scenario = gsub(".Rc", "", scenarios.list[[iterations]]),
+                mc = haha, year = 2011 + i, cause = "c34")]
 
-if (!exists("Out.Inc.C34")) {
-    Out.Inc.C34 = copy(POP[lung.ca.incidence == 2011])
-} else {
-    Temp = copy(POP[lung.ca.incidence == 2011+i])
-    Out.Inc.C34 <- rbind_all(list(Out.Inc.C34, Temp))
-}
+indiv.mort[[which(diseasestoexclude == "C34") + 1]] <-
+  POP[dead == T, 
+      .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
+      ][,
+        `:=` (year = 2011 + i, cause = "c34",
+              scenario = gsub(".Rc", "", scenarios.list[[iterations]]), 
+              mc = haha)]
+POP[v == T & dead == F, 
+    `:=` (c34.incidence = 0)]
+POP[,`:=` (v = NULL, dc = NULL)] 
 
-Out.Inc.C34 <- data.table(Out.Inc.C34, key="id")
+POP = copy(POP[dead == F | is.na(dead)== T,])
 
-# Estimate lung cancer mortality (people die of lung cancer up to 10 years after diagnosis)
-cat("Estimating lung cancer mortality...\n\n")
-POP <- merge(POP, C34surv, by = c("agegroup", "sex"), all.x = T)
-setkey(POP, agegroup, sex)
+rm(Temp, Temp1)
 
-if (!exists("i")){ # for 2011 that i doesn't exists yet
-    for (j in 1:10) {
-        POP[lung.ca.incidence == 2001+j, v:= dice(.N) <= .SD[,length.of.POP + 37 - j, with = F]] # T= dead, F=alive 
-    }
-    Out.Mort.C34 = copy(POP[v == T])
-    Out.Mort.C34[, `:=` (yearofdeath = 2011, v = NULL)]
-} else {
-    for (j in 1:10) {
-        POP[lung.ca.incidence == 2001+i+j, v:= dice(.N) <= .SD[,length.of.POP + 37 - j, with = F]] # T= dead, F=alive
-    }
-    Temp = copy(POP[v == T])
-    Temp[, `:=` (yearofdeath = 2011+i, v = NULL)]
-    Out.Mort.C34 = rbind_all(list(Out.Mort.C34, Temp))
-}
-
-POP =copy(POP[v == F | is.na(v)==T,])
-Out.Mort.C34 <- data.table(Out.Mort.C34, key="id")
-rm(length.of.POP)
-POP[, `:=` (incidence = NULL, p0tobonly = NULL, p0 = NULL, lung.ca.tob.rr = NULL, lung.ca.ets.rr = NULL, lung.ca.fru.rr = NULL, v = NULL, X1 = NULL,
-            X2 = NULL, X3 = NULL, X4 = NULL, X5 = NULL, X6 = NULL, X7 = NULL, X8 = NULL, X9 = NULL, X10 = NULL, X11 = NULL, X12 = NULL,
-            X13 = NULL, X14 = NULL, X15 = NULL, X16 = NULL, X17 = NULL, X18 = NULL, X19 = NULL, X20 = NULL, p1 = NULL, p2 = NULL, 
-            p3 = NULL, p4 = NULL, p5 = NULL, p6 = NULL, p7 = NULL, p8 = NULL, p9 = NULL, p10 = NULL)] 
+POP[, `:=` (c34.tob.rr = NULL, p0 = NULL,
+            c34.ets.rr = NULL, c34.fv.rr = NULL,
+            dead = NULL, fatality = NULL, remission = NULL)] 
+setkey(POP, age, sex, qimd)

@@ -41,6 +41,13 @@ if ("C16" %in% diseasestoexclude) {
     c(diseasestoexclude.ICD,"Malignant neoplasm of stomach")
 }
 
+if ("C34" %in% diseasestoexclude) {
+  remove <- "C34"
+  diseasestoexclude.ICD <- outersect(diseasestoexclude.ICD, remove)
+  diseasestoexclude.ICD <-
+    c(diseasestoexclude.ICD,"Malignant neoplasm of trachea, bronchus and lung")
+}
+
 population <-
   fread(
     "./Population/Population by adjusted IMD 2010 quintile_final.csv",
@@ -107,11 +114,16 @@ tt <-
     tt, deaths.causes, by = c("year", "sex", "qimd", "agegroup"), 
     all.x = T
   )
+tt[agegroup %!in% unique(agegroup.fn(ageL:ageH)), disease := 0] 
+tt[agegroup %in% c("0", "01-04"), agegroup := "00-04"]
+tt <- tt[, .(pop=sum(pop), deaths=sum(deaths), disease = sum(disease)),
+         by = .(year, sex, qimd, agegroup)]
+tt[, agegroup := relevel(factor(agegroup), "00-04")]
 tt[, Mx.all := deaths / pop]  
 #death rate all diseases tt[as.numeric(as.character(agegroup)) < ageL | 
 #as.numeric(as.character(agegroup)) > ageH, disease := 0] # Exclude disease 
 #mortality only for ages between ageL and ageH
-tt[agegroup %!in% unique(agegroup.fn(ageL:ageH)), disease := 0] 
+
 # Exclude disease mortality only for ages between ageL and ageH
 tt[, Mx.disease := (deaths - disease) / (pop - disease)]
 # death rate modelled diseases excluded
@@ -146,7 +158,7 @@ pp <-
             agegroup ~ year, value.var = "Mx.disease"),
       acast(tt[sex == k & qimd == l,],
             agegroup ~ year, value.var = "pop"),
-      c(0, 1, 6, seq(12.5, 87.5, 5), 100), #c(0:99),
+      c(seq(2.5, 87.5, 5), 92.5), #c(0:99),
       #c(0, 1, 5, seq(10, 85, 5), 100), 
       tt[sex == k & qimd == l, unique(year)],
       "mortality",
@@ -154,7 +166,7 @@ pp <-
     )
     xx <-
       smooth.demogdata(
-        xx, age.grid = 0:100, weight = F, interpolate = T
+        xx, age.grid = 0:100
       )
     temp <-
       forecast.fdm(fdm(xx,  method = "M", max.age = 100), hor)
@@ -171,7 +183,7 @@ pp <-
             agegroup ~ year, value.var = "Mx.all"),
       acast(tt[sex == k & qimd == l,],
             agegroup ~ year, value.var = "pop"),
-      c(0, 1, 6, seq(12.5, 87.5, 5), 100), #c(0:99),
+      c(seq(2.5, 87.5, 5), 92.5), #c(0:99),
       #c(0, 1, 5, seq(10, 85, 5), 100),
       tt[sex == k &
            qimd == l, unique(year)],
@@ -181,7 +193,7 @@ pp <-
     #plot(xx)
     xx <-
       smooth.demogdata(
-        xx, age.grid = 0:100, weight = F, interpolate = T
+        xx, age.grid = 0:100
       )
     xxx <- xx$pop
     temp <-
@@ -219,7 +231,7 @@ setkey(Lifetable.diab, age, sex, qimd)
 setkey(Lifetable,      age, sex, qimd)
 
 
-# Population and smoking death-rate inflation tables ----------------------
+# Population distribution  ----------------------
 # Match the sex and age structure of the initial year
 population.actual <- rbindlist(lapply(pp, `[[`, 3))[, .SD, .SDcols = c("age", "sex", "qimd", paste0(init.year))]
 setnames(population.actual, paste0(init.year), "pop.smooth")
@@ -242,7 +254,7 @@ population.actual[, pct := round(as.numeric(n) * pop / sum(pop))]
 population.actual[, pct2 := pct]
 population.actual[age > 89, pct2 := sum(pct), by = .(sex, qimd)] # aggregate ages>90
 # Calculate the exact fraction of the mid init.year population this sample represents
-pop.fraction <-
+  pop.fraction <-
   n / population.actual[, sum(pop)]
 # 53107200 is the total mid 2011 population of England (52642600 for 2010)
 
@@ -250,6 +262,8 @@ cat(paste0("Population fraction = ", pop.fraction, "\n"),
     file = "./Output/simulation parameters temp.txt",
     append = T)
 
+
+# Smoking death-rate inflation tables -------------------------------------
 # Load rr of death for smokers from Peto, Mortality in relation to smoking: 50
 # years observations on male British doctors. Table 1
 smokriskofdeath <- fread("./LifeTables/smokriskofdeath.csv")
@@ -258,8 +272,8 @@ smokriskofdeath <-
   smokriskofdeath[!diseasestoexclude,] 
 # Need to adjust 1st column for each new disease
 smokriskofdeath <-
-  smokriskofdeath[,(sum(Current) * 4680 / 35.30) / (sum(Lifelong.non.smokers) *
-                                                      2917 / 19.34)] 
+  smokriskofdeath[,(sum(Current) * 4680 / 35.40) / (sum(Lifelong.non.smokers) *
+                                                      2917 / 19.38)] 
 
 # Prevalence sec gradient -------------------------------------------------
 deaths.causes.secgrad <- 
@@ -315,6 +329,16 @@ if ("C16" %in% diseasestoexclude) {
                           ((100 + (as.integer(qimd) - 1) * 0.25 * fatality.sec.gradient.c16)/100)]
 }
 
+if ("C34" %in% diseasestoexclude) {
+  deaths.causes.secgrad[cause == "Malignant neoplasm of trachea, bronchus and lung" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(ageL:69)),
+                        sec.grad.adj := sec.grad /
+                          ((100 + (as.integer(qimd) - 1) * 0.25 * fatality.sec.gradient.c34)/100)]
+  deaths.causes.secgrad[cause == "Malignant neoplasm of stomach" & qimd != "1" &
+                          agegroup %in% unique(agegroup.fn(70:ageH)),
+                        sec.grad.adj := sec.grad /
+                          ((100 + (as.integer(qimd) - 1) * 0.25 * fatality.sec.gradient.c34)/100)]
+}
 #rm(list = c(apropos(glob2rx("mortal.sex-*"))))
 #rm(list = c(apropos(glob2rx("POP.sex-*"))))
 rm(tt, deaths.qimd, population, deaths.causes, diseasestoexclude.ICD, pp)

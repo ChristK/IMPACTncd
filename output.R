@@ -88,6 +88,11 @@ riskfactors[
 
 riskfactors[, sex := factor(sex, c("1", "2"), c("Men" ,"Women"))]
 
+lagtimes.dt <- fread("./Output/lagtimes.csv")
+lagtimes.dt[, mc := .I]
+
+riskfactors[lagtimes.dt, on="mc", `:=` (year.cvdlag = year - cvd.lag, 
+                                        year.calag  = year - cancer.lag)]
 save(
   riskfactors,
   file="./Output/RF/riskfactors.RData"
@@ -101,6 +106,7 @@ pop.abs <- riskfactors[group=="SAQ",
                               pop = round(mean(V1))),
                          by = .(year, scenario, sex, agegroup, qimd, mc)] 
 setkey(pop.abs, year, scenario, sex, agegroup, qimd, mc)
+
 save(
   pop.abs,
   file="./Output/RF/population.structure.RData"
@@ -468,11 +474,68 @@ if ("C16" %in% diseasestoexclude) {
   #save(healthylife.exp.c16, file="./Output/Gastric ca/indiv.incid.RData")
 }
 
+# Lung cancer burden ---------------------------------------------------
 if ("C34" %in% diseasestoexclude) {
-  dir.create(path = "./Output/Lung ca/", recursive = T, showWarnings = F)
+  cat("Collecting lung cancer burden output...\n"
+  )
   
+  dir.create(
+    path = "./Output/Lung ca/",
+    recursive = T,
+    showWarnings = F
+  )
+  
+  all.files <- as.list(
+    list.files(
+      path = "./Output",
+      pattern = "c34.burden.rds",
+      full.names = T,
+      recursive = T
+    )
+  ) 
+  
+  c34.burden <- rbindlist(
+    mclapply(
+      all.files,
+      readRDS,
+      mc.cores = clusternumber
+    ),
+    T, T
+  )
+  
+  c34.burden[
+    is.na(qimd) == T & is.na(agegroup) == T & is.na(sex) == F,
+    group := "S"
+    ]
+  c34.burden[
+    is.na(qimd) == T & is.na(agegroup) == F & is.na(sex) == F,
+    group := "SA"
+    ]
+  c34.burden[
+    is.na(qimd) == F & is.na(agegroup) == T & is.na(sex) == F,
+    group := "SQ"
+    ]
+  c34.burden[
+    is.na(qimd) == F & is.na(agegroup) == F & is.na(sex) == F,
+    group := "SAQ"
+    ]
+  c34.burden[
+    is.na(sex) == T,
+    group := "P"
+    ]
+  c34.burden[, sex := factor(sex, c("1", "2"), c("Men" ,"Women"))]
+  
+  save(
+    c34.burden,
+    file="./Output/Lung ca/c34.burden.RData"
+  )
+  
+  #rm(c34.burden)
+  #gc()
+  
+  #write.csv(healthylife.exp, file="./Output/Lung ca/healthylife.exp.csv", row.names = F)
+  #save(healthylife.exp.c34, file="./Output/Lung ca/indiv.incid.RData")
 }
-
 
 # Life expectancy ---------------------------------------------------------
 cat("Calculating life expectancy...\n"
@@ -572,17 +635,17 @@ save(
   file="./Output/Tables/Tables.rda"
 )
 
-lapply(
-  names(
-    Tables
-  ), 
-  function(x) write.csv(
-    Tables[[x]],
-    file = paste0("./Output/Tables/", x,".csv"),
-    quote = T,
-    row.names = F
-  )
-)
+# lapply(
+#   names(
+#     Tables
+#   ), 
+#   function(x) write.csv(
+#     Tables[[x]],
+#     file = paste0("./Output/Tables/", x,".csv"),
+#     quote = T,
+#     row.names = F
+#   )
+# )
 
 
 # Export graphs from tables -----------------------------------------------
@@ -592,7 +655,9 @@ dir.create(
   showWarnings = F
 )
 
-Graphs <- lapply(names(Tables), GraphsfromTables)
+Graphs <- mclapply(names(Tables), 
+                   GraphsfromTables,
+                   mc.cores = clusternumber)
 names(Graphs) <- names(Tables)
 
 save(Graphs, file="./Output/Graphs.tbl/Graphs.tbl.rda")
@@ -679,13 +744,13 @@ if (export.graphs == T) {
 # Calculate DPP/CPP included in the analysis output. current code not dynamic
 
 # Run validation ------------------------------------------------
-#loadcmp(file = "./validation.Rc")
+loadcmp(file = "./validation.Rc")
 
 # Clear intermediate files ------------------------------------------------
 if (cleardirectories == T) {
   scenarios.list <- list.files(
     path = "./Scenarios",
-    pattern = glob2rx("*.R"),
+    pattern = glob2rx("*.Rc"),
     full.names = F,
     recursive = F
   )
@@ -693,7 +758,7 @@ if (cleardirectories == T) {
   scenario.dirs <- as.list(
     paste0(
       "./Output/",
-      gsub(".R", "", scenarios.list
+      gsub(".Rc", "", scenarios.list
       )
     )
   )

@@ -21,8 +21,12 @@
 cat("Sample RR values for 2d Monte Carlo\n\n")
 # coefficients for salt model from the MC simulation
 load(file="./Lagtimes/salt.rq.coef.rda")
-salt.rq$coefficients <- salt.rq.coef[[counter[[iterations]]]]
+salt.rq$coefficients <- salt.rq.coef[[counter[[iterations]]]] # length=500 so 
+# up to 500 iteratin in each run
 #salt.rq$coefficients <- apply(simplify2array(salt.rq.coef), 1:2, mean) # mean of MC
+
+cvd.lag    <- cvd.lag.l[[counter[[iterations]]]]
+cancer.lag <- cancer.lag.l[[counter[[iterations]]]]
 
 atorv.eff        <- atorv.eff.l[[counter[[iterations]]]]
 smoking.decr     <- smoking.decr.l[[counter[[iterations]]]]
@@ -55,6 +59,11 @@ if ("stroke" %in% diseasestoexclude) {
   pa.rr.stroke      <- stroke.pa.rr.l[.id == counter[[iterations]]]
 }
 
+if ("C34" %in% diseasestoexclude) {
+  c34.ets.rr.mc <- c34.ets.rr.mc.l[[counter[[iterations]]]] 
+  c34.fv.rr.mc <- c34.fv.rr.mc.l[[counter[[iterations]]]]
+}
+
 if ("C16" %in% diseasestoexclude) {
   c16.salt.optim  <- c16.salt.optim.l[[counter[[iterations]]]]
   c16.salt.mr     <- c16.salt.mr.l[[counter[[iterations]]]]
@@ -62,5 +71,6 @@ if ("C16" %in% diseasestoexclude) {
   c16.extob.rr.mc <- c16.extob.rr.mc.l[[counter[[iterations]]]]
   c16.fv.rr.mc    <- c16.fv.rr.mc.l[.id == counter[[iterations]]]
   c16.salt.rr.mc  <- c16.salt.rr.mc.l[.id == counter[[iterations]]]
+  c16.bmi.rr.mc   <- c16.bmi.rr.mc.l[counter[[iterations]]]
 }
 

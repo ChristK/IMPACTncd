@@ -23,22 +23,18 @@ load(file="./Lagtimes/chol.svylm.rda")
 load(file="./Lagtimes/sbp.svylm.rda")
 load(file="./Lagtimes/diab.svylr.rda")
 load(file="./Lagtimes/smok.active.svylr.rda")
+load(file="./Lagtimes/smok.exactive.svylr.rda")
 load(file="./Lagtimes/smok.cess.svylr.rda")
-load(file="./Lagtimes/smok.cess.success.rda")
+load(file="./Lagtimes/smok.cess.success.log.rda")
+load(file="./Lagtimes/smok.cess.success.parabola.rda")
 load(file="./Lagtimes/smok.start.svylr.rda")
+load(file="./Lagtimes/smok.cigdyal.svylm.rda")
 load(file="./Lagtimes/fv.svylr.rda")
-load(file="./Lagtimes/fvrate.svylr.rda")
 load(file="./Lagtimes/pa.svylr.rda")
 load(file="./Lagtimes/salt.rq.rda")
-load(file="./Lagtimes/tctohdl.svylm.rda")
-load(file="./Lagtimes/famcvd.svylr.rda")
-load(file="./Lagtimes/af.svylr.rda")
-load(file="./Lagtimes/kiddiag.svylr.rda")
 load(file="./Lagtimes/bpmed.svylr.rda")
-load(file="./Lagtimes/undiag.diab.svylr.rda")
 
 cat("Load RF trajectories\n")
-
 
 # PA prediction ---------------------------------------
 PA.intervention <- 0L
@@ -55,7 +51,7 @@ pred.pa <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
                    ordered = T)
   }
   
-  newdata<- data.table(
+  newdata <- data.table(
     year = year - lag,
     age  = age  - lag, 
     sex  = sex, 
@@ -74,7 +70,7 @@ pred.pa <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
   n <- nrow(X)
   q <- length(pa.svylr$zeta)
   eta <- drop(X %*% pa.svylr$coefficients)
-  cc <- data.table(plogis(matrix(pa.svylr$zeta, n, q, byrow = TRUE) - 
+  cc <- as.data.table(plogis(matrix(pa.svylr$zeta, n, q, byrow = TRUE) - 
                             eta))
   set(cc, NULL, "V8", 1)
   #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
@@ -92,7 +88,6 @@ pred.pa <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
   return(cc[, a30])  
 } 
 )
-
 
 # F&V prediction --------------------------------------
 FV.intervention <- 0L
@@ -128,7 +123,7 @@ pred.fv <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
   n <- nrow(X)
   q <- length(fv.svylr$zeta)
   eta <- drop(X %*% fv.svylr$coefficients)
-  cc <- data.table(plogis(matrix(fv.svylr$zeta, n, q, byrow = TRUE) - 
+  cc <- as.data.table(plogis(matrix(fv.svylr$zeta, n, q, byrow = TRUE) - 
                             eta))
   set(cc, NULL, "V9", 1)
   #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
@@ -155,32 +150,31 @@ pred.fv <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
 #                        sample(c(1,10), n, replace = T))))/n
 # SPOP2011[age>19, summary(factor(porftvg))/.N]
 
-
 # Fruit prediction ------------------------
-pred.fvrate <- cmpfun(function(age, sex, qimd, porftvg, lag = cvd.lag) {
-  if (is.factor(sex)==F) {
-    sex <-  factor(sex, 
-                   levels = c(1,2), 
-                   ordered = F)
-  }
-  if (is.ordered(qimd)==F) {
-    qimd <- factor(qimd, 
-                   levels = c(1,2,3,4,5), 
-                   ordered = T)
-  }
-  cc <- predict(fvrate.svylr, 
-                data.table(age     = age - lag, 
-                           sex     = sex, 
-                           qimd    = qimd, 
-                           porftvg = porftvg), 
-                type="response", se.fit=F)
-  #cc<- rtruncnorm(nrow(cc), a = 0, b = 1, mean=cc[[1]], sd=cc[[2]])
-  #return(as.integer(porftvg*cc))
-  #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
-  cc <- rbinom(length(cc), porftvg, cc)
-  return(cc)
-}
-)
+# pred.fvrate <- cmpfun(function(age, sex, qimd, porftvg, lag = cvd.lag) {
+#   if (is.factor(sex)==F) {
+#     sex <-  factor(sex, 
+#                    levels = c(1,2), 
+#                    ordered = F)
+#   }
+#   if (is.ordered(qimd)==F) {
+#     qimd <- factor(qimd, 
+#                    levels = c(1,2,3,4,5), 
+#                    ordered = T)
+#   }
+#   cc <- predict(fvrate.svylr, 
+#                 data.table(age     = age - lag, 
+#                            sex     = sex, 
+#                            qimd    = qimd, 
+#                            porftvg = porftvg), 
+#                 type="response", se.fit=F)
+#   #cc<- rtruncnorm(nrow(cc), a = 0, b = 1, mean=cc[[1]], sd=cc[[2]])
+#   #return(as.integer(porftvg*cc))
+#   #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
+#   cc <- rbinom(length(cc), porftvg, cc)
+#   return(cc)
+# }
+# )
 
 # test
 # summary(factor(pred.fvrate(sample(c(0), n, replace = T), 
@@ -189,7 +183,6 @@ pred.fvrate <- cmpfun(function(age, sex, qimd, porftvg, lag = cvd.lag) {
 #                            sample(c(1:5), n, replace = T),
 #                            sample(c(0:9), n, replace = T),
 #                            sample(c(1,10), n, replace = T))))
-
 
 # Qdiabetes prediction ----------------------------------------------------
 # Define function for diab prevalence projection with QRisk diabetes 
@@ -221,14 +214,14 @@ pred.diab.qdrisk <- cmpfun(
     ## origin(ethnicity) is defined in the synthetic population now.
     
     # The prob of being diab is 8%. So the probability of having at least
-    # one of 3 family members with diabetes is 1 - (1-0.08)^3. I let family members vary between 2 and 4
+    # one of 3 family members with diabetes is 1 - (1-0.08)^3. I let family members vary above 2
     if (i == init.year - 2011) {
       DT[, fh_diab := 
-           dice(.N) < 1 - (1 - sum(diabtotr == "2") / .N)^sample(2:4, .N, T)]
+           dice(.N) < 1 - (1 - sum(diabtotr == "2") / .N)^(2 + rpois(.N, 1))]
     } else {
       DT[, fh_diab := 
            dice(.N) < 1 -
-           (1 - sum(diabtotr.cvdlag == "2") / .N)^sample(2:4, .N, T)]
+           (1 - sum(diabtotr.cvdlag == "2") / .N)^(2 + rpois(.N, 1))]
     }
     
     #if (paired) set.seed(seed[[counter[[iterations]]]])
@@ -248,7 +241,6 @@ pred.diab.qdrisk <- cmpfun(
     #            "bmi", "ethrisk", "fh_diab", "smoke_cat", "town") := NULL]
   }
 )
-
 
 # Diab prevalence  prediction ---------------------------------------------
 pred.diab <- cmpfun(function(age, sex, qimd, bmival, a30to06m) {
@@ -276,7 +268,6 @@ pred.diab <- cmpfun(function(age, sex, qimd, bmival, a30to06m) {
   #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
 }
 )
-
 
 # Diabetes incid ----------------------------------------------------------
 # rr = the rr of dying because of diabetes from Group TDS. Is the Current Definition for Diabetes Relevant to Mortality Risk From All Causes and Cardiovascular and Noncardiovascular Diseases? Dia Care. 2003 Jan 3;26(3):688–96. 
@@ -313,148 +304,229 @@ pred.diab.incid <- cmpfun(function(year, age1, sex1, qimd1, bmival, a30to06m) {
   mort[, mortal := .SD[, 5L, with = F] * actualprev * 1.6] # mortality * 1.6 (rr from DECODE)
   setkey(mort, id)
   tc <- prev1 - prev0 + mort[, mortal]
-  tc[tc<0] <- 0 
-  tc[tc>1] <- 1  
   #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
-  tc <- rbinom(length(tc), 1L, tc) + 1L
+  tc <- rbinom(length(tc), 1L, bound(tc)) + 1L
   return(as.character(tc))
   #return(prev1 - prev0)
 }
 )
 #table(pred.diab.incid(0, rep(84, 1000), 1, 3, 28, 1))
 
-
 # Diabetes lag ------------------------------------------------------------
 pred.diab.incid.lag <- cmpfun(function(age, sex, qimd, bmival, a30to06m, lag) { 
   prev0 <- pred.diab(age = age - lag,            sex = sex, qimd = qimd, bmival = bmival,    a30to06m = a30to06m)
   prev1 <- pred.diab(age = age,                  sex = sex, qimd = qimd, bmival = bmival,    a30to06m = a30to06m)
   tc <- prev0 / prev1 # derived from bayes theorem P(diab2008|diab2011)= P(diab2011|diab2008)*P(diab2008)/P(diab2011) and P(diab2011|diab2008) = 1)
-  tc[tc>1] <- 1
-  tc <- rbinom(tc, 1L, tc) + 1L
+  tc <- rbinom(tc, 1L, bound(tc)) + 1L
   return(as.character(tc))
   #return(prev0 / prev1)
 }
 )
 
-
 # Smoke initiation --------------------------------------------------------
 # Gives the annual probability of a never smoker to become  smoker next year
 # all other remain never smokers
-pred.nev0sm1 <- cmpfun(function(year, age, sex, qimd) {
-  qimd <- mapvalues(qimd,  c(1:5 ), c(1,2,2,2,2))
-  
-  pnev0sm1 <- predict(smok.start.svylr, data.table(year = year, age = age, sex = sex, qimd = qimd), type = "response", se.fit=F)
-  #return(pnev0sm1[[1]])
-  return(rbinom(length(pnev0sm1), 1, pnev0sm1))
-}
+pred.nev0sm1 <- cmpfun(
+  function(year, age, sex, qimd) {
+    #qimd <- mapvalues(qimd,  c(1:5 ), c(1,2,2,2,2))
+    if (is.factor(sex)==F) {
+      sex <-  factor(sex, 
+                     levels = c(1,2), 
+                     ordered = F)
+    }
+    if (is.ordered(qimd)==F) {
+      qimd <- factor(qimd, 
+                     levels = c(1,2,3,4,5), 
+                     ordered = T)
+    }
+    age <- cut(bound(age, 20, 50), c(-Inf, 22, 30, 35, 50))
+    pnev0sm1 <- as.data.table(predict(smok.start.svylr, data.table(year = year, age2 = age, sex = sex, qimd = qimd), type = "response", se.fit=T))
+    return(pnev0sm1[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
+    #return(rbinom(pnev0sm1[, .N], 1, pnev0sm1[, response]))
+  }
 )
 
 # plot(pred.nev0sm1(0, 16:60, 1), ylim=c(0,0.5))
 # lines(pred.nev0sm1(16:60, "3"), ylim=c(0,0.2))
 
-
 # Smoke cessation ---------------------------------------------------------
 # Predicts the annual probability of a smoker to become ex-smoker
-pred.sm0ex1 <- cmpfun(function(year, age, sex, qimd) {
-  if (is.factor(sex)==F) {
-    sex <-  factor(sex, 
-                   levels = c(1,2), 
-                   ordered = F)
-  }
-  if (is.ordered(qimd)==F) {
-    qimd <- factor(qimd, 
-                   levels = c(1,2,3,4,5), 
-                   ordered = T)
-  }
-  sm0ex1 <- predict(smok.cess.svylr, data.table(year = year, age = age, sex = sex, qimd = qimd), type = "response", se.fit=F)
-  #return(rtruncnorm(nrow(sm0ex1), 0, 1, sm0ex1[[1]], sm0ex1[[2]]))
-  return(rbinom(length(sm0ex1), 1, sm0ex1))
-}
-)
+pred.sm0ex1 <- 
+  cmpfun(
+    function(year, age, sex, qimd) {
+      if (is.factor(sex)==F) {
+        sex <-  factor(sex, 
+                       levels = c(1,2), 
+                       ordered = F)
+      }
+      if (is.ordered(qimd)==F) {
+        qimd <- factor(qimd, 
+                       levels = c(1,2,3,4,5), 
+                       ordered = T)
+      }
+      
+      sm0ex1 <- as.data.table(
+        predict(
+          smok.cess.svylr,
+          data.table(
+            year = year, age = bound(age, 20, 75), sex = sex, qimd = qimd), 
+          type   = "response", 
+          se.fit = T)
+      )
+      return(sm0ex1[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
+      #return(rbinom(sm0ex1[, .N], 1, sm0ex1[, response]))
+      #return(sm0ex1[])
+    }
+  )
 
 # for (jj in 1:5) {
 #     plot(16:90, pred.sm0ex1(0, 16:90, 1, jj), ylim=c(0,0.4))
 # }
 
-
 # Smoke relapse -----------------------------------------------------------
-# Predicts probability of ex-smoker to become active smoker (relapse) (only works for 1<endsmoke<10). Else should be 0
-pred.ex0sm1 <- cmpfun(function(endsmoke, sex, qimd) {
-  if (is.factor(sex)==F) {
-    sex <-  factor(sex, 
-                   levels = c(1,2), 
-                   ordered = F)
-  }
-  if (is.ordered(qimd)==F) {
-    qimd <- factor(qimd, 
-                   levels = c(1,2,3,4,5), 
-                   ordered = T)
-  }
-  
-  ex0sm1 <- data.frame(predict(smok.cess.success, data.table(endsmoke = endsmoke-1, sex = sex, qimd = qimd), type="response", se.fit=F))
-  ex0sm1[ex0sm1[1]>0.95, 1] <-1
-  ex1sm2 <- data.frame(predict(smok.cess.success, data.table(endsmoke = endsmoke+0, sex = sex, qimd = qimd), type="response", se.fit=F))
-  pr <- ex0sm1[[1]] - ex1sm2[[1]]
-  return(pr)
-}
-)
-#pred.ex0sm1(1:10, 1, 1)
 
+# Predicts probability of ex-smoker to become active smoker (relapse) (only works for 1<endsmoke<10). Else should be 0
+pred.ex0sm1 <- cmpfun(
+  function(endsmoke, sex, qimd, type = c("parabola", "log")) {
+    if (is.factor(sex)==F) {
+      sex <-  factor(sex, 
+                     levels = c(1,2), 
+                     ordered = F)
+    }
+    if (is.ordered(qimd)==F) {
+      qimd <- factor(qimd, 
+                     levels = c(1,2,3,4,5), 
+                     ordered = T)
+    }
+    
+    if (type == "parabola") {
+      ex0sm1 <-
+        as.data.table(
+          predict(
+            smok.cess.success.parabola,
+            data.table(endsmoke = bound(endsmoke, 1, 20), sex = sex, qimd = qimd), 
+            type = "response",
+            se.fit = T))
+    }
+    if (type == "log") {
+      ex0sm1 <- 
+        as.data.table(
+          predict(
+            smok.cess.success.log, 
+            data.table(endsmoke = bound(endsmoke, 1, 20), qimd = qimd),
+            type = "response", 
+            se.fit = T))
+    }
+    #pr <- rbinom(length(ex0sm1), 1, ex0sm1)
+    return(ex0sm1[, rbinom(.N, 1, bound(rnorm(.N, fit, se.fit)))])
+    #return(pr)
+  }
+)
+#pred.ex0sm1(1:10, 1, 1, "parabola")
 
 # Smoke prevalence --------------------------------------------------------
-# predicts the active smoker prevalence
-pred.sm0prev <- cmpfun(function(year, age, sex, qimd) {
-  if (is.factor(sex)==F) {
-    sex <-  factor(sex, 
-                   levels = c(1,2), 
-                   ordered = F)
-  }
-  if (is.ordered(qimd)==F) {
-    qimd <- factor(qimd, 
-                   levels = c(1,2,3,4,5), 
-                   ordered = T)
-  }
-  sm0prev <- predict(smok.active.svylr, data.table(year = year, age = age, sex = sex, qimd = qimd), type = "response", se.fit=F)
-  #return(sm0prev[[1]])
-  return(rbinom(length(sm0prev), 1, sm0prev))
-}
-)
+# predicts the active smoker prevalence for age 20
+pred.sm0prev <-
+  cmpfun(
+    function(year, sex, qimd) {
+      if (is.factor(sex)==F) {
+        sex <-  factor(sex, 
+                       levels = c(1,2), 
+                       ordered = F)
+      }
+      if (is.ordered(qimd)==F) {
+        qimd <- factor(qimd, 
+                       levels = c(1,2,3,4,5), 
+                       ordered = T)
+      }
+      
+      sm0prev <- as.data.table(predict(smok.active.svylr, data.table(year = year, sex = sex, qimd = qimd), type = "response", se.fit=T))
+      #return(sm0prev)
+      return(sm0prev[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
+    }
+  )
+
 # for (jj in 1:5) {
-#     plot(pred.sm0prev(0:50, 20, 1, jj), ylim=c(0,0.8))
+#     plot(pred.sm0prev(-10:10, 20, 1, jj), ylim=c(0, .8), main = as.character(jj))
 # }
 
+# Ex-Smoke prevalence --------------------------------------------------------
+# predicts the ex-smoker prevalence for age 20
+pred.ex0prev <-
+  cmpfun(
+    function(year, sex) {
+      if (is.factor(sex)==F) {
+        sex <-  factor(sex, 
+                       levels = c(1,2), 
+                       ordered = F)
+      }
+      
+      ex0prev <- as.data.table(predict(smok.exactive.svylr, data.table(year = year, sex = sex), type = "response", se.fit=T))
+      return(ex0prev[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
+    }
+  )
+
+# Smoke cigdyal --------------------------------------------------------
+# predicts number of cigars for active smokers
+pred.cigdyal <-
+  cmpfun(
+    function(year, sex, qimd, smokyrs) {
+      if (is.factor(sex)==F) {
+        sex <-  factor(sex, 
+                       levels = c(1,2), 
+                       ordered = F)
+      }
+      if (is.ordered(qimd)==F) {
+        qimd <- factor(qimd, 
+                       levels = c(1,2,3,4,5), 
+                       ordered = T)
+      }
+      cigdyal <- predict(smok.cigdyal.svylm, data.table(year = year, sex = sex, qimd = qimd, smokyrs = smokyrs),
+                         type = "response", se.fit=F)
+      #return(cigdyal)
+      nm <- rnbinom(length(cigdyal), mu = cigdyal, size = 3)
+      nm[nm == 0]<- 1
+      return(nm)
+    }
+  )
+
+# for (jj in 1:5) {
+#     plot(pred.cigdyal(-10:10, 20, 1, 5, jj), ylim=c(0, 50), main = as.character(jj))
+# }
 
 # BMI prediction ----------------------------------------------------------
 # Define function for bmi projection (predicts mean bmi)
-pred.bmi <- cmpfun(function(year, age, sex, qimd, a30to06m, lag = cvd.lag) {
-  if (is.factor(sex)==F) {
-    sex <-  factor(sex, 
-                   levels = c(1,2), 
-                   ordered = F)
-  }
-  if (is.ordered(qimd)==F) {
-    qimd <- factor(qimd, 
-                   levels = c(1,2,3,4,5), 
-                   ordered = T)
-  }
-  pr <- data.frame(
-    predict(
-      bmi.svylm, 
-      data.table(
-        year         = year - lag,
-        age          = age  - lag, 
-        sex          = sex, 
-        qimd         = qimd,
-        a30to06m.imp = a30to06m
-      ), 
-      type = "response", 
-      se.fit=T
-    )
+pred.bmi <- 
+  cmpfun(
+    function(year, age, sex, qimd, a30to06m, lag = cvd.lag) {
+      if (is.factor(sex)==F) {
+        sex <-  factor(sex, 
+                       levels = c(1,2), 
+                       ordered = F)
+      }
+      if (is.ordered(qimd)==F) {
+        qimd <- factor(qimd, 
+                       levels = c(1,2,3,4,5), 
+                       ordered = T)
+      }
+      pr <- data.frame(
+        predict(
+          bmi.svylm, 
+          data.table(
+            year         = year - lag,
+            age          = age  - lag, 
+            sex          = sex, 
+            qimd         = qimd,
+            a30to06m.imp = a30to06m
+          ), 
+          type = "response", 
+          se.fit=T
+        )
+      )
+      #return(pr[[1]])
+      return(rnorm(nrow(pr), pr[[1]], pr[[2]]))
+    }
   )
-  #return(pr[[1]])
-  return(rnorm(nrow(pr), pr[[1]], pr[[2]]))
-}
-)
 
 # test
 # summary(pred.bmi(sample(c(0:50), n, replace = T), 
@@ -463,25 +535,25 @@ pred.bmi <- cmpfun(function(year, age, sex, qimd, a30to06m, lag = cvd.lag) {
 #                  sample(c(1:5), n, replace = T),
 #                  sample(c(1,10), n, replace = T)))
 
-
 # Salt prediction ---------------------------------------------------------
 # Returns a dataframe of 24h salt percentiles by year, age, sex, qimd 
 pred.salt <- 
   cmpfun(
     function(year, lag = cancer.lag) {
-      year <- 
-        switch(EXPR = as.character((year - lag)),
-               "-16" =  lag - 8,
-               "-15" =  lag - 8.5, 
-               "-14" =  lag - 9,
-               "-13" =  lag - 9.5, 
-               "-12" =  lag - 9, #9
-               "-11" =  lag - 8.5, #8.5
-               "-10" =  lag - 8, #8
-               "-9"  =  lag - 7.7,
-               "-8"  =  lag - 7.5,
-               year
-        )
+      # year <- 
+        # switch(EXPR = as.character((year - lag)),
+        #        "-16" =  lag - 8,
+        #        "-15" =  lag - 8.5,
+        #        "-14" =  lag - 9,
+        #        "-13" =  lag - 9.5,
+        #        "-12" =  lag - 9,
+        #        "-11" =  lag - 8.5,
+        #        "-10" =  lag - 8,
+        #        "-9"  =  lag - 7.7,
+        #        "-8"  =  lag - 7.5,
+        #        year
+        # )
+      if (lag>4) lag <- 4
       
       tmp <- expand.grid(
         year = year-lag,
@@ -492,7 +564,7 @@ pred.salt <-
       )
       cc <- predict(salt.rq, tmp)^3
       
-      tmp <- data.table(cbind(tmp, cc))
+      tmp <- setDT(cbind(tmp, cc))
       tmp[, `:=` (year = NULL, age = age + lag)]
       setnames(tmp,
                paste0("tau= ", sprintf("%.2f", c(0.01, 1:19/20, 0.99))),
@@ -512,7 +584,6 @@ pred.salt <-
       return(tmp)
     }
   )
-
 
 # SBP prediction ----------------------------------------------------------
 # Define function for sbp projection (for DT needs the by= to work correctly with mean(bmival)) (predicts mean sbp)
@@ -552,17 +623,16 @@ pred.sbp <- cmpfun(function(year, age, sex, qimd, bmival, cigst1, a30to06m, lag 
 )
 
 #test
-# summary(pred.sbp(sample(c(0:50), n, replace = T), 
+# summary(pred.sbp(sample(c(0:50),  n, replace = T), 
 #                  sample(c(20,85), n, replace = T), 
-#                  sample(c(1,2), n, replace = T), 
-#                  sample(c(1:5), n, replace = T),
+#                  sample(c(1,2),   n, replace = T), 
+#                  sample(c(1:5),   n, replace = T),
 #                  runif(n, 10, 90),
-#                  sample(c(1,10), n, replace = T)))
-
+#                  sample(c(1,10),  n, replace = T)))
 
 # Chol prediction ---------------------------------------------------------
 # Define function for chol projection (for ages above 30)
-pred.chol <- cmpfun(function(year, age, sex, qimd, bmival, porftvg, a30to06m, lag = cvd.lag) {
+pred.chol <- cmpfun(function(year, age, sex, qimd, bmival, porftvg, lag = cvd.lag) {
   if (is.factor(sex)==F) {
     sex <-  factor(sex, 
                    levels = c(1,2), 
@@ -583,8 +653,7 @@ pred.chol <- cmpfun(function(year, age, sex, qimd, bmival, porftvg, a30to06m, la
         sex = sex, 
         qimd = qimd, 
         bmival = bmival, 
-        porftvg.imp = porftvg,
-        a30to06m.imp = a30to06m),
+        porftvg.imp = porftvg),
       type = "response", 
       se.fit=T
     )
@@ -602,115 +671,6 @@ pred.chol <- cmpfun(function(year, age, sex, qimd, bmival, porftvg, a30to06m, la
 #                   sample(c(1:5), n, replace = T),
 #                   runif(n, 10, 50),runif(n, 10, 20),
 #                   sample(c(1,10), n, replace = T)))
-
-# TC to HDL prediction ---------------------------------------------------------
-# Define function for hdl estimation
-pred.tctohdl <- cmpfun(function(cholval1, age, sex, qimd, bmival, a30to06m, cigst1, lag = cvd.lag) {
-  if (is.factor(sex)==F) {
-    sex <-  factor(sex, 
-                   levels = c(1,2), 
-                   ordered = F)
-  }
-  if (is.ordered(qimd)==F) {
-    qimd <- factor(qimd, 
-                   levels = c(1,2,3,4,5), 
-                   ordered = T)
-  }
-  bmival[bmival>40] <- 40 # otherwise predicts NAN values
-  cigst2 <- mapvalues(cigst1,  c(4:1 ), c(1,0,0,0))
-  pr <- data.frame(
-    predict(
-      tctohdl.svylm, 
-      data.table(
-        cholval1     = cholval1,
-        age          = age - lag, 
-        sex          = sex, 
-        qimd         = qimd, 
-        bmival       = bmival,
-        a30to06m.imp = a30to06m,
-        cigst1       = cigst2),
-      type = "response", 
-      se.fit=T
-    )
-  )
-  #return(pr[[1]])
-  #return(rtruncnorm(nrow(pr), a = 2.5, b = 12,  pr[[1]], pr[[2]]))
-  return(rnorm(nrow(pr), pr[[1]], pr[[2]]))
-}
-)
-
-# FamCVD prediction ---------------------------------------------
-pred.famcvd <- cmpfun(function(n, age, qimd) {
-  newdata <-
-    data.table(
-      age          = age, 
-      qimd         = qimd
-    )
-  
-  type <-"response"
-  total <- NULL
-  tt <- delete.response(terms(formula(famcvd.svylr)))
-  mf <- model.frame(tt, data = newdata)
-  mm <- model.matrix(tt, mf)
-  if (!is.null(total) && attr(tt, "intercept")) {
-    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
-      total
-  }
-  eta <- drop(mm %*% coef(famcvd.svylr))
-  eta <- switch(type, link = eta, response = famcvd.svylr$family$linkinv(eta))
-  rbinom(n, 1, eta)
-  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
-}
-)
-
-# AF prevalence prediction ---------------------------------------------
-pred.af <- cmpfun(function(n, age, qimd, cigst1) {
-  newdata <-
-    data.table(
-      age          = age, 
-      qimd         = qimd,
-      cigst1       = cigst1
-    )
-  
-  type <-"response"
-  total <- NULL
-  tt <- delete.response(terms(formula(af.svylr)))
-  mf <- model.frame(tt, data = newdata)
-  mm <- model.matrix(tt, mf)
-  if (!is.null(total) && attr(tt, "intercept")) {
-    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
-      total
-  }
-  eta <- drop(mm %*% coef(af.svylr))
-  eta <- switch(type, link = eta, response = af.svylr$family$linkinv(eta))
-  rbinom(n, 1, eta)
-  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
-}
-)
-
-# Kidney disease prevalence prediction ---------------------------------------------
-pred.kiddiag <- cmpfun(function(n, age, sex, qimd) {
-  newdata <-
-    data.table(
-      age          = age, 
-      sex          = sex,
-      qimd         = qimd    )
-  
-  type <-"response"
-  total <- NULL
-  tt <- delete.response(terms(formula(kiddiag.svylr)))
-  mf <- model.frame(tt, data = newdata)
-  mm <- model.matrix(tt, mf)
-  if (!is.null(total) && attr(tt, "intercept")) {
-    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
-      total
-  }
-  eta <- drop(mm %*% coef(kiddiag.svylr))
-  eta <- switch(type, link = eta, response = kiddiag.svylr$family$linkinv(eta))
-  rbinom(n, 1, eta)
-  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
-}
-)
 
 # BP medication prediction ---------------------------------------------
 pred.bpmed <- cmpfun(function(n, age, sex, qimd, omsysval) {
@@ -737,29 +697,184 @@ pred.bpmed <- cmpfun(function(n, age, sex, qimd, omsysval) {
 }
 )
 
-# Undiagnosed  prediction ---------------------------------------------
-pred.undiag.diab <- cmpfun(function(n, qimd, year) {
-  if (is.ordered(qimd)==F) {
-    qimd <- factor(qimd, 
-                   levels = c(1,2,3,4,5), 
-                   ordered = T)
-  }
-  newdata <-
-    data.table(
-      qimd = qimd)
+# Undiagnosed DM prediction ---------------------------------------------
+if (length(grep("health check", scenarios.list[[iterations]]))) {
+  load(file="./Lagtimes/undiag.diab.svylr.rda")
   
-  type <-"response"
-  total <- NULL
-  tt <- delete.response(terms(formula(undiag.diab.svylr)))
-  mf <- model.frame(tt, data = newdata)
-  mm <- model.matrix(tt, mf)
-  if (!is.null(total) && attr(tt, "intercept")) {
-    mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
-      total
-  }
-  eta <- drop(mm %*% coef(undiag.diab.svylr))
-  eta <- switch(type, link = eta, response = undiag.diab.svylr$family$linkinv(eta))
-  rbinom(n, 1, eta)
-  #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+  pred.undiag.diab <- cmpfun(
+    function(n, qimd, year) {
+      if (is.ordered(qimd)==F) {
+        qimd <- factor(qimd, 
+                       levels = c(1,2,3,4,5), 
+                       ordered = T)
+      }
+      newdata <-
+        data.table(
+          qimd = qimd)
+      
+      type <-"response"
+      total <- NULL
+      tt <- delete.response(terms(formula(undiag.diab.svylr)))
+      mf <- model.frame(tt, data = newdata)
+      mm <- model.matrix(tt, mf)
+      if (!is.null(total) && attr(tt, "intercept")) {
+        mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
+          total
+      }
+      eta <- drop(mm %*% coef(undiag.diab.svylr))
+      eta <- switch(type, link = eta, response = undiag.diab.svylr$family$linkinv(eta))
+      rbinom(n, 1, eta)
+      #return(rtruncnorm(nrow(pr), a = 0, b = 1, mean=pr[[1]], sd=pr[[2]])) 
+    }
+  )
 }
-)
+
+# COPD prevalence prediction ---------------------------------------------
+if ("C34" %in% diseasestoexclude) {
+  load(file="./Lagtimes/copd.svylr.rda")
+  
+  pred.copd <- cmpfun(
+    function(n, age, qimd, cigst1) {
+      if (!is.factor(cigst1)) {
+        cigst1 <- factor(cigst1, 
+                         levels = c(1,2,3,4), 
+                         ordered = F)
+      }
+      if (is.ordered(qimd)==F) {
+        qimd <- factor(qimd, 
+                       levels = c(1,2,3,4,5), 
+                       ordered = T)
+      }
+      newdata <-
+        data.table(
+          age          = age, 
+          qimd         = qimd,
+          cigst1       = cigst1)
+      
+      type <-"response"
+      total <- NULL
+      tt <- delete.response(terms(formula(copd.svylr)))
+      mf <- model.frame(tt, data = newdata)
+      mm <- model.matrix(tt, mf)
+      if (!is.null(total) && attr(tt, "intercept")) {
+        mm[, attr(tt, "intercept")] <- mm[, attr(tt, "intercept")] * 
+          total
+      }
+      eta <- drop(mm %*% coef(copd.svylr))
+      eta <- switch(type, link = eta, response = copd.svylr$family$linkinv(eta))
+      rbinom(n, 1, eta)
+    }
+  )
+  
+  # PLCO lung cancer model to estimate risk from -----
+  # Tammemägi M, et al. Evaluation of the Lung Cancer Risks at which to Screen Ever- and Never-Smokers:
+  # Screening Rules Applied to the PLCO and NLST Cohorts. PLoS medicine. 2014;11(12): e1001764.
+  # not to be applied on never smokers
+  tob.cum.risk <- 
+    cmpfun(
+      function(age, sex, sec, bmi, cigst1, cigdyal, numsmok, smokyrs, endsmoke, origin, i) { 
+        copd.h <- pred.copd(length(age), age, sec, 1) # hypothetical if never smokers. Biased as based on prevalence not incidence
+        copd.a <- pred.copd(length(age), age, sec, cigst1) # actual
+        
+        dt <- data.table(age, sex, i)
+        
+        # History of cancer: from Maddams J, et al. Projections of cancer
+        # prevalence in the United  Kingdom, 2010-2040. 
+        #Br J Cancer 2012; 107: 1195-1202 (table 5, scenario 1)
+        dt <- data.table(age, sex, i)
+        if (i < 9) {# before 2020
+          dt[age < 45             & sex =="1", hist.of.ca := rbinom(.N, 1, 381/1e5)]
+          dt[between(age, 45, 64) & sex =="1", hist.of.ca := rbinom(.N, 1, 2669/1e5)]
+          dt[age > 64             & sex =="1", hist.of.ca := rbinom(.N, 1, 12656/1e5)]
+          dt[age < 45             & sex =="2", hist.of.ca := rbinom(.N, 1, 525/1e5)]
+          dt[between(age, 45, 64) & sex =="2", hist.of.ca := rbinom(.N, 1, 4952/1e5)]
+          dt[age > 64             & sex =="2", hist.of.ca := rbinom(.N, 1, 12801/1e5)]
+        }
+        if (i >= 9 & i < 19) {# after 2020
+          dt[age < 45             & sex =="1", hist.of.ca := rbinom(.N, 1, 391/1e5)]
+          dt[between(age, 45, 64) & sex =="1", hist.of.ca := rbinom(.N, 1, 3037/1e5)]
+          dt[age > 64             & sex =="1", hist.of.ca := rbinom(.N, 1, 15558/1e5)]
+          dt[age < 45             & sex =="2", hist.of.ca := rbinom(.N, 1, 567/1e5)]
+          dt[between(age, 45, 64) & sex =="2", hist.of.ca := rbinom(.N, 1, 5914/1e5)]
+          dt[age > 64             & sex =="2", hist.of.ca := rbinom(.N, 1, 15909/1e5)]
+        }
+        if (i >= 19 & i < 29) {# after 2030
+          dt[age < 45             & sex =="1", hist.of.ca := rbinom(.N, 1, 424/1e5)]
+          dt[between(age, 45, 64) & sex =="1", hist.of.ca := rbinom(.N, 1, 3459/1e5)]
+          dt[age > 64             & sex =="1", hist.of.ca := rbinom(.N, 1, 18698/1e5)]
+          dt[age < 45             & sex =="2", hist.of.ca := rbinom(.N, 1, 655/1e5)]
+          dt[between(age, 45, 64) & sex =="2", hist.of.ca := rbinom(.N, 1, 7299/1e5)]
+          dt[age > 64             & sex =="2", hist.of.ca := rbinom(.N, 1, 19261/1e5)]
+        }
+        if (i >= 29 ) {# after 2040
+          dt[age < 45             & sex =="1", hist.of.ca := rbinom(.N, 1, 431/1e5)]
+          dt[between(age, 45, 64) & sex =="1", hist.of.ca := rbinom(.N, 1, 3632/1e5)]
+          dt[age > 64             & sex =="1", hist.of.ca := rbinom(.N, 1, 23301/1e5)]
+          dt[age < 45             & sex =="2", hist.of.ca := rbinom(.N, 1, 690/1e5)]
+          dt[between(age, 45, 64) & sex =="2", hist.of.ca := rbinom(.N, 1, 8419/1e5)]
+          dt[age > 64             & sex =="2", hist.of.ca := rbinom(.N, 1, 24852/1e5)]
+        }
+        
+        # Assuming hypothetical never smokers having 70% of the risk for cancer
+        dt[, hist.of.ca.h := hist.of.ca * rbinom(.N, 1, 0.7)]
+        
+        # Family history of lung cancer: from Maddams J, et al. Projections of cancer
+        # prevalence in the United  Kingdom, 2010-2040. 
+        # Br J Cancer 2012; 107: 1195-1202 (table 3, scenario 1)
+        # The prob of having ca is 120/1e5. So the probability of having at least
+        # one of 3 family members with diabetes is 1 - (1-120/1e5)^3. I let family
+        # members vary between 2 and 4
+        if (i < 9) { # before 2020
+          dt[, fam.hist.of.ca := 
+               dice(.N) < 1 -
+               (1-104/1e5)^(2 + rpois(.N, 1))]
+        }
+        if (i >= 9 & i < 19) { # after 2020
+          dt[, fam.hist.of.ca := 
+               dice(.N) < 1 -
+               (1-120/1e5)^(2 + rpois(.N, 1))]
+        }
+        if (i >= 19 & i < 29) { # after 2030
+          dt[, fam.hist.of.ca := 
+               dice(.N) < 1 -
+               (1-148/1e5)^(2 + rpois(.N, 1))]
+        }
+        if (i >= 29) { # after 2040
+          dt[, fam.hist.of.ca := 
+               dice(.N) < 1 -
+               (1-188/1e5)^(2 + rpois(.N, 1))]
+        }
+        
+        sec <- 3L - as.integer(as.character(sec)) # originaly education but I use it as proxy for 
+        # sec. Also centered around 4
+        
+        origin[origin == 1 | origin == 9] <- 0
+        origin[between(origin, 2, 5) | origin == 8] <- -0.5241286
+        origin[origin == 6 | origin == 7] <- 0.3211605
+        
+        # Probability of cancer if never smoker
+        risk.h <- exp((age - 62L) * 0.079597 - sec * 0.0879289 - (bmi - 27) * 0.028948 + 
+                        copd.h * 0.3457265 + dt$hist.of.ca.h * 0.4845208 + 
+                        dt$fam.hist.of.ca * 0.5856777 + origin - 7.02198)
+        
+        risk.h <- risk.h / (1 + risk.h)
+        
+        cigst1 <- c(2.542472, 2.799727)[1L + (cigst1 == "4")]
+        cigdyal <- cigdyal + numsmok
+        #cigdyal[cigdyal < 6] <- 6 # necessary, other wise smoking less than 6 cigarettes was protective
+        
+        # Probability of cancer for active smoker
+        risk.a <- exp((age - 62L) * 0.079597 - sec * 0.0879289 - (bmi - 27) * 0.028948 + 
+                        copd.a * 0.3457265 + dt$hist.of.ca * 0.4845208 + 
+                        dt$fam.hist.of.ca * 0.5856777 + origin - 7.02198 + cigst1 -
+                        ((((cigdyal)/100)^-1) - 4.021541613) * 0.1815486 +
+                        (smokyrs - 27) * 0.0305566 -
+                        (endsmoke - 8.593417626) * 0.0321362 * (cigst1 == 2.542472))
+        
+        risk.a <- risk.a / (1 + risk.a)
+        return(risk.a / risk.h) # Sampling error is not considered because not clearly reported and sample size was ~ 200.000
+        #return(cbind(risk.a, risk.h))
+      }
+    )
+}
+

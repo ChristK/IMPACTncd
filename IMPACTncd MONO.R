@@ -22,11 +22,13 @@ gc()
 options(datatable.verbose = F)
 
 # User input
-init.year <- 2011
+init.year <- 2006
 
-n <- 2e5  # Define the sample size
+widesynthpop <- F
 
-yearstoproject <- 7  # NEED TO force >=1 and up to 50
+n <- 1e5  # Define the sample size
+
+yearstoproject <- 3  # NEED TO force >=1 and up to 50
 
 numberofiterations <- 5
 
@@ -40,18 +42,20 @@ qdrisk <- T # Use QDrisk score for diabetes incidence
 
 Fertility.Assumption <- "N"  # Select (N)ormal, (H)igh or (L)ow fertility rate asumptions based on ONS scenarios. They do matter for accurate population statistics
 
-cvd.lag <- 5L # Avoid 0
-fatality.annual.improvement.chd    <- 3 # 3 means 3% annual improvement in fatality
-fatality.annual.improvement.stroke <- 3 # 3 means 3% annual improvement in fatality
-fatality.annual.improvement.c16    <- 2
+cvd.lag <- 5 
+fatality.annual.improvement.chd    <- 3L # 3 means 3% annual improvement in fatality
+fatality.annual.improvement.stroke <- 3L # 3 means 3% annual improvement in fatality
+fatality.annual.improvement.c16    <- 2L
+fatality.annual.improvement.c34    <- 2L
 
-fatality.sec.gradient.chd    <- 40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
-fatality.sec.gradient.stroke <- 40 # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
-fatality.sec.gradient.c16    <- 30
+fatality.sec.gradient.chd    <- 40L # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+fatality.sec.gradient.stroke <- 40L # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+fatality.sec.gradient.c16    <- 30L
+fatality.sec.gradient.c34    <- 30L
 
-cancer.lag <- 10L # Needs to be longer than cvd.lag to work properly (smoking histories)
+cancer.lag <- 8 
 
-clusternumber <- 4 # Change to your number of CPU cores 
+clusternumber <- 4L # Change to your number of CPU cores 
 
 paired <- T 
 
@@ -59,23 +63,8 @@ cleardirectories <- F # If T delete auxiliary output directories when simulation
 
 export.graphs <- F
 
-diseasestoexclude <- c("CHD", "stroke")  # Define disease to be excluded from lifetables
-{
-  # Ischaemic heart diseases (I20-I25)
-  # Stroke (I60-I69), 
-  # Malignant neoplasms of lip, oral cavity and pharynx (C00-C14) 
-  # Malignant neoplasm of oesophagus (C15) 
-  # Malignant neoplasm of stomach (C16)
-  # Malignant neoplasm of colon (C18) 
-  # Malignant neoplasm of rectosigmoid junction (C19) 
-  # Malignant neoplasm of rectum (C20)
-  # Malignant neoplasm of liver and intrahepatic bile ducts (C22)
-  # Malignant neoplasm of pancreas (C25) 
-  # Malignant neoplasm of larynx (C32) 
-  # Malignant neoplasm of trachea (C33)
-  # Malignant neoplasm of bronchus and lung (C34) 
-  # Malignant neoplasm of breast (C50) 
-}  # ICD10 code reminder for disease coding (http://apps.who.int/classifications/icd10/browse/2010/en#/I20-I25)
+diseasestoexclude <- c("CHD", "stroke", "C34", "C16")  # Define disease to be excluded from lifetables
+# ICD10 code reminder for disease coding (http://apps.who.int/classifications/icd10/browse/2010/en#/I20-I25)
 
 # *************************************************************************************************
 
@@ -101,7 +90,7 @@ if (Sys.info()[1] == "Linux") {
       stop("You need to install RCurl package.")
     if (Sys.info()["sysname"] != "Windows") 
       stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry.")
-    db.file <- paste(Sys.getenv("APPDATA"), "\\Dropbox\\host.db", sep = "")
+    db.file <- paste(Sys.getenv("LOCALAPPDATA"), "\\Dropbox\\host.db", sep = "")
     base64coded <- readLines(db.file, warn = F)[2]
     base64(base64coded, encode = F)
   }
@@ -110,7 +99,7 @@ if (Sys.info()[1] == "Linux") {
 
 # Main --------------------------------------------------------------------
 source(file = "./initialisation.R")
-
+#setthreads(1L)
 # Create lifetable without the disease(s) to be modelled. Lifetables were calculated using data from
 # England and Wales not just England. Minimal bias since we use probabilities.
 cat("Generating life table...\n\n")
@@ -124,8 +113,6 @@ sys.source(file = "./cluster functions.R", my.env)
 sys.source(file = "./diseases epidemiology.R", my.env)
 # Load synthetic population
 sys.source(file = "./load synthetic population.R", my.env)
-
-# Generating Incidence tables
 
 
 # Actual simulation
