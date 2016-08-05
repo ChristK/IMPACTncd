@@ -22,7 +22,11 @@
 # Assumes that the trends that where observed since 2001 will continue in the future
 cat("current trends scenario\n\n")
 
+
 if (i == (init.year - 2011)) {
+  policy.effect.cigdyal <- 0 # effect of policy on cigarette consumption
+  policy.effect.cigst1 <- 0 # effect of policy on smoking prevalence 
+  millenia <- FALSE
   # Function to apply after ageing
   post.ageing.scenario.fn <- function(i, env = my.env) {
     cat("Post ageing scenario function\n")

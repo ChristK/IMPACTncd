@@ -18,7 +18,7 @@
 ## Fifth Floor, Boston, MA 02110-1301  USA.
 
 
-# preample ----------------------------------------------------------------
+# preample ------------------------------------------
 # if (exists("scenarios.list") &
 #     "current trends.R" %in% scenarios.list) {
 #   
@@ -567,8 +567,8 @@ mcjobs[[36]] <- function () {
     tt[agegroup %in% c("65-69", "70-74"), agegroup := "65-74"]
     tt[agegroup %in% c("75-79", "80-84"), agegroup := "75-84"]
     tt <- tt[, .(pop = sum(pop),
-                             c34.mortality = sum(deaths)),
-                         by = .(agegroup, sex, qimd, year)]
+                 c34.mortality = sum(deaths)),
+             by = .(agegroup, sex, qimd, year)]
     tt[, `:=` (Model = "Observed", mean = c34.mortality / pop)]
     
     c34.mort <- rbind(c34.mort,c34.drates, tt, fill=T)
@@ -613,7 +613,7 @@ mcjobs[[36]] <- function () {
     
     #print(c34.men)
     #print(c34.women) 
-
+    
     # ggsave("./Validation/validation men c34.pdf", c34.men, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
     # ggsave("./Validation/validation women c34.pdf", c34.women, units = "in", device=cairo_pdf, family="Calibri", antialias = "subpixel", dpi=1200, width = 11.69, height = 8.27)
     
@@ -646,7 +646,7 @@ mcjobs[[36]] <- function () {
     ttt <- rbind(c34.incid, c34cases, fill = T)[agegroup %in% unique(agegroup.fn(30:84)), ]
     
     c34.incid.a <- ggplot(ttt[between(year, 2006, 2013),],
-                        aes(x=year, y=cases, colour=grp)) + 
+                          aes(x=year, y=cases, colour=grp)) + 
       geom_line(position=pd, size = 1, alpha = 3/5) +
       #geom_errorbar(aes(ymin= lui.pop, ymax = uui.pop), width=.05, position=pd, alpha=3/5) +
       #geom_smooth(method=lm, se=F) +
@@ -669,7 +669,7 @@ mcjobs[[36]] <- function () {
     #print(c34.incid.a)
     
     c34.incid.a.rates <- ggplot(ttt[between(year, 2006, 2013),],
-                          aes(x=year, y=mean * 1e5, colour=grp)) + 
+                                aes(x=year, y=mean * 1e5, colour=grp)) + 
       geom_line(position=pd, size = 1, alpha = 3/5) +
       #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
       #geom_smooth(method=lm, se=F) +
@@ -748,7 +748,7 @@ mcjobs[[36]] <- function () {
     c34.incid.e <- c34.incid + geom_errorbar(aes(ymin = lui.pop, ymax = uui.pop), width=.05, position=pd, alpha=3/5)
     
     c34.incid.rates <- ggplot(ttt[between(year, 2006, 2013),],
-                        aes(x=year, y=mean*1e5, colour=grp)) + 
+                              aes(x=year, y=mean*1e5, colour=grp)) + 
       geom_line(position=pd, size = 1, alpha = 3/5) +
       #geom_errorbar(aes(ymin= lui*100000, ymax = uui*100000), width=.05, position=pd, alpha=3/5) +
       #geom_smooth(method=lm, se=F) +
@@ -1862,7 +1862,60 @@ mcjobs[[15]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.cvd", ext), smok)
+  ggsave.mine(paste0(dir, "smok.act.s.cvd", ext), smok)
+  
+  dt1 = copy(Tables$smoking.cvd.S[scenario == "Current Policy", ])
+  dt2 = copy(Tables$nev.smoking.cvd.S[scenario == "Current Policy", ])
+  
+  dt <- dt1[dt2, on = c("year.cvdlag", "sex" ), `:=` (
+    mean = 1 - mean - i.mean,
+    lui  = 1 - lui  - i.lui,
+    uui  = 1 - uui  - i.uui)]
+  dt[, year := year.cvdlag]
+  dt2 <- setnames(
+    data.table(
+      svyby(~I(cigst1 > 1 & cigst1 < 4), ~sex + year, HSE.ts.srv.int, svymean, na.rm = T)
+    ), 
+    c("I(cigst1 > 1 & cigst1 < 4)TRUE", "se.I(cigst1 > 1 & cigst1 < 4)TRUE"), c("mean", "se")
+  )
+  
+  dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
+  dt2[, lui := mean - 1.96 * se]
+  dt2[, uui := mean + 1.96 * se]
+  dt2[, scenario := "Observed"]
+  dt2[, year := year + 2011]
+  dt <- rbind(dt, dt2, fill = T)
+  
+  smok <- 
+    ggplot(dt[between(year, sy, 2012)],
+           aes(x = year + 0.5, 
+               y = mean,
+               colour = scenario)) + 
+    geom_errorbar(
+      aes(
+        ymin = lui, 
+        ymax = uui
+      )
+    ) +
+    geom_point(size = 2, alpha = 4/5) +
+    geom_smooth(method=lm, se=F) +
+    facet_grid(sex ~ .) +
+    scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
+    scale_y_continuous(name="Prevalence",labels = percent_format()) +
+    theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
+    ggtitle("Ex smoking prevalence (ages 30 - 84)") +
+    theme(text = element_text(family = "Calibri", size = 14)) +
+    theme(plot.title = element_text(family = "Calibri", face = "bold", size = 16)) + 
+    theme(strip.text.x = element_text(size = 12, face = "bold"),
+          strip.text.y = element_text(size = 12, face = "bold"),
+          strip.background = element_rect(colour = "purple", fill = "#CCCCFF")) +
+    scale_fill_manual(values = cbbPalette,
+                      name = "") +
+    scale_colour_manual(values = cbbPalette,
+                        name = "")
+  # print(smok)
+  
+  ggsave.mine(paste0(dir, "smok.ex.s.cvd", ext), smok)
 }
 
 # Smoking cvd QIMD validation ------------------------------------------------------
@@ -1920,7 +1973,61 @@ mcjobs[[16]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.cvd.q", ext), smok)
+  ggsave.mine(paste0(dir, "smok.act.q.cvd", ext), smok)
+  
+  dt1 = copy(Tables$smoking.cvd.SQ[scenario == "Current Policy", ])
+  dt2 = copy(Tables$nev.smoking.cvd.SQ[scenario == "Current Policy", ])
+  dt <- dt1[dt2, on = c("year.cvdlag", "sex", "qimd" ), `:=` (
+    mean = 1 - mean - i.mean,
+    lui  = 1 - lui  - i.lui,
+    uui  = 1 - uui  - i.uui)]
+  
+  dt[, year := year.cvdlag]
+  
+  dt2 <- setnames(
+    data.table(
+      svyby(~I(cigst1 > 1 & cigst1 < 4), ~sex + qimd + year, HSE.ts.srv.int, svymean, na.rm = T)
+    ), 
+    c("I(cigst1 > 1 & cigst1 < 4)TRUE", "se.I(cigst1 > 1 & cigst1 < 4)TRUE"), c("mean", "se")
+  )
+  
+  dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
+  dt2[, lui := mean - 1.96 * se]
+  dt2[, uui := mean + 1.96 * se]
+  dt2[, scenario := "Observed"]
+  dt2[, year := year + 2011]
+  dt <- rbind(dt, dt2, fill = T)
+  
+  smok <- 
+    ggplot(dt[between(year, sy, 2012)],
+           aes(x = year + 0.5, 
+               y = mean,
+               colour = scenario)) + 
+    geom_errorbar(
+      aes(
+        ymin = lui, 
+        ymax = uui
+      )
+    ) +
+    geom_point(size = 2, alpha = 4/5) +
+    geom_smooth(method=lm, se=F) +
+    facet_grid(sex ~ qimd, labeller = qimd_labeller) +
+    scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
+    scale_y_continuous(name="Prevalence",labels = percent_format()) +
+    theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
+    ggtitle("Ex smoking prevalence (ages 30 - 84)") +
+    theme(text = element_text(family = "Calibri", size = 14)) +
+    theme(plot.title = element_text(family = "Calibri", face = "bold", size = 16)) + 
+    theme(strip.text.x = element_text(size = 12, face = "bold"),
+          strip.text.y = element_text(size = 12, face = "bold"),
+          strip.background = element_rect(colour = "purple", fill = "#CCCCFF")) +
+    scale_fill_manual(values = cbbPalette,
+                      name = "") +
+    scale_colour_manual(values = cbbPalette,
+                        name = "")
+  # print(smok)
+  
+  ggsave.mine(paste0(dir, "smok.ex.q.cvd", ext), smok)
 }
 
 # Smoking cvd agegroup validation ------------------------------------------------------
@@ -1980,7 +2087,63 @@ mcjobs[[17]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.cvd.a", ext), smok)
+  ggsave.mine(paste0(dir, "smok.act.a.cvd", ext), smok)
+  
+  dt1 = copy(Tables$smoking.cvd.SA[scenario == "Current Policy", ])
+  dt2 = copy(Tables$nev.smoking.cvd.SA[scenario == "Current Policy", ])
+  dt <- dt1[dt2, on = c("year.cvdlag", "sex", "agegroup" ), `:=` (
+    mean = 1 - mean - i.mean,
+    lui  = 1 - lui  - i.lui,
+    uui  = 1 - uui  - i.uui)]
+  
+  dt[, year := year.cvdlag]
+  dt <- dt[agegroup %in% unique(agegroup.fn(20:ageH))]
+  
+   dt2 <- setnames(
+    data.table(
+      svyby(~I(cigst1 > 1 & cigst1 < 4), ~sex + agegroup + year, HSE.ts.srv.int, svymean, na.rm = T)
+    ), 
+    c("I(cigst1 > 1 & cigst1 < 4)TRUE", "se.I(cigst1 > 1 & cigst1 < 4)TRUE"), c("mean", "se")
+  )
+  
+  dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
+  dt2[, lui := mean - 1.96 * se]
+  dt2[, uui := mean + 1.96 * se]
+  dt2[, scenario := "Observed"]
+  dt2[, year := year + 2011]
+  dt <- rbind(dt, dt2, fill = T)
+  
+  smok <- 
+    ggplot(dt[between(year, sy, 2012)],
+           aes(x = year + 0.5, 
+               y = mean,
+               colour = scenario)) + 
+    geom_errorbar(
+      aes(
+        ymin = lui, 
+        ymax = uui
+      )
+    ) +
+    #geom_line(position = pd, size = 0.5, alpha = 4/4, se = F) +
+    geom_point(size = 2, alpha = 4/5) +
+    geom_smooth(method=lm, se=F) +
+    facet_grid(sex ~ agegroup) +
+    scale_x_continuous(name = "Year", breaks = seq(sy, 2013, 3)) +
+    scale_y_continuous(name="Prevalence",labels = percent_format()) +
+    theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
+    ggtitle("Ex smoking prevalence (ages 20 - 84)") +
+    theme(text = element_text(family = "Calibri", size = 10)) +
+    theme(plot.title = element_text(family = "Calibri", face = "bold", size = 14)) + 
+    theme(strip.text.x = element_text(size = 12, face = "bold"),
+          strip.text.y = element_text(size = 12, face = "bold"),
+          strip.background = element_rect(colour = "purple", fill = "#CCCCFF")) +
+    scale_fill_manual(values = cbbPalette,
+                      name = "") +
+    scale_colour_manual(values = cbbPalette,
+                        name = "")
+  # print(smok)
+  
+  ggsave.mine(paste0(dir, "smok.ex.a.cvd", ext), smok)
 }
 
 # Smoking cvd (never) validation ------------------------------------------------------
@@ -2039,7 +2202,7 @@ mcjobs[[18]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.cvd.nev", ext), smok)
+  ggsave.mine(paste0(dir, "smok.nev.s.cvd", ext), smok)
 }
 
 # Smoking cvd QIMD (never)validation ------------------------------------------------------
@@ -2097,7 +2260,7 @@ mcjobs[[19]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.cvd.nev.q", ext), smok)
+  ggsave.mine(paste0(dir, "smok.nev.q.cvd.", ext), smok)
 }
 
 # Smoking cvd agegroup (never) validation ------------------------------------------------------
@@ -2156,14 +2319,13 @@ mcjobs[[20]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.cvd.nev.a", ext), smok)
+  ggsave.mine(paste0(dir, "smok.nev.a.cvd", ext), smok)
 }
 
 # Smoking curr validation ------------------------------------------------------
 mcjobs[[21]] <- function () {
   dt = copy(Tables$smoking.curr.S[scenario == "Current Policy", ])
-  dt[, year := year]
-  
+
   HSE.ts = copy(HSE.ts2)
   agegroup.fn(HSE.ts)
   HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
@@ -2213,14 +2375,67 @@ mcjobs[[21]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.curr", ext), smok)
+  ggsave.mine(paste0(dir, "smok.act.s.curr", ext), smok)
+  
+  dt1 = copy(Tables$smoking.curr.S[scenario == "Current Policy", ])
+  dt2 = copy(Tables$nev.smoking.curr.S[scenario == "Current Policy", ])
+  dt <- dt1[dt2, on = c("year", "sex" ), `:=` (
+    mean = 1 - mean - i.mean,
+    lui  = 1 - lui  - i.lui,
+    uui  = 1 - uui  - i.uui)]
+
+  
+  dt2 <- setnames(
+    data.table(
+      svyby(~I(cigst1 > 1 & cigst1 < 4), ~sex + year, HSE.ts.srv.int, svymean, na.rm = T)
+    ), 
+    c("I(cigst1 > 1 & cigst1 < 4)TRUE", "se.I(cigst1 > 1 & cigst1 < 4)TRUE"), c("mean", "se")
+  )
+  
+  dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
+  dt2[, lui := mean - 1.96 * se]
+  dt2[, uui := mean + 1.96 * se]
+  dt2[, scenario := "Observed"]
+  dt2[, year := year + 2011]
+  dt <- rbind(dt, dt2, fill = T)
+  
+  smok <- 
+    ggplot(dt[between(year, sy, 2012)],
+           aes(x = year + 0.5, 
+               y = mean,
+               colour = scenario)) + 
+    geom_errorbar(
+      aes(
+        ymin = lui, 
+        ymax = uui
+      )
+    ) +
+    geom_smooth(method=lm, se=F) +
+    geom_point(size = 2, alpha = 4/5) +
+    facet_grid(sex ~ .) +
+    scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
+    scale_y_continuous(name="Prevalence",labels = percent_format()) +
+    theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
+    ggtitle("Ex smoking prevalence (ages 30 - 84)") +
+    theme(text = element_text(family = "Calibri", size = 14)) +
+    theme(plot.title = element_text(family = "Calibri", face = "bold", size = 16)) + 
+    theme(strip.text.x = element_text(size = 12, face = "bold"),
+          strip.text.y = element_text(size = 12, face = "bold"),
+          strip.background = element_rect(colour = "purple", fill = "#CCCCFF")) +
+    scale_fill_manual(values = cbbPalette,
+                      name = "") +
+    scale_colour_manual(values = cbbPalette,
+                        name = "")
+  # print(smok)
+  
+  ggsave.mine(paste0(dir, "smok.ex.s.curr", ext), smok)
 }
+
 
 # Smoking curr QIMD validation ------------------------------------------------------
 mcjobs[[22]] <- function () {
   dt = copy(Tables$smoking.curr.SQ[scenario == "Current Policy", ])
-  dt[, year := year]
-  
+
   HSE.ts = copy(HSE.ts2)
   agegroup.fn(HSE.ts)
   HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
@@ -2270,13 +2485,65 @@ mcjobs[[22]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.curr.q", ext), smok)
+  ggsave.mine(paste0(dir, "smok.act.q.curr", ext), smok)
+  
+  dt1 = copy(Tables$smoking.curr.SQ[scenario == "Current Policy", ])
+  dt2 = copy(Tables$nev.smoking.curr.SQ[scenario == "Current Policy", ])
+  dt <- dt1[dt2, on = c("year", "sex", "qimd" ), `:=` (
+    mean = 1 - mean - i.mean,
+    lui  = 1 - lui  - i.lui,
+    uui  = 1 - uui  - i.uui)]
+
+  dt2 <- setnames(
+    data.table(
+      svyby(~I(cigst1 > 1 & cigst1 < 4), ~sex + qimd + year, HSE.ts.srv.int, svymean, na.rm = T)
+    ), 
+    c("I(cigst1 > 1 & cigst1 < 4)TRUE", "se.I(cigst1 > 1 & cigst1 < 4)TRUE"), c("mean", "se")
+  )
+  
+  dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
+  dt2[, lui := mean - 1.96 * se]
+  dt2[, uui := mean + 1.96 * se]
+  dt2[, scenario := "Observed"]
+  dt2[, year := year + 2011]
+  dt <- rbind(dt, dt2, fill = T)
+  
+  smok <- 
+    ggplot(dt[between(year, sy, 2012)],
+           aes(x = year + 0.5, 
+               y = mean,
+               colour = scenario)) + 
+    geom_errorbar(
+      aes(
+        ymin = lui, 
+        ymax = uui
+      )
+    ) +
+    geom_smooth(method=lm, se=F) +
+    geom_point(size = 2, alpha = 4/5) +
+    facet_grid(sex ~ qimd, labeller = qimd_labeller) +
+    scale_x_continuous(name = "Year", breaks = c(sy:2013)) +
+    scale_y_continuous(name="Prevalence",labels = percent_format()) +
+    theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
+    ggtitle("Ex smoking prevalence (ages 30 - 84)") +
+    theme(text = element_text(family = "Calibri", size = 14)) +
+    theme(plot.title = element_text(family = "Calibri", face = "bold", size = 16)) + 
+    theme(strip.text.x = element_text(size = 12, face = "bold"),
+          strip.text.y = element_text(size = 12, face = "bold"),
+          strip.background = element_rect(colour = "purple", fill = "#CCCCFF")) +
+    scale_fill_manual(values = cbbPalette,
+                      name = "") +
+    scale_colour_manual(values = cbbPalette,
+                        name = "")
+  # print(smok)
+  
+  ggsave.mine(paste0(dir, "smok.ex.q.curr", ext), smok)
+  
 }
 
 # Smoking curr agegroup validation ------------------------------------------------------
 mcjobs[[23]] <- function () {
   dt = copy(Tables$smoking.curr.SA[scenario == "Current Policy", ])
-  dt[, year := year]
   dt <- dt[agegroup %in% unique(agegroup.fn(20:ageH)) ,]
   
   HSE.ts = copy(HSE.ts2)
@@ -2328,7 +2595,61 @@ mcjobs[[23]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.curr.a", ext), smok)
+  ggsave.mine(paste0(dir, "smok.act.a.curr", ext), smok)
+  
+  dt1 = copy(Tables$smoking.curr.SA[scenario == "Current Policy", ])
+  dt2 = copy(Tables$nev.smoking.curr.SA[scenario == "Current Policy", ])
+  dt <- dt1[dt2, on = c("year", "sex", "agegroup"), `:=` (
+    mean = 1 - mean - i.mean,
+    lui  = 1 - lui  - i.lui,
+    uui  = 1 - uui  - i.uui)]
+  dt <- dt[agegroup %in% unique(agegroup.fn(20:ageH)) ,]
+  
+  dt2 <- setnames(
+    data.table(
+      svyby(~I(cigst1 > 1 & cigst1 < 4), ~sex + agegroup + year, HSE.ts.srv.int, svymean, na.rm = T)
+    ), 
+    c("I(cigst1 > 1 & cigst1 < 4)TRUE", "se.I(cigst1 > 1 & cigst1 < 4)TRUE"), c("mean", "se")
+  )
+  
+  dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
+  dt2[, lui := mean - 1.96 * se]
+  dt2[, uui := mean + 1.96 * se]
+  dt2[, scenario := "Observed"]
+  dt2[, year := year + 2011]
+  dt <- rbind(dt, dt2, fill = T)
+  
+  smok <- 
+    ggplot(dt[between(year, sy, 2012)],
+           aes(x = year + 0.5, 
+               y = mean,
+               colour = scenario)) + 
+    geom_errorbar(
+      aes(
+        ymin = lui, 
+        ymax = uui
+      )
+    ) +
+    geom_smooth(method=lm, se=F) +
+    geom_point(size = 2, alpha = 4/5) +
+    facet_grid(sex ~ agegroup) +
+    scale_x_continuous(name = "Year", breaks = seq(sy, 2013, 3)) +
+    scale_y_continuous(name="Prevalence",labels = percent_format()) +
+    theme(axis.text.x  = element_text(angle = 90, vjust = 0.5)) + 
+    ggtitle("Ex smoking prevalence (ages 20 - 84)") +
+    theme(text = element_text(family = "Calibri", size = 10)) +
+    theme(plot.title = element_text(family = "Calibri", face = "bold", size = 14)) + 
+    theme(strip.text.x = element_text(size = 12, face = "bold"),
+          strip.text.y = element_text(size = 12, face = "bold"),
+          strip.background = element_rect(colour = "purple", fill = "#CCCCFF")) +
+    scale_fill_manual(values = cbbPalette,
+                      name = "") +
+    scale_colour_manual(values = cbbPalette,
+                        name = "")
+  # print(smok)
+  
+  ggsave.mine(paste0(dir, "smok.ex.a.curr", ext), smok)
+  
 }
 
 # Smoking curr (never) validation ------------------------------------------------------
@@ -2385,7 +2706,7 @@ mcjobs[[24]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.curr.nev", ext), smok)
+  ggsave.mine(paste0(dir, "smok.nev.s.curr", ext), smok)
 }
 
 # Smoking curr QIMD (never)validation ------------------------------------------------------
@@ -2442,7 +2763,7 @@ mcjobs[[25]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.curr.nev.q", ext), smok)
+  ggsave.mine(paste0(dir, "smok.nev.q.curr", ext), smok)
 }
 
 # Smoking curr agegroup (never) validation ------------------------------------------------------
@@ -2500,7 +2821,7 @@ mcjobs[[26]] <- function () {
                         name = "")
   # print(smok)
   
-  ggsave.mine(paste0(dir, "smok.curr.nev.a", ext), smok)
+  ggsave.mine(paste0(dir, "smok.nev.a.curr", ext), smok)
 }
 
 # Diabetes validation ----------------------------------------------------------
@@ -2868,9 +3189,9 @@ mcjobs[[33]] <- function () {
   
   dt2 <- setnames(
     data.table(
-      svyby(~I(porftvg) > 4, ~sex + year, HSE.ts.srv.int, svymean, na.rm = T)
+      svyby(~I(porftvg > 4), ~sex + year, HSE.ts.srv.int, svymean, na.rm = T)
     ),
-    c("I(porftvg) > 4TRUE", "se.I(porftvg) > 4TRUE"), c("mean", "se")
+    c("I(porftvg > 4)TRUE", "se.I(porftvg > 4)TRUE"), c("mean", "se")
   )
   dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
   dt2[, lui := mean - 1.96 * se]
@@ -2926,9 +3247,9 @@ mcjobs[[34]] <- function () {
   
   dt2 <- setnames(
     data.table(
-      svyby(~I(porftvg) > 4, ~sex + qimd + year, HSE.ts.srv.int, svymean, na.rm = T)
+      svyby(~I(porftvg > 4), ~sex + qimd + year, HSE.ts.srv.int, svymean, na.rm = T)
     ),
-    c("I(porftvg) > 4TRUE", "se.I(porftvg) > 4TRUE"), c("mean", "se")
+    c("I(porftvg > 4)TRUE", "se.I(porftvg > 4)TRUE"), c("mean", "se")
   )
   dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
   dt2[, lui := mean - 1.96 * se]
@@ -2985,9 +3306,9 @@ mcjobs[[35]] <- function () {
   
   dt2 <- setnames(
     data.table(
-      svyby(~I(porftvg) > 4, ~sex + agegroup + year, HSE.ts.srv.int, svymean, na.rm = T)
+      svyby(~I(porftvg > 4), ~sex + agegroup + year, HSE.ts.srv.int, svymean, na.rm = T)
     ),
-    c("I(porftvg) > 4TRUE", "se.I(porftvg) > 4TRUE"), c("mean", "se")
+    c("I(porftvg > 4)TRUE", "se.I(porftvg > 4)TRUE"), c("mean", "se")
   )
   dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
   dt2[, lui := mean - 1.96 * se]
@@ -3031,7 +3352,7 @@ mcjobs[[35]] <- function () {
 # Packyears ---------------------------------------------------------------
 mcjobs[[37]] <- function () {
   dt = copy(Tables$packyears.S[scenario == "Current Policy", ])
-
+  
   HSE.ts = copy(HSE.ts2)
   HSE.ts[startsmk == 97, startsmk := NA]
   HSE.ts[cigst1 == 4, smokyrs:= age - startsmk]
@@ -3041,9 +3362,9 @@ mcjobs[[37]] <- function () {
   HSE.ts[cigst1 == 3, packyears := numsmok * smokyrs/20]
   HSE.ts[cigst1 == 2, packyears := smokyrs/20]
   HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F,
-                                data = HSE.ts, check.strata = T)
+                              data = HSE.ts, check.strata = T)
   HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
-                               is.na(packyears) == F)
+                             is.na(packyears) == F)
   
   dt2 <- setnames(data.table(svyby(~packyears, ~sex + year, HSE.ts.srv.int, svymean, na.rm = T)), "packyears", "mean")
   dt2[, sex := factor(sex, 1:2, c("Men", "Women"))]
@@ -3085,7 +3406,7 @@ mcjobs[[37]] <- function () {
   ggsave.mine(paste0(dir, "packyears", ext), packyears)
   
   dt = copy(Tables$packyears.SQ[scenario == "Current Policy", ])
-
+  
   HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
   HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= ageL & age <= ageH & wt.int > 0 & 
                              is.na(packyears) == F & !is.na(qimd))
@@ -3130,7 +3451,7 @@ mcjobs[[37]] <- function () {
   ggsave.mine(paste0(dir, "packyears.q", ext), packyears.q)
   
   dt = copy(Tables$packyears.SA[scenario == "Current Policy", ])
-
+  
   HSE.ts.srv.int <- svydesign(id = ~psu, strata = ~cluster, weights = ~wt.int, nest = F, data = HSE.ts, check.strata = T)
   HSE.ts.srv.int <- subset(HSE.ts.srv.int, age >= 20L & age <= ageH & wt.int > 0 & 
                              is.na(packyears) == F & !is.na(agegroup))

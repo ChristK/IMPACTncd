@@ -22,13 +22,14 @@ load(file="./Lagtimes/bmi.svylm.rda")
 load(file="./Lagtimes/chol.svylm.rda")
 load(file="./Lagtimes/sbp.svylm.rda")
 load(file="./Lagtimes/diab.svylr.rda")
-load(file="./Lagtimes/smok.active.svylr.rda")
-load(file="./Lagtimes/smok.exactive.svylr.rda")
+#load(file="./Lagtimes/smok.active.svylr.rda")
+#load(file="./Lagtimes/smok.exactive.svylr.rda")
 load(file="./Lagtimes/smok.cess.svylr.rda")
-load(file="./Lagtimes/smok.cess.success.log.rda")
-load(file="./Lagtimes/smok.cess.success.parabola.rda")
+#load(file="./Lagtimes/smok.cess.success.log.rda")
+#load(file="./Lagtimes/smok.cess.success.parabola.rda")
 load(file="./Lagtimes/smok.start.svylr.rda")
-load(file="./Lagtimes/smok.cigdyal.svylm.rda")
+#load(file="./Lagtimes/smok.cigdyal.svylm.rda")
+load(file="./Lagtimes/cigdyal.svylr.rda")
 load(file="./Lagtimes/fv.svylr.rda")
 load(file="./Lagtimes/pa.svylr.rda")
 load(file="./Lagtimes/salt.rq.rda")
@@ -39,7 +40,10 @@ cat("Load RF trajectories\n")
 # PA prediction ---------------------------------------
 PA.intervention <- 0L
 PA.intervention.success <- 1 # eg 0.8 means 80% will increase pa by the intervention days
-pred.pa <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
+pred.pa <-
+  cmpfun(
+    function(year, age, sex, qimd, percentil.rank, lag = cvd.lag, fortune = 0.1) {
+      percentil.rank <- bound(jitter(percentil.rank, amount = fortune)) 
   if (is.factor(sex)==F) {
     sex <-  factor(sex, 
                    levels = c(1,2), 
@@ -74,7 +78,7 @@ pred.pa <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
                             eta))
   set(cc, NULL, "V8", 1)
   #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
-  set(cc, NULL, "d", dice(nrow(cc)))
+  set(cc, NULL, "d", percentil.rank)
   for (k in 1:8) set(cc, NULL, k, cc[, Reduce(`<`, .SD), .SDcol = c(k, 9)])
   cc[, a30 :=  Reduce(`+`, .SD), .SDcol = 1:8]
   
@@ -92,7 +96,10 @@ pred.pa <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
 # F&V prediction --------------------------------------
 FV.intervention <- 0L
 FV.intervention.success <- 1 # eg 0.8 means 80% will increase f&v by the intervention portions
-pred.fv <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
+pred.fv <- 
+  cmpfun(
+    function(year, age, sex, qimd, percentil.rank, lag = cvd.lag, fortune = 0.1) {
+  percentil.rank <- bound(jitter(percentil.rank, amount = fortune)) 
   if (is.factor(sex)==F) {
     sex <-  factor(sex, 
                    levels = c(1,2), 
@@ -127,7 +134,7 @@ pred.fv <- cmpfun(function(year, age, sex, qimd, lag = cvd.lag) {
                             eta))
   set(cc, NULL, "V9", 1)
   #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
-  set(cc, NULL, "d", dice(nrow(cc)))
+  set(cc, NULL, "d", percentil.rank)
   for (k in 1:9) set(cc, NULL, k, cc[, Reduce(`<`, .SD), .SDcol = c(k, 10)])
   cc[, fv :=  Reduce(`+`, .SD), .SDcol = 1:9]
   
@@ -326,34 +333,56 @@ pred.diab.incid.lag <- cmpfun(function(age, sex, qimd, bmival, a30to06m, lag) {
 # Smoke initiation --------------------------------------------------------
 # Gives the annual probability of a never smoker to become  smoker next year
 # all other remain never smokers
-pred.nev0sm1 <- cmpfun(
-  function(year, age, sex, qimd) {
-    #qimd <- mapvalues(qimd,  c(1:5 ), c(1,2,2,2,2))
-    if (is.factor(sex)==F) {
-      sex <-  factor(sex, 
-                     levels = c(1,2), 
-                     ordered = F)
+pred.nev0sm1 <- 
+  cmpfun(
+    function(year, age, sex, qimd, rank, policy.effect=0, millenia=FALSE) {
+      #qimd <- mapvalues(qimd,  c(1:5 ), c(1,2,2,2,2))
+      if (is.factor(sex)==F) {
+        sex <-  factor(sex, 
+                       levels = c(1,2), 
+                       ordered = F)
+      }
+      if (is.ordered(qimd)==F) {
+        qimd <- factor(qimd, 
+                       levels = c(1,2,3,4,5), 
+                       ordered = T)
+      }
+      new.data <- data.table(year = year, 
+                             age = age, 
+                             sex = sex, 
+                             qimd = qimd)
+      pnev0sm1 <- 
+        as.data.table(
+          predict(smok.start.svylr,
+                  new.data,
+                  type = "response", se.fit=T)) # prev of ever smoker
+      
+      if (millenia == TRUE) {
+        pnev0sm1 <- cbind.dt(pnev0sm1, new.data)
+        if (pnev0sm1[(year + 2011 - age) >= 2000, .N] > 0) {
+          pnev0sm1[(year + 2011 - age) >= 2000, 
+                   prv := (1 - policy.effect) * rnorm(.N, response, SE)]
+        }
+        if (pnev0sm1[(year + 2011 - age) < 2000, .N] > 0) {
+          pnev0sm1[(year + 2011 - age) < 2000, 
+                   prv := rnorm(.N, response, SE)]
+        }
+        return(1L + (rank > (1 - pnev0sm1[, prv])))
+      } 
+      
+      if (millenia == FALSE) {
+        return(1L + (rank > (1 - pnev0sm1[, (1 - policy.effect) * rnorm(.N, response, SE)]))) #2 or T means they start smoking.
+      }
     }
-    if (is.ordered(qimd)==F) {
-      qimd <- factor(qimd, 
-                     levels = c(1,2,3,4,5), 
-                     ordered = T)
-    }
-    age <- cut(bound(age, 20, 50), c(-Inf, 22, 30, 35, 50))
-    pnev0sm1 <- as.data.table(predict(smok.start.svylr, data.table(year = year, age2 = age, sex = sex, qimd = qimd), type = "response", se.fit=T))
-    return(pnev0sm1[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
-    #return(rbinom(pnev0sm1[, .N], 1, pnev0sm1[, response]))
-  }
-)
-
-# plot(pred.nev0sm1(0, 16:60, 1), ylim=c(0,0.5))
+  )
+# plot(pred.nev0sm1(0, 16:90, 1, 1, 1), ylim=c(0,1))
 # lines(pred.nev0sm1(16:60, "3"), ylim=c(0,0.2))
 
 # Smoke cessation ---------------------------------------------------------
-# Predicts the annual probability of a smoker to become ex-smoker
+# Predicts the annual probability of a smoker to become ex-smoker and vice versa
 pred.sm0ex1 <- 
   cmpfun(
-    function(year, age, sex, qimd) {
+    function(year, age, sex, qimd, rank, policy.effect = 0, millenia = FALSE) {
       if (is.factor(sex)==F) {
         sex <-  factor(sex, 
                        levels = c(1,2), 
@@ -365,112 +394,135 @@ pred.sm0ex1 <-
                        ordered = T)
       }
       
+      new.data <- data.table(
+        year = year, 
+        age = age, 
+        sex = sex,
+        qimd = qimd)    
+      
       sm0ex1 <- as.data.table(
         predict(
           smok.cess.svylr,
-          data.table(
-            year = year, age = bound(age, 20, 75), sex = sex, qimd = qimd), 
+          new.data, 
           type   = "response", 
-          se.fit = T)
+          se.fit = T) # preval of ex-smokers among ever smokers
       )
-      return(sm0ex1[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
-      #return(rbinom(sm0ex1[, .N], 1, sm0ex1[, response]))
-      #return(sm0ex1[])
+      
+      if (millenia == TRUE) {
+        sm0ex1 <- cbind.dt(sm0ex1, new.data)
+        if (sm0ex1[(year + 2011 - age) >= 2000, .N] > 0) {
+          sm0ex1[(year + 2011 - age) >= 2000, 
+                 prv := (1 - policy.effect) * (1 - rnorm(.N, response, SE))]
+        }
+        if (sm0ex1[(year + 2011 - age) < 2000, .N] > 0) {
+          sm0ex1[(year + 2011 - age) < 2000, 
+                 prv := 1 - rnorm(.N, response, SE)]
+        }
+        return(3L + ((1 - rank) < sm0ex1[, prv]))
+      } 
+      
+      if (millenia == FALSE) {
+        return(3L + ((1 - rank) < sm0ex1[,  (1 - policy.effect) * (1 - rnorm(.N, response, SE))])) #4==T means remain active smokers.
+      }
     }
   )
-
+#pred.sm0ex1(0, 16:90, 1, 1, 1)[]
 # for (jj in 1:5) {
 #     plot(16:90, pred.sm0ex1(0, 16:90, 1, jj), ylim=c(0,0.4))
 # }
 
 # Smoke relapse -----------------------------------------------------------
 
-# Predicts probability of ex-smoker to become active smoker (relapse) (only works for 1<endsmoke<10). Else should be 0
-pred.ex0sm1 <- cmpfun(
-  function(endsmoke, sex, qimd, type = c("parabola", "log")) {
-    if (is.factor(sex)==F) {
-      sex <-  factor(sex, 
-                     levels = c(1,2), 
-                     ordered = F)
-    }
-    if (is.ordered(qimd)==F) {
-      qimd <- factor(qimd, 
-                     levels = c(1,2,3,4,5), 
-                     ordered = T)
-    }
-    
-    if (type == "parabola") {
-      ex0sm1 <-
-        as.data.table(
-          predict(
-            smok.cess.success.parabola,
-            data.table(endsmoke = bound(endsmoke, 1, 20), sex = sex, qimd = qimd), 
-            type = "response",
-            se.fit = T))
-    }
-    if (type == "log") {
-      ex0sm1 <- 
-        as.data.table(
-          predict(
-            smok.cess.success.log, 
-            data.table(endsmoke = bound(endsmoke, 1, 20), qimd = qimd),
-            type = "response", 
-            se.fit = T))
-    }
-    #pr <- rbinom(length(ex0sm1), 1, ex0sm1)
-    return(ex0sm1[, rbinom(.N, 1, bound(rnorm(.N, fit, se.fit)))])
-    #return(pr)
-  }
-)
-#pred.ex0sm1(1:10, 1, 1, "parabola")
-
-# Smoke prevalence --------------------------------------------------------
-# predicts the active smoker prevalence for age 20
-pred.sm0prev <-
-  cmpfun(
-    function(year, sex, qimd) {
-      if (is.factor(sex)==F) {
-        sex <-  factor(sex, 
-                       levels = c(1,2), 
-                       ordered = F)
-      }
-      if (is.ordered(qimd)==F) {
-        qimd <- factor(qimd, 
-                       levels = c(1,2,3,4,5), 
-                       ordered = T)
-      }
-      
-      sm0prev <- as.data.table(predict(smok.active.svylr, data.table(year = year, sex = sex, qimd = qimd), type = "response", se.fit=T))
-      #return(sm0prev)
-      return(sm0prev[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
-    }
-  )
-
-# for (jj in 1:5) {
-#     plot(pred.sm0prev(-10:10, 20, 1, jj), ylim=c(0, .8), main = as.character(jj))
-# }
-
-# Ex-Smoke prevalence --------------------------------------------------------
-# predicts the ex-smoker prevalence for age 20
-pred.ex0prev <-
-  cmpfun(
-    function(year, sex) {
-      if (is.factor(sex)==F) {
-        sex <-  factor(sex, 
-                       levels = c(1,2), 
-                       ordered = F)
-      }
-      
-      ex0prev <- as.data.table(predict(smok.exactive.svylr, data.table(year = year, sex = sex), type = "response", se.fit=T))
-      return(ex0prev[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
-    }
-  )
+# # Predicts probability of ex-smoker to become active smoker (relapse) (only works for 1<endsmoke<10). Else should be 0
+# pred.ex0sm1 <- cmpfun(
+#   function(endsmoke, sex, qimd, type = c("parabola", "log")) {
+#     if (is.factor(sex)==F) {
+#       sex <-  factor(sex, 
+#                      levels = c(1,2), 
+#                      ordered = F)
+#     }
+#     if (is.ordered(qimd)==F) {
+#       qimd <- factor(qimd, 
+#                      levels = c(1,2,3,4,5), 
+#                      ordered = T)
+#     }
+#     
+#     if (type == "parabola") {
+#       ex0sm1 <-
+#         as.data.table(
+#           predict(
+#             smok.cess.success.parabola,
+#             data.table(endsmoke = bound(endsmoke, 1, 20), sex = sex, qimd = qimd), 
+#             type = "response",
+#             se.fit = T))
+#     }
+#     if (type == "log") {
+#       ex0sm1 <- 
+#         as.data.table(
+#           predict(
+#             smok.cess.success.log, 
+#             data.table(endsmoke = bound(endsmoke, 1, 20), qimd = qimd),
+#             type = "response", 
+#             se.fit = T))
+#     }
+#     #pr <- rbinom(length(ex0sm1), 1, ex0sm1)
+#     return(ex0sm1[, rbinom(.N, 1, bound(rnorm(.N, fit, se.fit)))])
+#     #return(pr)
+#   }
+# )
+# #pred.ex0sm1(1:10, 1, 1, "parabola")
+# 
+# # Smoke prevalence --------------------------------------------------------
+# # predicts the active smoker prevalence for age 20
+# pred.sm0prev <-
+#   cmpfun(
+#     function(year, sex, qimd) {
+#       if (is.factor(sex)==F) {
+#         sex <-  factor(sex, 
+#                        levels = c(1,2), 
+#                        ordered = F)
+#       }
+#       if (is.ordered(qimd)==F) {
+#         qimd <- factor(qimd, 
+#                        levels = c(1,2,3,4,5), 
+#                        ordered = T)
+#       }
+#       
+#       sm0prev <- as.data.table(predict(smok.active.svylr, data.table(year = year, sex = sex, qimd = qimd), type = "response", se.fit=T))
+#       #return(sm0prev)
+#       return(sm0prev[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
+#     }
+#   )
+# 
+# # for (jj in 1:5) {
+# #     plot(pred.sm0prev(-10:10, 20, 1, jj), ylim=c(0, .8), main = as.character(jj))
+# # }
+# 
+# # Ex-Smoke prevalence --------------------------------------------------------
+# # predicts the ex-smoker prevalence for age 20
+# pred.ex0prev <-
+#   cmpfun(
+#     function(year, sex) {
+#       if (is.factor(sex)==F) {
+#         sex <-  factor(sex, 
+#                        levels = c(1,2), 
+#                        ordered = F)
+#       }
+#       
+#       ex0prev <- as.data.table(predict(smok.exactive.svylr, data.table(year = year, sex = sex), type = "response", se.fit=T))
+#       return(ex0prev[, rbinom(.N, 1, bound(rnorm(.N, response, SE)))])
+#     }
+#   )
 
 # Smoke cigdyal --------------------------------------------------------
 # predicts number of cigars for active smokers
-pred.cigdyal <-
+# To ignore rank use dice(.N)
+pred.cigdyal <- 
   cmpfun(
-    function(year, sex, qimd, smokyrs) {
+    function(year, age, sex, qimd, percentil.rank, policy.effect = 0, fortune = 0.05) {
+      # add randomness to rank
+      percentil.rank <- bound(jitter(percentil.rank, amount = fortune)) 
+      
       if (is.factor(sex)==F) {
         sex <-  factor(sex, 
                        levels = c(1,2), 
@@ -481,15 +533,42 @@ pred.cigdyal <-
                        levels = c(1,2,3,4,5), 
                        ordered = T)
       }
-      cigdyal <- predict(smok.cigdyal.svylm, data.table(year = year, sex = sex, qimd = qimd, smokyrs = smokyrs),
-                         type = "response", se.fit=F)
-      #return(cigdyal)
-      nm <- rnbinom(length(cigdyal), mu = cigdyal, size = 3)
-      nm[nm == 0]<- 1
-      return(nm)
+      
+      newdata <- data.table(
+        year     = year,
+        age      = age, 
+        sex      = sex, 
+        qimd     = qimd
+      )
+      
+      #code adapted from method getAnywhere(predict.polr)
+      Terms <- delete.response(cigdyal.svylr$terms)
+      m <- model.frame(Terms, newdata, na.action = function(x) x, 
+                       xlev = cigdyal.svylr$xlevels)
+      if (!is.null(cl <- attr(Terms, "dataClasses"))) 
+        .checkMFClasses(cl, m)
+      X <- model.matrix(Terms, m, contrasts = cigdyal.svylr$contrasts)
+      xint <- match("(Intercept)", colnames(X), nomatch = 0L)
+      if (xint > 0L) 
+        X <- X[, -xint, drop = FALSE]
+      n <- nrow(X)
+      q <- length(cigdyal.svylr$zeta)
+      eta <- drop(X %*% cigdyal.svylr$coefficients)
+      cc <- as.data.table(plogis(matrix(cigdyal.svylr$zeta, n, q, byrow = TRUE) - 
+                                   eta))
+      set(cc, NULL, "V8", 1)
+      #if (paired) set.seed(seed[[counter[[iterations]]]] + year)
+      set(cc, NULL, "dd", percentil.rank)
+      for (k in 1:8) set(cc, NULL, k, cc[, Reduce(`<`, .SD), .SDcol = c(k, 9)])
+      cc[, cigdyal :=  Reduce(`+`, .SD), .SDcol = 1:8]
+      #cc[is.na(cigdyal), cigdyal:=0]
+      cc[, cigdyal := as.integer(runif(.N, cigdyal*4, cigdyal*4+4 ))]
+      cc[cigdyal<1, cigdyal := 1]
+      cc[, cigdyal := cigdyal * (1 - policy.effect)]
+      cc[cigdyal<1, cigdyal := 1]
+      return(cc[, cigdyal])   
     }
-  )
-
+  ) 
 # for (jj in 1:5) {
 #     plot(pred.cigdyal(-10:10, 20, 1, 5, jj), ylim=c(0, 50), main = as.character(jj))
 # }
@@ -729,10 +808,12 @@ if (length(grep("health check", scenarios.list[[iterations]]))) {
   )
 }
 
-# COPD prevalence prediction ---------------------------------------------
+# COPD prevalence prediction -------------------------------
 if ("C34" %in% diseasestoexclude) {
   load(file="./Lagtimes/copd.svylr.rda")
-  
+  CPS <- fread("./Cancer Statistics/CPSII C34 nonsmokers deaths.csv")
+  CPS[, sex := factor(sex)]
+  CPS[, rr.sm := predict(loess(rr~age, span=0.7)), by=sex]
   pred.copd <- cmpfun(
     function(n, age, qimd, cigst1) {
       if (!is.factor(cigst1)) {
@@ -740,7 +821,7 @@ if ("C34" %in% diseasestoexclude) {
                          levels = c(1,2,3,4), 
                          ordered = F)
       }
-      if (is.ordered(qimd)==F) {
+      if (!is.ordered(qimd)) {
         qimd <- factor(qimd, 
                        levels = c(1,2,3,4,5), 
                        ordered = T)
@@ -845,7 +926,7 @@ if ("C34" %in% diseasestoexclude) {
                (1-188/1e5)^(2 + rpois(.N, 1))]
         }
         
-        sec <- 3L - as.integer(as.character(sec)) # originaly education but I use it as proxy for 
+        sec <- 2L - as.integer(as.character(sec)) # originaly education but I use it as proxy for 
         # sec. Also centered around 4
         
         origin[origin == 1 | origin == 9] <- 0
@@ -853,26 +934,46 @@ if ("C34" %in% diseasestoexclude) {
         origin[origin == 6 | origin == 7] <- 0.3211605
         
         # Probability of cancer if never smoker
-        risk.h <- exp((age - 62L) * 0.079597 - sec * 0.0879289 - (bmi - 27) * 0.028948 + 
-                        copd.h * 0.3457265 + dt$hist.of.ca.h * 0.4845208 + 
-                        dt$fam.hist.of.ca * 0.5856777 + origin - 7.02198)
+        # risk.h <- exp((age - 62L) * 0.079597 -
+        #                 sec * 0.0879289 -
+        #                 (bmi - 27) * 0.028948 +
+        #                 copd.h * 0.3457265 +
+        #                 dt$hist.of.ca.h * 0.4845208 +
+        #                 dt$fam.hist.of.ca * 0.5856777 +
+        #                 origin - 7.02198)
+        # 
+        # risk.h <- risk.h / (1 + risk.h)
         
-        risk.h <- risk.h / (1 + risk.h)
+        dt[, age:= age + cvd.lag]
+        dt[CPS, on=c("age", "sex"), risk.h := rr.sm/1e5]
         
         cigst1 <- c(2.542472, 2.799727)[1L + (cigst1 == "4")]
         cigdyal <- cigdyal + numsmok
         #cigdyal[cigdyal < 6] <- 6 # necessary, other wise smoking less than 6 cigarettes was protective
         
         # Probability of cancer for active smoker
-        risk.a <- exp((age - 62L) * 0.079597 - sec * 0.0879289 - (bmi - 27) * 0.028948 + 
-                        copd.a * 0.3457265 + dt$hist.of.ca * 0.4845208 + 
-                        dt$fam.hist.of.ca * 0.5856777 + origin - 7.02198 + cigst1 -
-                        ((((cigdyal)/100)^-1) - 4.021541613) * 0.1815486 +
+        # risk.a <- exp((age - 62L) * 0.079597 - 
+        #                 sec * 0.0879289 -
+        #                 (bmi - 27) * 0.028948 + 
+        #                 copd.a * 0.3457265 + 
+        #                 dt$hist.of.ca * 0.4845208 + 
+        #                 dt$fam.hist.of.ca * 0.5856777 + 
+        #                 origin - 7.02198 + cigst1 -
+        #                 ((((cigdyal)/100)^-1) - 4.021541613) *
+        #                 0.1815486 +
+        #                 (smokyrs - 27) * 0.0305566 -
+        #                 (endsmoke - 8.593417626) *
+        #                 0.0321362 * (cigst1 == 2.542472))
+        
+        risk.a <- exp((age - 62L) * 0.079597 - 7.02198 + cigst1 -
+                        (((cigdyal/100)^-1) - 4.021541613) *
+                        0.1815486 +
                         (smokyrs - 27) * 0.0305566 -
-                        (endsmoke - 8.593417626) * 0.0321362 * (cigst1 == 2.542472))
+                        (endsmoke - 8.593417626) *
+                        0.0321362 * (cigst1 == 2.542472))
         
         risk.a <- risk.a / (1 + risk.a)
-        return(risk.a / risk.h) # Sampling error is not considered because not clearly reported and sample size was ~ 200.000
+        return(risk.a / dt$risk.h) # Sampling error is not considered because not clearly reported and sample size was ~ 200.000
         #return(cbind(risk.a, risk.h))
       }
     )

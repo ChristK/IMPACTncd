@@ -21,7 +21,7 @@
 cat("Estimating deaths from other causes...\n")
 cat(paste0(Sys.time(), "\n\n"))
 
-cat("Inflate mortality for diabetics and smokers...\n\n")
+#cat("Inflate mortality for diabetics and smokers...\n\n")
 #Doll R, et al. Mortality in relation to smoking: 50 years’ observations on male
 #British doctors. BMJ 2004;328:1519. doi:10.1136/bmj.38142.554479.AE table 1
 set(POP, NULL, "death.tob.rr", 1)
@@ -31,14 +31,14 @@ set(POP, NULL, "death.diab.rr", 1)
 POP[diabtotr.cvdlag == "2", death.diab.rr := 1.6] #rr from DECODE study
 
 deathpaf <- 
-  POP[between(age, ageL, ageH), 
+  POP[between(age, 16, 99), 
       .(paf = 1 - 1 / (sum(death.tob.rr * death.diab.rr) / .N)), 
       by = .(age, sex, qimd)
       ]
 setkey(deathpaf, age, sex, qimd)
 
 deathrate <- setnames(
-  Lifetable[, c("age", "sex", "qimd", as.character(i + 2011)), with = F],
+  Lifetable[, .SD, .SDcols = c("age", "sex", "qimd", as.character(i + 2011))],
   as.character(i + 2011), "qx")
 setkey(deathrate, age, sex, qimd)
 
@@ -53,7 +53,7 @@ POP[, `:=` (qx = NULL,
             death.tob.rr = NULL,
             death.diab.rr = NULL)]
 
-cat("Export Other mortality summary...\n\n")
+#cat("Export Other mortality summary...\n\n")
 if (i == init.year-2011) other.mortal <- vector("list", yearstoproject * 4)
 
 other.mortal[[(2011 - init.year + i) * 4 + 1]] <-
@@ -73,13 +73,13 @@ if (i == yearstoproject + init.year - 2012) {
           file = paste0(output.dir(), "other.mortal.rds"))
 }
 
-cat("Export Other mortality individuals...\n\n")
+#cat("Export Other mortality individuals...\n\n")
 indiv.mort[[1]] <- 
   POP[dead == 1L, 
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
       )][,`:=` (year = 2011 + i, 
                 cause = "other", 
-                scenario = gsub(".R", "", scenarios.list[[iterations]]), 
+                scenario = gsub(".Rc", "", scenarios.list[[iterations]]), 
                 mc = haha)]
 
 POP = POP[is.na(dead)]  # remove dead 

@@ -28,7 +28,7 @@ widesynthpop <- F
 
 n <- 1e5  # Define the sample size
 
-yearstoproject <- 3  # NEED TO force >=1 and up to 50
+yearstoproject <- 40  # NEED TO force >=1 and up to 50
 
 numberofiterations <- 5
 
@@ -36,20 +36,20 @@ ageL <- 30  # Define lower age limit to diseases-model simulation (min = 30)
 
 ageH <- 84  # Define lower age limit to diseases-model simulation (max = 84)
 
-alignment <- F # T or F (apply correction factor to counterpoise levin's and exposure error)
+alignment <- T # T or F (apply correction factor for lung cancer model)
 
 qdrisk <- T # Use QDrisk score for diabetes incidence
 
 Fertility.Assumption <- "N"  # Select (N)ormal, (H)igh or (L)ow fertility rate asumptions based on ONS scenarios. They do matter for accurate population statistics
 
 cvd.lag <- 5 
-fatality.annual.improvement.chd    <- 3L # 3 means 3% annual improvement in fatality
-fatality.annual.improvement.stroke <- 3L # 3 means 3% annual improvement in fatality
+fatality.annual.improvement.chd    <- 5L # 3 means 3% annual improvement in fatality
+fatality.annual.improvement.stroke <- 5L # 3 means 3% annual improvement in fatality
 fatality.annual.improvement.c16    <- 2L
 fatality.annual.improvement.c34    <- 2L
 
-fatality.sec.gradient.chd    <- 40L # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
-fatality.sec.gradient.stroke <- 40L # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+fatality.sec.gradient.chd    <- 35L # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
+fatality.sec.gradient.stroke <- 30L # Percentage of difference in fatality between qimd 1 and 5. Positive values mean the poorest are experincing higher fatality 
 fatality.sec.gradient.c16    <- 30L
 fatality.sec.gradient.c34    <- 30L
 
@@ -63,7 +63,7 @@ cleardirectories <- F # If T delete auxiliary output directories when simulation
 
 export.graphs <- F
 
-diseasestoexclude <- c("CHD", "stroke", "C34", "C16")  # Define disease to be excluded from lifetables
+diseasestoexclude <- c("CHD", "stroke", "C34")  # Define disease to be excluded from lifetables
 # ICD10 code reminder for disease coding (http://apps.who.int/classifications/icd10/browse/2010/en#/I20-I25)
 
 # *************************************************************************************************
@@ -105,7 +105,7 @@ source(file = "./initialisation.R")
 cat("Generating life table...\n\n")
 source(file = "./life table engine.R")
 
-iterations = 1 
+iterations = 4 
 my.env <- environment() # get environment of this branch
 
 # Define functions in foreach loop
@@ -113,7 +113,7 @@ sys.source(file = "./cluster functions.R", my.env)
 sys.source(file = "./diseases epidemiology.R", my.env)
 # Load synthetic population
 sys.source(file = "./load synthetic population.R", my.env)
-
+POP2 = copy(POP)
 
 # Actual simulation
 i = init.year - 2011

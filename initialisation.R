@@ -52,9 +52,11 @@ dependencies(c("demography",
 
 enableJIT(2) #set to 1, 2 or 3 to enable different precompiling levels
 # options(datatable.optimize = 1)
+# options(datatable.verbose = T)
 options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata around the sample grand mean rather than the stratum mean)
 # require(devtools)
 # install_github("Rdatatable/data.table",  build_vignettes = F)
+if (packageVersion("data.table") != "1.9.6") setthreads(1L) # deactivate implicit parallelisation 
 
 # max projection horizon (limited by fertility)
 if (init.year + yearstoproject > 2061) yearstoproject <- 2061 - init.year
@@ -222,6 +224,14 @@ outersect <-
     }
   )
 
+# Define cbind for datatables. 2 orders of magnitude faster than original
+cbind.dt = function(...) {
+  x = c(...)
+  setattr(x, "class", c("data.table", "data.frame"))
+  ans = .Call(data.table:::Calloccolwrapper, x, max(100L, ncol(x) + 64L), FALSE)
+  .Call(data.table:::Csetnamed, ans, 0L)
+}
+
 # Define function to split agegroups and create groups
 agegroup.fn <- 
   cmpfun(
@@ -362,26 +372,29 @@ if (!exists("scenarios.list")) { # not if defined by GUI
 }
 
 n.scenarios <- length(scenarios.list)
-scenarios.list <- rep(scenarios.list, each = numberofiterations)
+#scenarios.list <- rep(scenarios.list, each = numberofiterations)
+scenarios.list <- rep(scenarios.list, numberofiterations)
 it <- numberofiterations * n.scenarios
-if (paired == T) counter <- rep(1:numberofiterations, n.scenarios)
+#if (paired == T) counter <- rep(1:numberofiterations, n.scenarios)
+if (paired == T) counter <- rep(1:numberofiterations, each = n.scenarios)
 if (paired == F) counter <- 1:it
 
-paired.mem <-
-  suppressWarnings(
-    max(
-      as.integer(
-        list.dirs(
-          path = "./Output/current trends", 
-          #pattern = "riskfactors.rds", 
-          full.names = F, 
-          recursive = F
+if (!exists("paired.mem") | (exists("paired.mem") && paired.mem == 0)) { #priority to gui input
+  paired.mem <-
+    suppressWarnings(
+      max(
+        as.integer(
+          list.dirs(
+            path = "./Output/current trends", 
+            #pattern = "riskfactors.rds", 
+            full.names = F, 
+            recursive = F
+          )
         )
       )
     )
-  )
-paired.mem <- ifelse(is.infinite(paired.mem), 0, paired.mem)
-
+  paired.mem <- ifelse(is.infinite(paired.mem), 0, paired.mem)
+}
 
 # Specify output.txt file for simulation parameters -----------------------
 dir.create(path = "./Output/", recursive = T, showWarnings = F)
@@ -653,7 +666,7 @@ if ("stroke" %in% diseasestoexclude) {
              cigst1.cvdlag = as.character(cigst1.cvdlag))]
   stroke.tobacco.rr.l <- tt[stroke.tobacco.rr.l, on = c("agegroup", "sex", "cigst1.cvdlag"), allow.cartesian = T]
   stroke.tobacco.rr.l[age > 69 & cigst1.cvdlag == "3",
-                   rr := rr * (1-(age-69)/100)] # decrease risk for elderly
+                      rr := rr * (1-(age-69)/100)] # decrease risk for elderly
   stroke.tobacco.rr.l[, rr := predict(loess(rr~age, span=0.75)), by = .(.id, sex, cigst1.cvdlag)]
   stroke.tobacco.rr.l[rr < 1, rr := 1]
   #stroke.tobacco.rr.l[sex == "1" & cigst1.cvdlag == "4", plot(age, rr)]
@@ -778,7 +791,7 @@ if ("C16" %in% diseasestoexclude) {
   c16.salt.mr.l <- rpert(ifelse(paired, numberofiterations, it), 5.8, 6, 7, 4) # optimal level for salt around 4 g/day. Under which no risk
   #c16.tob.rr.mc.l <- stochRRabov1(ifelse(paired, numberofiterations, it), 1.04, 1.01)
   c16.tob.rr.mc.l <-rtruncnorm(ifelse(paired, numberofiterations, it),
-                                    0, Inf, 1.017144, 0.0009138235) # see gastric model.R for explanation
+                               0, Inf, 1.017144, 0.0009138235) # see gastric model.R for explanation
   c16.extob.rr.mc.l <- stochRRbelow1(ifelse(paired, numberofiterations, it), 0.961, 1)
   c16.bmi.rr.mc.l <- runif(ifelse(paired, numberofiterations, it))
   

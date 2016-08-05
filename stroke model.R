@@ -37,8 +37,9 @@ setkey(POP, age, sex, cigst1.cvdlag)
 POP[tobacco.rr.stroke, stroke.tob.rr := rr]
 POP[is.na(stroke.tob.rr) | stroke.tob.rr < 1, stroke.tob.rr := 1]
 #ex-smokers
-# Stroke risk decreased significantly by two years and was at the level of nonsmokers
-# by five years after cessation of cigarette smoking.
+# Cigarette smoking as a risk factor for stroke: The Framingham study
+# "Stroke risk decreased significantly by two years and was at the
+# level of nonsmokers by five years after cessation of cigarette smoking"
 
 # Calculate PAF of ETS for stroke
 # RR from Oono IP, Mackay DF, Pell JP. Meta-analysis of the association between secondhand smoke exposure and stroke. 
@@ -113,28 +114,6 @@ setkey(POP, age, a30to06m.cvdlag)
 POP[pa.rr.stroke, stroke.pa.rr := rr]
 POP[is.na(stroke.pa.rr), stroke.pa.rr := 1]
 
-# Estimate PAF ------------------------------------------------------------
-if (i == init.year - 2011) {
-  #cat("Estimating stroke PAF...\n")
-  strokepaf <- 
-    POP[between(age, ageL, ageH), 
-        .(paf = 1 - 1 / (sum(stroke.tob.rr * stroke.ets.rr *
-                               stroke.sbp.rr * stroke.chol.rr * 
-                               stroke.bmi.rr * stroke.diab.rr * 
-                               stroke.fv.rr * stroke.pa.rr) / .N)), 
-        by = .(age, sex)
-        ]
-  setkey(strokepaf, age, sex)
-  #strokepaf[, paf := predict(loess(paf~age, span=0.20)), by = .(sex)]
-  setkey(strokeincid, age, sex)
-  strokeincid[strokepaf, p0 := incidence * (1 - paf)]
-  strokeincid[is.na(p0), p0 := incidence]
-}
-
-setkey(POP, age, sex)
-POP[strokeincid, p0 := p0]
-
-
 # Estimate prevalence -----------------------------------------------------
 if (i == init.year - 2011) {
   #cat(paste0("Estimating stroke prevalence in ", init.year, " ...\n\n"))
@@ -153,17 +132,40 @@ if (i == init.year - 2011) {
   
   id.stroke <- POP[age <= ageH, 
                    sample(id, age.structure[sex == .BY[[2]] & age == .BY[[1]], Nprev], 
-                            prob = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
-                              stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr *
-                              stroke.fv.rr * stroke.pa.rr * 
-                              sec.grad.adj, 
-                            replace = F), 
+                          prob = stroke.tob.rr * stroke.ets.rr * stroke.sbp.rr * 
+                            stroke.chol.rr * stroke.bmi.rr * stroke.diab.rr *
+                            stroke.fv.rr * stroke.pa.rr * 
+                            sec.grad.adj, 
+                          replace = F), 
                    by = .(age, sex)][, V1]
   POP[id %in% id.stroke, stroke.incidence := init.year - 1] # and then we assign
   # these ids to the population
   POP[, sec.grad.adj := NULL]
   rm(id.stroke)
 }
+
+# Estimate PAF ------------------------------------------------------------
+if (i == init.year - 2011) {
+  #cat("Estimating stroke PAF...\n")
+  strokepaf <- 
+    POP[between(age, ageL, ageH) & stroke.incidence == 0, 
+        .(paf = 1 - 1 / (sum(stroke.tob.rr * stroke.ets.rr *
+                               stroke.sbp.rr * stroke.chol.rr * 
+                               stroke.bmi.rr * stroke.diab.rr * 
+                               stroke.fv.rr * stroke.pa.rr) / .N)), 
+        by = .(age, sex)
+        ]
+  setkey(strokepaf, age, sex)
+  #strokepaf[, paf := predict(loess(paf~age, span=0.20)), by = .(sex)]
+  setkey(strokeincid, age, sex)
+  strokeincid[strokepaf, p0 := incidence * (1 - paf)]
+  strokeincid[is.na(p0), p0 := incidence]
+}
+
+setkey(POP, age, sex)
+POP[strokeincid, p0 := p0]
+
+
 
 #cat("Estimating stroke incidence...\n\n")
 POP[between(age, ageL, ageH) & 

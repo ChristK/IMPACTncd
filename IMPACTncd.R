@@ -1,4 +1,4 @@
-#!/opt/gridware/apps/gcc/R/3.2.3/lib64/R/bin/Rscript
+#!/opt/gridware/apps/gcc/R/3.3.0/lib64/R/bin/Rscript
 ## IMPACTncd: A decision support tool for primary prevention of NCDs Copyright (C)
 ## 2015 Chris Kypridemos
 

@@ -27,7 +27,8 @@ if (i == init.year - 2011) {
   }
 }
 POP[age == 0, chd.incidence := 0]
-# RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. Role of Smoking in Global and Regional 
+# RR for tobacco from Ezzati M, Henley SJ, Thun MJ, Lopez AD. 
+# Role of Smoking in Global and Regional 
 # Cardiovascular Mortality. Circulation. 2005 Jul 26;112(4):489–97.
 # Table 1 Model B
 #cat("smoking RR\n")
@@ -37,7 +38,8 @@ POP[tobacco.rr.chd, chd.tob.rr := rr]
 POP[is.na(chd.tob.rr), chd.tob.rr := 1]
 # RR for ex-smokers from Huxley RR, Woodward M. 
 # Cigarette smoking as a risk factor for coronary heart disease
-# in women compared with men: a systematic review and meta-analysis of prospective cohort studies. 
+# in women compared with men: a systematic review and meta-analysis
+# of prospective cohort studies. 
 # The Lancet. 2011 Oct 14;378(9799):1297–305. 
 # Appendix webfigure 8
 # POP[sex=="1"&qimd=="2", mean(chd.tob.rr), by = age][, plot(age, V1)]
@@ -117,27 +119,6 @@ setkey(POP, age, a30to06m.cvdlag)
 POP[pa.rr.chd, chd.pa.rr := rr]
 POP[is.na(chd.pa.rr), chd.pa.rr := 1]
 
-# Estimate PAF ------------------------------------------------------------
-if (i == init.year - 2011) {
-  #cat("Estimating CHD PAF...\n")
-  chdpaf <- 
-    POP[between(age, ageL, ageH), 
-        .(paf = 1 - 1 / (sum(chd.tob.rr * chd.ets.rr *
-                               chd.sbp.rr * chd.chol.rr * 
-                               chd.bmi.rr * chd.diab.rr * chd.fv.rr *
-                               chd.pa.rr) / .N)), 
-        by = .(age, sex)
-        ]
-  setkey(chdpaf, age, sex)
-  #chdpaf[, paf := predict(loess(paf~age, span=0.20)), by = .(sex)]
-  setkey(CHDincid, age, sex)
-  CHDincid[chdpaf, p0 := incidence * (1 - paf)]
-  CHDincid[is.na(p0), p0 := incidence]
-}
-
-setkey(POP, age, sex)
-POP[CHDincid, p0 := p0]
-
 # Estimate prevalence -----------------------------------------------------
 if (i == init.year - 2011) {
   #cat(paste0("Estimating CHD prevalence in ", init.year, " ...\n\n"))
@@ -156,12 +137,12 @@ if (i == init.year - 2011) {
   
   id.chd <- POP[age <=  ageH, 
                 sample(id, age.structure[sex == .BY[[2]] & age == .BY[[1]],
-                                            Nprev], 
-                         prob = chd.tob.rr * chd.ets.rr * 
-                           chd.sbp.rr * chd.chol.rr * chd.bmi.rr * 
-                           chd.diab.rr * chd.fv.rr * chd.pa.rr * 
-                           sec.grad.adj, 
-                         replace = F), 
+                                         Nprev], 
+                       prob = chd.tob.rr * chd.ets.rr * 
+                         chd.sbp.rr * chd.chol.rr * chd.bmi.rr * 
+                         chd.diab.rr * chd.fv.rr * chd.pa.rr * 
+                         sec.grad.adj, 
+                       replace = F), 
                 by = .(age, sex)][, V1]
   
   POP[id %in% id.chd, chd.incidence := init.year - 1] # and then we assign
@@ -169,6 +150,29 @@ if (i == init.year - 2011) {
   POP[, sec.grad.adj := NULL]
   rm(id.chd)
 }
+
+
+# Estimate PAF ------------------------------------------------------------
+if (i == init.year - 2011) {
+  #cat("Estimating CHD PAF...\n")
+  chdpaf <- 
+    POP[between(age, ageL, ageH) & chd.incidence == 0L, 
+        .(paf = 1 - 1 / (sum(chd.tob.rr * chd.ets.rr *
+                               chd.sbp.rr * chd.chol.rr * 
+                               chd.bmi.rr * chd.diab.rr * chd.fv.rr *
+                               chd.pa.rr) / .N)), 
+        by = .(age, sex)
+        ]
+  setkey(chdpaf, age, sex)
+  #chdpaf[, paf := predict(loess(paf~age, span=0.20)), by = .(sex)]
+  setkey(CHDincid, age, sex)
+  CHDincid[chdpaf, p0 := incidence * (1 - paf)]
+  CHDincid[is.na(p0), p0 := incidence]
+}
+
+setkey(POP, age, sex)
+POP[CHDincid, p0 := p0]
+
 
 #cat("Estimating CHD incidence...\n\n")
 POP[between(age, ageL, ageH) & 
@@ -189,7 +193,8 @@ POP[between(age, ageL, ageH) &
 # ie 3% improvemnt by year (as supportet by BHF)
 
 if (i > init.year - 2011) {
-  CHDsurv[, fatality := fatality * (100 - fatality.annual.improvement.chd)/100]
+  CHDsurv[sex == "1", fatality := fatality * (100 - fatality.annual.improvement.chd)/100]
+  CHDsurv[sex == "2", fatality := fatality * (100 - fatality.annual.improvement.chd - 1)/100] # calibration
   fatality.annual.improvement.chd <- fatality.annual.improvement.chd * 0.98
 }
 setkey(POP, age, sex)

@@ -17,23 +17,31 @@
 ## or write to the Free Software Foundation, Inc., 51 Franklin Street,
 ## Fifth Floor, Boston, MA 02110-1301  USA.
 
-# RF to RR  ---------------------------------------------------------------
 cat("Loading lung cancer (C34) model...\n")
 cat(paste0(Sys.time(), "\n\n"))
 if (i == init.year - 2011) set(POP, NULL, "c34.incidence",  0) # Only needs to run the very first time of each simulation
 POP[age == 0, c34.incidence := 0]
 
+# Alignment ----------------------------
+if ((alignment == T) & between(i, init.year - 2011 + 1, init.year - 2011 + 6)) {
+  cat("alignmment ON\n")
+  POP[sex == "2" & between(age, 55, 69), cigdyal := cigdyal * 1.1] # calibration
+}
+
+# RF to RR  -------------------------------
 # PLCO model to estimate risk from: Tammemägi M, et al. Evaluation of the Lung
 # Cancer Risks at which to Screen Ever- and Never-Smokers: Screening Rules
 # Applied to the PLCO and NLST Cohorts. PLoS medicine. 2014;11(12): e1001764.
 # I intentionally used cvdlag because it is closer to 6 years that was the duration of the study
 set(POP, NULL, "c34.tob.rr", 1)
-POP[cigst1 != "1" & between(age, ageL, ageH),
-    c34.tob.rr := bound(tob.cum.risk(age - cvd.lag, sex, qimd,
-                               bmival.cvdlag, cigst1.cvdlag,
-                               cigdyal.cvdlag, numsmok.cvdlag, smokyrs.cvdlag,
-                               endsmoke.cvdlag, origin, i - cvd.lag), 1, Inf)]
-POP[age > 69, c34.tob.rr := (c34.tob.rr-1) * (1-(age-69)/100)+1] # decrease risk for elderly
+if (POP[cigst1.cvdlag != "1" & between(age, ageL, ageH), .N] > 0) {
+  POP[cigst1.cvdlag != "1" & between(age, ageL, ageH),
+      c34.tob.rr := bound(tob.cum.risk(age - cvd.lag, sex, qimd,
+                                       bmival.cvdlag, cigst1.cvdlag,
+                                       cigdyal.cvdlag, numsmok.cvdlag, smokyrs.cvdlag,
+                                       endsmoke.cvdlag, origin, i - cvd.lag), 1, Inf)]
+  POP[age > 69, c34.tob.rr := (c34.tob.rr-1) * (1-(age-69)/100)+1] # decrease risk for elderly
+}
 
 
 # RR for ETS from Kim CH, et al. Exposure to secondhand tobacco smoke and lung
@@ -57,27 +65,6 @@ POP[age > 69, c34.ets.rr := (c34.ets.rr-1) * (1-(age-69)/100)+1] # decrease risk
 set(POP, NULL, "c34.fv.rr", 1)
 POP[porftvg.calag < 6L, c34.fv.rr := c34.fv.rr.mc^(porftvg.calag - 5L)] # No benefit from >5 portions
 POP[age > 69, c34.fv.rr := (c34.fv.rr-1) * (1-(age-69)/100)+1] # decrease risk for elderly
-
-# PAF estimation ----------------------------------------------------------
-if (i == init.year - 2011) {
-  #cat("Estimating lung cancer PAF...\n")
-  c34paf <- 
-    POP[between(age, ageL, ageH), 
-        .(paf = 1 - 1 / (sum(c34.tob.rr * c34.fv.rr * c34.ets.rr) / .N)), 
-        by = .(age, sex)
-        ]
-  setkey(c34paf, age, sex)
-  c34paf[, paf := predict(loess(paf~age, span=0.75)), by = .(sex)]
-  #c34paf[sex == "2" & between(age, 60, 79), paf := paf.sm]
-  #c34paf[, paf := rollmean(paf, 5, fill = "extend", align = "center"), by = .(sex)]
-
-  setkey(C34incid, age, sex)
-  C34incid[c34paf, p0 := incidence * (1 - paf)]
-  C34incid[is.na(p0), p0 := incidence]
-}
-
-setkey(POP, age, sex)
-POP[C34incid, p0 := p0]
 
 # Prevalence of C34 only in first run  ------------------------------------
 if (i == init.year - 2011) {
@@ -109,6 +96,28 @@ if (i == init.year - 2011) {
   POP[, sec.grad.adj := NULL]
 }
 
+
+# PAF estimation ----------------------------------------------------------
+if (i == init.year - 2011) {
+  #cat("Estimating lung cancer PAF...\n")
+  c34paf <- 
+    POP[between(age, ageL, ageH) & c34.incidence == 0, 
+        .(paf = 1 - 1 / (sum(c34.tob.rr * c34.fv.rr * c34.ets.rr) / .N)), 
+        by = .(age, sex)
+        ]
+  setkey(c34paf, age, sex)
+  #c34paf[, paf := predict(loess(paf~age, span=0.2)), by = .(sex)]
+  #c34paf[sex == "2" & between(age, 60, 79), paf := paf.sm]
+  #c34paf[, paf := rollmean(paf, 5, fill = "extend", align = "center"), by = .(sex)]
+  
+  setkey(C34incid, age, sex)
+  C34incid[c34paf, p0 := incidence * (1 - paf)]
+  C34incid[is.na(p0), p0 := incidence]
+}
+
+setkey(POP, age, sex)
+POP[C34incid, p0 := p0]
+
 # Incidence of C34  ------------------------------------
 #cat("Estimating lung cancer incidence...\n\n")
 POP[between(age, ageL, ageH) &
@@ -123,6 +132,7 @@ if (i > init.year - 2011) {
   C34fatal[, fatality  := fatality  * (100 - fatality.annual.improvement.c34)/100]
   C34remis[, remission := remission * (100 + fatality.annual.improvement.c34)/100]
   # It make sense when fatality decreasing remission to increase and vice versa. 
+  fatality.annual.improvement.c34 <- fatality.annual.improvement.c34 * 0.99
 }
 
 setkey(POP, age, sex)
@@ -132,14 +142,14 @@ Temp <- POP[between(age, ageL, ageH),
             .(before = sum(c34.incidence > 0) * mean(fatality)),
             by = .(agegroup, sex)] #expected number of deaths
 
-POP[between(age, ageL, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.c34 / 2) * fatality/100]
-POP[between(age, ageL, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.c34 / 4) * fatality/100]
-POP[between(age, ageL, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.c34 / 4) * fatality/100]
-POP[between(age, ageL, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.c34 / 2) * fatality/100]
-# POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.c34 / 1) * fatality/100]
-# POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.c34 / 2) * fatality/100]
-# POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.c34 / 2) * fatality/100]
-# POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.c34 / 1) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "1", fatality := (100 - fatality.sec.gradient.c34 / 2) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "2", fatality := (100 - fatality.sec.gradient.c34 / 4) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "4", fatality := (100 + fatality.sec.gradient.c34 / 4) * fatality/100]
+POP[between(age, ageL, 69) & qimd == "5", fatality := (100 + fatality.sec.gradient.c34 / 2) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "1", fatality := (100 - fatality.sec.gradient.c34 / 4) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "2", fatality := (100 - fatality.sec.gradient.c34 / 8) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "4", fatality := (100 + fatality.sec.gradient.c34 / 8) * fatality/100]
+POP[between(age, 70, ageH) & qimd == "5", fatality := (100 + fatality.sec.gradient.c34 / 4) * fatality/100]
 
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
 Temp1 <- POP[between(age, ageL, ageH), 
@@ -159,14 +169,14 @@ Temp <- POP[between(age, ageL, ageH),
             .(before = sum(c34.incidence > 0) * mean(remission)),
             by = .(agegroup, sex)] #expected number of deaths
 
-POP[between(age, ageL, ageH) & qimd == "1", remission := (100 + fatality.sec.gradient.c34 / 2) * remission/100]
-POP[between(age, ageL, ageH) & qimd == "2", remission := (100 + fatality.sec.gradient.c34 / 4) * remission/100]
-POP[between(age, ageL, ageH) & qimd == "4", remission := (100 - fatality.sec.gradient.c34 / 4) * remission/100]
-POP[between(age, ageL, ageH) & qimd == "5", remission := (100 - fatality.sec.gradient.c34 / 2) * remission/100]
-# POP[between(age, 70, ageH) & qimd == "1", remission := (100 + fatality.sec.gradient.c34 / 2) * remission/100]
-# POP[between(age, 70, ageH) & qimd == "2", remission := (100 + fatality.sec.gradient.c34 / 4) * remission/100]
-# POP[between(age, 70, ageH) & qimd == "4", remission := (100 - fatality.sec.gradient.c34 / 4) * remission/100]
-# POP[between(age, 70, ageH) & qimd == "5", remission := (100 - fatality.sec.gradient.c34 / 2) * remission/100]
+POP[between(age, ageL, 69) & qimd == "1", remission := (100 + fatality.sec.gradient.c34 / 2) * remission/100]
+POP[between(age, ageL, 69) & qimd == "2", remission := (100 + fatality.sec.gradient.c34 / 4) * remission/100]
+POP[between(age, ageL, 69) & qimd == "4", remission := (100 - fatality.sec.gradient.c34 / 4) * remission/100]
+POP[between(age, ageL, 69) & qimd == "5", remission := (100 - fatality.sec.gradient.c34 / 2) * remission/100]
+POP[between(age, 70, ageH) & qimd == "1", remission := (100 + fatality.sec.gradient.c34 / 4) * remission/100]
+POP[between(age, 70, ageH) & qimd == "2", remission := (100 + fatality.sec.gradient.c34 / 8) * remission/100]
+POP[between(age, 70, ageH) & qimd == "4", remission := (100 - fatality.sec.gradient.c34 / 8) * remission/100]
+POP[between(age, 70, ageH) & qimd == "5", remission := (100 - fatality.sec.gradient.c34 / 4) * remission/100]
 #expected number of deaths after gradient and needs to be corrected by Temp/Temp1
 
 Temp1 <- POP[between(age, ageL, ageH), 
