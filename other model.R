@@ -30,12 +30,14 @@ POP[cigst1.cvdlag == "4", death.tob.rr := smokriskofdeath]
 set(POP, NULL, "death.diab.rr", 1)
 POP[diabtotr.cvdlag == "2", death.diab.rr := 1.6] #rr from DECODE study
 
+if (i == init.year - 2011) {
 deathpaf <- 
   POP[between(age, 16, 99), 
       .(paf = 1 - 1 / (sum(death.tob.rr * death.diab.rr) / .N)), 
       by = .(age, sex, qimd)
       ]
 setkey(deathpaf, age, sex, qimd)
+}
 
 deathrate <- setnames(
   Lifetable[, .SD, .SDcols = c("age", "sex", "qimd", as.character(i + 2011))],
