@@ -23,39 +23,32 @@
 #     "current trends.R" %in% scenarios.list) {
 #   
 if (Sys.info()[1] == "Linux") {
-  if (system("whoami", T ) == "mdxasck2") {
+  if (system("whoami", T) == "mdxasck2") {
     setwd("~/IMPACTncd/")
-    clusternumber <- ifelse(clusternumber > 30, 30, clusternumber)  # overwrites previous if <60
+    # all.files <- list.files('./SynthPop', pattern = glob2rx('spop2011*.rds'),
+    # full.names = T) spop.l <- lapply(all.files, readRDS) rm(all.files)
   } else {
-    setwd(paste("/home/", 
-                system("whoami", T), 
-                "/Dropbox/PhD/Models/IMPACTncd/", 
-                sep = "", 
-                collapse = ""))
+    setwd(paste("/home/", system("whoami", T), "/pCloudDrive/My Models/Responsibility deal/", 
+                sep = "", collapse = ""))
   }
-} else if (Sys.info()[1] == "Darwin") {
-  setwd("/Volumes/home/dropbox/PhD/Models/IMPACTncd/")
 } else {
   get.dropbox.folder <- function() {
     if (!require(RCurl)) 
       stop("You need to install RCurl package.")
     if (Sys.info()["sysname"] != "Windows") 
-      stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry.")
-    db.file <- paste(Sys.getenv("LOCALAPPDATA"), "\\Dropbox\\host.db", sep = "")
+      stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry...")
+    db.file <- paste(Sys.getenv("APPDATA"), "\\Dropbox\\host.db", sep = "")
     base64coded <- readLines(db.file, warn = F)[2]
     base64(base64coded, encode = F)
   }
-  clusternumber <- 1L
-  
   setwd(paste0(get.dropbox.folder(), "/PhD/Models/IMPACTncd/"))
-  dir.dataset <- (paste0(get.dropbox.folder(), "/PhD/Datasets/"))
 }
 
 ext <- ".pdf"
-dir <- "./Output/Validation/"
+dir <- "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Validation/"
 
 #  if (!exists("yearstoproject")) {
-tt <- readLines("./Output/simulation parameters.txt")
+tt <- readLines("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/simulation parameters.txt")
 
 yearstoproject <- as.integer(substring(tt[[grep(glob2rx("Years to project = *"), tt)]], 19))
 ageL <- as.integer(substring(tt[[grep(glob2rx("ageL = *"), tt)]], 7))
@@ -91,27 +84,27 @@ rm(jjj, tt)
 # }
 
 require(compiler)
-loadcmp(file = "./initialisation.Rc")
+source(file = "./initialisation.R")
 cvd.lag    <- round(1 + cvd.lag * 9) # binom mean = n*p
 cancer.lag <- round(1 + cancer.lag * 9) # binom mean = n*p
 
 #load("C:/Users/ckyprid/Documents/IMPACTncd outputs/riskfactors.RData")
 #load("./Output/RF/highrisk.RData")
-if (!exists("pop.abs")) load("./Output/RF/population.structure.RData")
+if (!exists("pop.abs")) load("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/RF/population.structure.RData")
 #load("./Output/Other/life.exp0.RData")
 #load("./Output/Other/life.exp65.RData")
 #load("./Output/Other/hlife.exp.RData")
 #load("./Output/Other/other.mortality.RData")
-if (!exists("chd.burden") & "CHD" %in% diseasestoexclude) load("./Output/CHD/chd.burden.RData")
-if (!exists("stroke.burden") & "stroke" %in% diseasestoexclude) load("./Output/Stroke/stroke.burden.RData")
-if (!exists("c34.burden") & "C34" %in% diseasestoexclude) load("./Output/Lung ca/c34.burden.RData")
-if (!exists("c16.burden") & "C16" %in% diseasestoexclude) load("./Output/Gastric ca/c16.burden.RData")
+if (!exists("chd.burden") & "CHD" %in% diseasestoexclude) load("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/CHD/chd.burden.RData")
+if (!exists("stroke.burden") & "stroke" %in% diseasestoexclude) load("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Stroke/stroke.burden.RData")
+if (!exists("c34.burden") & "C34" %in% diseasestoexclude) load("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Lung ca/c34.burden.RData")
+if (!exists("c16.burden") & "C16" %in% diseasestoexclude) load("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Gastric ca/c16.burden.RData")
 #load("./Output/Graphs.tbl//Graphs.tbl.rda")
-if (!exists("Tables")) load("./Output/Tables/Tables.rda")
+if (!exists("Tables")) load("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Tables/Tables.rda")
 load(file = "./Lagtimes/HSE.ts.RData")
 HSE.ts2 = copy(HSE.ts)
 
-loadcmp(file = "./post simulation functions.Rc")
+source(file = "./post simulation functions.R")
 
 # population.actual <- fread("./Population/population.struct.csv",  header = T)[year == paste0(init.year), ]
 # population.actual[, pct := round(as.numeric(n) * pop / sum(pop))]
@@ -3177,6 +3170,9 @@ mcjobs[[37]] <- function () {
 
 
 # Parallelisation ---------------------------------------------------------
-mclapply(mcjobs,
-         function(f) f(),
-         mc.cores = clusternumber)
+# mclapply(mcjobs,
+#          function(f) f(),
+#          mc.cores = clusternumber)
+lapply(mcjobs,
+         function(f) f())
+

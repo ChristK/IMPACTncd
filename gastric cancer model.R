@@ -265,7 +265,7 @@ if (i == yearstoproject + init.year - 2012) {
 indiv.incid[[which(diseasestoexclude=="C16")]] <- 
   POP[c16.incidence == 2011 + i,
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
-      ][, `:=` (scenario = gsub(".Rc", "", scenarios.list[[iterations]]),
+      ][, `:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]),
                 mc = haha, year = 2011 + i, cause = "c16")]
 
 indiv.mort[[which(diseasestoexclude=="C16") + 1]] <-
@@ -273,7 +273,7 @@ indiv.mort[[which(diseasestoexclude=="C16") + 1]] <-
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
       ][,
         `:=` (year = 2011 + i, cause = "c16",
-              scenario = gsub(".Rc", "", scenarios.list[[iterations]]), 
+              scenario = gsub(".R", "", scenarios.list[[iterations]]), 
               mc = haha)]
 POP[v == T & dead == F, 
     `:=` (c16.incidence = 0)]

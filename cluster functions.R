@@ -33,8 +33,8 @@ if (paired == T) {
 output.dir <-
   cmpfun(
     function() {
-      paste0("./Output/",
-             gsub(".Rc", "", scenarios.list[[iterations]]), 
+      paste0("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/",
+             gsub(".R", "", scenarios.list[[iterations]]), 
              "/",
              haha,
              "/")
@@ -42,26 +42,28 @@ output.dir <-
   )
 
 
-dir.create(path = output.dir(), recursive = T) # create a unique directory for each run of each scenario
+dir.create(output.dir(), F, recursive = T) # create a unique directory for each run of each scenario
 
-# from Mozaffarian NEJM 
-salt.sbp.reduct <- cmpfun(
+# from Mozaffarian NEJM. Negative salt diff leads to negative change in sbp
+salt.sbp.diff <- cmpfun(
   function(salt.difference, age, sbp, n) {
-    if (paired) set.seed(seed[[counter[[iterations]]]])
+    # if (paired) set.seed(seed[[counter[[iterations]]]]) 
     y = rnorm(n, -3.735, 0.73) + rnorm(n, -0.105, 0.029) * (age - 50) +
       rnorm(n, -1.874, 0.884) * (sbp > 140) +
       rnorm(n, -2.489, 1.188) * rbinom(n, 1, 0.1)
-    return(salt.difference * y /5.85)
+    return(bound(-salt.difference * y / 5.85, 0, Inf)) # Careful this will only work if salt increases in scenarios. 
   }
 )
 
+# summary(salt.sbp.diff(1, sample(20:84, 1e6, T), runif(1e6, 90, 220), 1e6))
+
 diseases <- vector("list", length(diseasestoexclude) + 1)
 names(diseases) <- c(diseasestoexclude, "other")
-if ("CHD" %in% diseasestoexclude) diseases$CHD <- function() loadcmp(file = "./chd model.Rc", my.env)
-if ("stroke" %in% diseasestoexclude) diseases$stroke <- function() loadcmp(file = "./stroke model.Rc", my.env)
-if ("C34" %in% diseasestoexclude) diseases$C34 <- function() loadcmp(file = "./lung cancer model.Rc", my.env)
-if ("C16" %in% diseasestoexclude) diseases$C16 <- function() loadcmp(file = "./gastric cancer model.Rc", my.env)
-diseases$other <- function() loadcmp(file = "./other model.Rc", my.env)
+if ("CHD" %in% diseasestoexclude) diseases$CHD <- function() sys.source("./chd model.R", my.env)
+if ("stroke" %in% diseasestoexclude) diseases$stroke <- function() sys.source("./stroke model.R", my.env)
+if ("C34" %in% diseasestoexclude) diseases$C34 <- function() sys.source("./lung cancer model.R", my.env)
+if ("C16" %in% diseasestoexclude) diseases$C16 <- function() sys.source("./gastric cancer model.R", my.env)
+diseases$other <- function() sys.source(file = "./other model.R", my.env)
 
 ageing.distr <- # smaller fortune increase the variability of the join
   cmpfun(
@@ -97,7 +99,7 @@ ageing.distr <- # smaller fortune increase the variability of the join
 pop.summ <-  cmpfun(
   function(N, ...) {
     return(list("year" = 2011 + i,
-                "scenario" = gsub(".Rc", "", scenarios.list[[iterations]]),
+                "scenario" = gsub(".R", "", scenarios.list[[iterations]]),
                 "mc" = haha,
                 "pop" = N))
   }
@@ -106,15 +108,16 @@ pop.summ <-  cmpfun(
 output.rf  <- cmpfun(
   function(dt, strata, l = 0, h = 100, ...) {
     dt[between(age, l, h), c(2011 + i,
-                             gsub(".Rc", "", scenarios.list[[iterations]]),
+                             gsub(".R", "", scenarios.list[[iterations]]),
                              haha,
                              .N,
                              meansd(bmival.cvdlag),
                              meansd(bmival.calag),
                              meansd(omsysval.cvdlag),
                              meansd(cholval.cvdlag),
-                             meansd(salt24h.cvdlag),
-                             meansd(salt24h.calag),
+                             meansd(salt24h.report),
+                             meansd(salt24h.report.rd),
+                             meansd(salt24h.report.diff),
                              meansd(packyears),
                              meansd(packyears.cvdlag),
                              fvsum(porftvg.cvdlag, porftvg.calag),
@@ -128,7 +131,8 @@ output.rf  <- cmpfun(
 output.rf.names <- 
   c("year", "scenario", "mc" , "pop", "bmi.cvd.mean", "bmi.cvd.sd", "bmi.ca.mean",
     "bmi.ca.sd", "sbp.cvd.mean", "sbp.cvd.sd", "tc.cvd.mean", "tc.cvd.sd",
-    "salt.cvd.mean", "salt.cvd.sd", "salt.ca.mean", "salt.ca.sd",
+    "salt.fsa.mean", "salt.fsa.sd", "salt.rd.mean", "salt.rd.sd",
+    "salt.diff.mean", "salt.diff.sd",
     "packyears.mean", "packyears.sd", "packyears.cvd.mean",
     "packyears.cvd.sd", paste0("fv.cvd.", 0:8), 
     paste0("fv.ca.", 0:8), "smok.cvd.never", "smok.cvd.active",
@@ -141,7 +145,7 @@ output.chd  <- cmpfun(
   ) {
     dt[between(age, l, h), 
        list("year"              = 2011 + i,
-            "scenario"          = gsub(".Rc", "", scenarios.list[[iterations]]),
+            "scenario"          = gsub(".R", "", scenarios.list[[iterations]]),
             "mc"                = haha,
             "pop"               = .N,
             "chd.incidence"     = sum(chd.incidence == 2011 + i, na.rm = T),
@@ -155,7 +159,7 @@ output.chd  <- cmpfun(
 output.stroke  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"                 = 2011 + i,
-          "scenario"             = gsub(".Rc", "", scenarios.list[[iterations]]
+          "scenario"             = gsub(".R", "", scenarios.list[[iterations]]
           ),
           "mc"                   = haha,
           "pop"                  = .N,
@@ -170,7 +174,7 @@ output.stroke  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
 output.cvd  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"            = 2011 + i,
-          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
+          "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
           "mc"              = haha,
           "pop"             = .N,
           #"cvd.incidence"   = sum(chd.incidence == (2011 + i) | stroke.incidence == (2011 + i), na.rm = T), # proper incidence is difficult because of mortality, but the bias is minimal
@@ -182,7 +186,7 @@ output.cvd  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
 output.c16  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"            = 2011 + i,
-          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
+          "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
           "mc"              = haha,
           "pop"             = .N,
           "c16.incidence"   = sum(c16.incidence == 2011 + i, na.rm = T),
@@ -195,7 +199,7 @@ output.c16  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
 output.c34  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
   dt[between(age, l, h), 
      list("year"            = 2011 + i,
-          "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
+          "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
           "mc"              = haha,
           "pop"             = .N,
           "c34.incidence"   = sum(c34.incidence == 2011 + i, na.rm = T),
@@ -207,7 +211,7 @@ output.c34  <- cmpfun(function(dt, strata, l = ageL, h = ageH, ...) {
 
 output.other  <- cmpfun(function(dt, strata, ...) {
   dt[, list("year"            = 2011 + i,
-            "scenario"        = gsub(".Rc", "", scenarios.list[[iterations]]),
+            "scenario"        = gsub(".R", "", scenarios.list[[iterations]]),
             "mc"              = haha,
             "pop"             = .N,
             "other.mortality" = sum(dead, na.rm = T)
@@ -240,6 +244,13 @@ pred.origin <- cmpfun(function(age, sex, qimd) {
 } 
 )
 
+salt <- fread("./Exposure/24h_urine_data.csv")
+tt <- data.table(time = salt[, unique(time)], year = c(1, 6, 8.5, 11.5, 14.5)) # 2000 = year 0
+salt[tt, on = "time", year := i.year]
+salt <- salt[incomplete == 0] # remove incomplete/extra participants
+saltpre <- salt[year <= 10, ]
+saltpost <- salt[year >= 8, ] # not a typo we need a point before responsibility deal and all after
+rm(salt)
 
 # Seeded random -----------------------------------------------------------
 # if (paired == T) {

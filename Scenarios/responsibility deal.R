@@ -1,4 +1,4 @@
-#cmpfile("./Scenarios/current trends.R")
+#cmpfile("./Scenarios/responsibility deal.R")
 ## IMPACTncd: A decision support tool for primary prevention of NCDs
 ## Copyright (C) 2015  Chris Kypridemos
 
@@ -19,13 +19,31 @@
 
 
 # This scenario is the fundamental one
-# Assumes that the trends that where observed since 2001 will continue in the future
-cat("current trends scenario\n\n")
-
+# Assumes that the trends stops in 2011 as a result of the responsibility deal
+cat("Responsibility deal scenario\n\n")
+intervention.year <- 2011
 
 if (i == (init.year - 2011)) {
+
+  
+  # Function to apply after ageing
   post.ageing.scenario.fn <- function(i, env = my.env) {
     cat("Post ageing scenario function\n")
+    if (i - cvd.lag >= intervention.year - init.year) {
+      POP[, salt24h.baseline := salt24h.cvdlag]
+      POP[, salt24h.cvdlag := pred.salt.rd(i, age, sex, salt_rank, cvd.lag, salt_data)]
+      set(POP, NULL, "salt_diff", 0)
+      POP[salt24h.cvdlag > c16.salt.optim, salt_diff := salt24h.cvdlag - 
+            salt24h.baseline]
+      POP[between(age, ageL, ageH), omsysval.cvdlag := omsysval.cvdlag +
+            salt.sbp.diff(salt_diff, age, omsysval.cvdlag, .N)]
+    }
+    
+    if (i - cancer.lag >= intervention.year - init.year) {
+      POP[, salt24h.calag.rd := pred.salt.rd(i, age, sex, salt_rank, cancer.lag, salt_data)]
+      POP[salt24h.calag > c16.salt.optim, salt24h.calag := salt24h.calag.rd]
+    }
   }
 }
+
 

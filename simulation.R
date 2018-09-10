@@ -32,14 +32,13 @@ for (i in (init.year - 2011):(yearstoproject + init.year - 2012)) {
   cat(paste0(rep("* ", 20)), "\n\n")    
   
   # Load scenario
-  loadcmp(file = paste0("./Scenarios/", scenarios.list[[iterations]]), my.env)
+  sys.source(file = paste0("./Scenarios/", scenarios.list[[iterations]]), my.env)
   
   # Start births engine
-  #sys.source(file = "./birth engine.R", my.env)
-  loadcmp(file = "./birth engine.Rc", my.env)
-  
+  sys.source(file = "./birth engine.R", my.env)
+
   # Start ageing engine
-  loadcmp(file = "./ageing engine.Rc", my.env)
+  sys.source(file = "./ageing engine.R", my.env)
   
   # Estimating incidence and mortality of modelled NCDs
   indiv.mort <- vector("list", length(diseasestoexclude) + 1) # to store individual deaths
@@ -48,7 +47,7 @@ for (i in (init.year - 2011):(yearstoproject + init.year - 2012)) {
   lapply(sample(diseases), function(f) f()) # randomly change the order of diseases each year and run all functions in the list
   
   # Summarising individual outputs
-  loadcmp(file = "./individual summary.Rc", my.env)
+  sys.source(file = "./individual summary.R", my.env)
   
   #cat("Advance age\n")
   POP[, `:=`(age = age + 1)]  # make pop older

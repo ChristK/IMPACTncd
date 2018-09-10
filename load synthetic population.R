@@ -104,5 +104,8 @@ POP[cigst1 == "3" & numsmok < 1L, numsmok := 1L]
 
 POP[, `:=` (cigdyal = as.numeric(cigdyal), numsmok = as.numeric(numsmok))]
 
+POP[, salt_rank := (frank(salt.intersalt, na.last = F, ties.method = "random") - 1)/(.N - 1), by = .(age, sex)]
+POP[salt_rank == 0, salt_rank := 0.0001]
+POP[salt_rank == 1, salt_rank := 0.9999]
 rm(tt, SPOP, origin.multinom)
 # sink() 

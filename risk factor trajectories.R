@@ -17,24 +17,83 @@
 ## or write to the Free Software Foundation, Inc., 51 Franklin Street,
 ## Fifth Floor, Boston, MA 02110-1301  USA.
 
-
-load(file="./Lagtimes/bmi.svylm.rda")
-load(file="./Lagtimes/chol.svylm.rda")
-load(file="./Lagtimes/sbp.svylm.rda")
-load(file="./Lagtimes/diab.svylr.rda")
-load(file="./Lagtimes/smok.active.svylr.rda")
-load(file="./Lagtimes/smok.exactive.svylr.rda")
-load(file="./Lagtimes/smok.cess.svylr.rda")
-load(file="./Lagtimes/smok.cess.success.log.rda")
-load(file="./Lagtimes/smok.cess.success.parabola.rda")
-load(file="./Lagtimes/smok.start.svylr.rda")
-load(file="./Lagtimes/smok.cigdyal.svylm.rda")
-load(file="./Lagtimes/fv.svylr.rda")
-load(file="./Lagtimes/pa.svylr.rda")
-load(file="./Lagtimes/salt.rq.rda")
-load(file="./Lagtimes/bpmed.svylr.rda")
-
 cat("Load RF trajectories\n")
+
+# salt.gamlss <- readRDS("./Lagtimes/salt.itsgamlss_lin.rds")
+salt.gamlss <- readRDS("./Lagtimes/salt.itsgamlss_log.rds")
+salt_data <- fread("./Lagtimes/salt_data.csv")
+load("./Lagtimes/bmi.svylm.rda")
+load("./Lagtimes/chol.svylm.rda")
+load("./Lagtimes/sbp.svylm.rda")
+load("./Lagtimes/diab.svylr.rda")
+load("./Lagtimes/smok.active.svylr.rda")
+load("./Lagtimes/smok.exactive.svylr.rda")
+load("./Lagtimes/smok.cess.svylr.rda")
+load("./Lagtimes/smok.cess.success.log.rda")
+load("./Lagtimes/smok.cess.success.parabola.rda")
+load("./Lagtimes/smok.start.svylr.rda")
+load("./Lagtimes/smok.cigdyal.svylm.rda")
+load("./Lagtimes/fv.svylr.rda")
+load("./Lagtimes/pa.svylr.rda")
+load("./Lagtimes/bpmed.svylr.rda")
+
+pred.salt <- 
+  function(year, age, sex, rank, lag, data1) {
+    if (is.factor(sex) == F) {
+      sex <-  factor(sex, 
+                     levels = c(1,2), 
+                     ordered = F)
+    }
+    newdata <- data.table(
+      year = bound(year - lag + 11.5, 0, Inf), # +11.5 because in gamlss regression year 2000 = 0
+      age  = age  - lag, 
+      sex  = c("Male", "Female")[sex],
+      rank = rank,
+      resp_deal = factor(0, levels = 0:1)
+    )
+    newdata[year < 0.5, year := 0.5] # assume salt stable before 2001
+    newdata[, id := .I]
+    print("Predict")
+    newdata[, c("mu", "sigma") := predictAll(salt.gamlss,
+                                             newdata = newdata[, .(year, age, sex, resp_deal)], type = "response",
+                                             data = data1)]
+    print("qRGtr")
+    newdata[, salt := qRGtr(rank, mu = mu, sigma = sigma)]
+    # setorder(newdata, sex, age, rank)
+    # newdata[, salt := sort(salt), by = .(age, sex)]
+    # setorder(newdata, id)
+    # return(newdata)
+    return(newdata$salt)
+  }
+
+pred.salt.rd <- 
+  function(year, age, sex, rank, lag, data1) {
+    if (is.factor(sex) == F) {
+      sex <-  factor(sex, 
+                     levels = c(1,2), 
+                     ordered = F)
+    }
+    newdata <- data.table(
+      year = bound(year - lag + 11.5, 0, Inf), # +11.5 because in gamlss regression year 2000 = 0
+      age  = age  - lag, 
+      sex  = c("Male", "Female")[sex],
+      rank = rank,
+      resp_deal = factor(1, levels = 0:1)
+    )
+    newdata[year < 0.5, year := 0.5] # assume salt stable before 2001
+    newdata[, id := .I]
+    print("Predict")
+    newdata[, c("mu", "sigma") := predictAll(salt.gamlss,
+                                             newdata = newdata[, .(year, age, sex, resp_deal)], type = "response",
+                                             data = data1)]
+    print("qRGtr")
+    newdata[, salt := qRGtr(rank, mu = mu, sigma = sigma)]
+    # setorder(newdata, sex, age, rank)
+    # newdata[, salt := sort(salt), by = .(age, sex)]
+    # setorder(newdata, id)
+    # return(newdata)
+    return(newdata$salt)
+  }
 
 # PA prediction ---------------------------------------
 PA.intervention <- 0L
@@ -535,55 +594,7 @@ pred.bmi <-
 #                  sample(c(1:5), n, replace = T),
 #                  sample(c(1,10), n, replace = T)))
 
-# Salt prediction ---------------------------------------------------------
-# Returns a dataframe of 24h salt percentiles by year, age, sex, qimd 
-pred.salt <- 
-  cmpfun(
-    function(year, lag = cancer.lag) {
-      # year <- 
-        # switch(EXPR = as.character((year - lag)),
-        #        "-16" =  lag - 8,
-        #        "-15" =  lag - 8.5,
-        #        "-14" =  lag - 9,
-        #        "-13" =  lag - 9.5,
-        #        "-12" =  lag - 9,
-        #        "-11" =  lag - 8.5,
-        #        "-10" =  lag - 8,
-        #        "-9"  =  lag - 7.7,
-        #        "-8"  =  lag - 7.5,
-        #        year
-        # )
-      if (lag>4) lag <- 4
-      
-      tmp <- expand.grid(
-        year = year-lag,
-        age  = (19 - lag):(ageH - lag),
-        #age  = (ageL-lag):(ageH-lag),
-        sex  = factor(1:2),
-        qimd = ordered(1:5)
-      )
-      cc <- predict(salt.rq, tmp)^3
-      
-      tmp <- setDT(cbind(tmp, cc))
-      tmp[, `:=` (year = NULL, age = age + lag)]
-      setnames(tmp,
-               paste0("tau= ", sprintf("%.2f", c(0.01, 1:19/20, 0.99))),
-               paste0(c(0.01, 1:19/20, 0.99)))
-      
-      tmp <- melt(tmp, 1:3, 
-                  variable.name = "percentile",
-                  value.name = "salt.u", 
-                  variable.factor = F)
-      
-      tmp[, percentile := as.numeric(percentile)]
-      tmp[, salt.l := shift(salt.u, 1, 1, "lag"),
-          by = .(age, sex, qimd)]
-      tmp[salt.u<salt.l, salt.t := salt.u] # logic to reverse column l u columns
-      tmp[salt.u<salt.l, `:=` (salt.u = salt.l, salt.l = salt.t)]
-      if ("salt.t" %in% names(tmp)) tmp[, salt.t := NULL]
-      return(tmp)
-    }
-  )
+
 
 # SBP prediction ----------------------------------------------------------
 # Define function for sbp projection (for DT needs the by= to work correctly with mean(bmival)) (predicts mean sbp)

@@ -33,7 +33,6 @@ dependencies <- function(x) {
 
 # Then try/install packages...
 dependencies(c("demography", 
-               #"truncnorm", 
                "stringr", 
                "nnet",
                "reshape2", 
@@ -45,16 +44,16 @@ dependencies(c("demography",
                "doParallel",
                "doRNG",
                "foreach",
-               "quantreg",
+               "gamlss",
+               "gamlss.tr",
                "Rcpp",
-               "data.table", 
-               "dplyr"))
+               "data.table" 
+               ))
+gen.trun(par = 0.6088304,family = "RG", type = "left")
 
-enableJIT(2) #set to 1, 2 or 3 to enable different precompiling levels
 # options(datatable.optimize = 1)
 options(survey.lonely.psu = "adjust") #Lonely PSU (center any single-PSU strata around the sample grand mean rather than the stratum mean)
-# require(devtools)
-# install_github("Rdatatable/data.table",  build_vignettes = F)
+
 
 # max projection horizon (limited by fertility)
 if (init.year + yearstoproject > 2061) yearstoproject <- 2061 - init.year
@@ -62,7 +61,7 @@ if (init.year + yearstoproject > 2061) yearstoproject <- 2061 - init.year
 # Define end() function to beep end print a message
 end <- function(...) {
   cat("All done! \a\n")
-  sink(file = "./Output/simulation parameters.txt",
+  sink(file = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/simulation parameters.txt",
        append = T, 
        type = "output",
        split = F)
@@ -76,7 +75,7 @@ end <- function(...) {
 
 # Function for timing log
 time.mark <- function(x) {
-  sink(file = "./Output/times.txt",
+  sink(file = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/times.txt",
        append = T, 
        type = "output",
        split = F)
@@ -84,12 +83,6 @@ time.mark <- function(x) {
   sink()
 }
 
-# # Create a vector of random numbers, using the SIMD-oriented Fast Mersenne Twister algorithms by
-# # Matsumoto & Saito (2008)
-# dice <- function(n = .N) {
-#     rand <- SFMT(n, dim = 1, mexp = 19937, usepset = T, withtorus = F, usetime = T)
-#     return(rand)
-# }
 
 # Define RNG for parallel use with doRNG
 RNGkind("L'Ecuyer-CMRG")
@@ -357,8 +350,8 @@ setnames(Fertility, c("age", 2000:2061))
 setkey(Fertility, age)
 
 # Find and load scenarios -------------------------------------------------
-if (!exists("scenarios.list")) { # not if defined by GUI
-  scenarios.list <- list.files(path = "./Scenarios", pattern = glob2rx("*.Rc"), full.names = F, recursive = F)
+if (!exists("scenarios.list")) { #  if not defined by GUI
+  scenarios.list <- list.files(path = "./Scenarios", pattern = glob2rx("*.R"), full.names = F, recursive = F)
 }
 
 n.scenarios <- length(scenarios.list)
@@ -372,7 +365,7 @@ paired.mem <-
     max(
       as.integer(
         list.dirs(
-          path = "./Output/current trends", 
+          path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/current trends", 
           #pattern = "riskfactors.rds", 
           full.names = F, 
           recursive = F
@@ -384,8 +377,8 @@ paired.mem <- ifelse(is.infinite(paired.mem), 0, paired.mem)
 
 
 # Specify output.txt file for simulation parameters -----------------------
-dir.create(path = "./Output/", recursive = T, showWarnings = F)
-fileOut <- file(paste0("./Output/simulation parameters temp.txt"))
+dir.create(path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/", recursive = T, showWarnings = F)
+fileOut <- file(paste0("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/simulation parameters temp.txt"))
 writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n", 
              paste0("Simulation started at: ", Sys.time(), "\n"),
              "Simulation parameters:\n",
@@ -407,7 +400,7 @@ writeLines(c("IMPACTncd\nA dynamic microsimulation, by Dr Chris Kypridemos", "\n
              paste0("Gastric cancer fatality gradient = ", fatality.sec.gradient.c16/100),
              paste0("Lung cancer fatality gradient = ", fatality.sec.gradient.c34/100),
              paste0("Sample size = ", format(n, scientific = F)),
-             paste0("Number of iterations = ", numberofiterations),
+             paste0("Number of iterations = ", paired.mem + numberofiterations),
              paste0("Number of scenarios = ", n.scenarios) 
 ), 
 fileOut)
@@ -415,28 +408,13 @@ close(fileOut)
 
 
 # Load C++ function to summarise riskfactors ------------------------------
-sourceCpp("functions.cpp")
+sourceCpp("functions.cpp", cacheDir = "./.cache")
 
 # Sample for parameter distributions --------------------------------------
 cvd.lag <- (cvd.lag - 1)/9 # calculate p of binom for mean = user input cvd.lag
 cancer.lag <- (cancer.lag - 1)/9 # because n*p is integer, mean = median
 cvd.lag.l    <- 1L + rbinom(ifelse(paired, numberofiterations, it), 9, cvd.lag)
 cancer.lag.l <- 1L + rbinom(ifelse(paired, numberofiterations, it), 9, cancer.lag)
-
-lagtimes.dt <- data.table("cvd.lag" = cvd.lag.l, "cancer.lag" = cancer.lag.l)
-if (file.exists("./Output/lagtimes.csv")) {
-  write.table(lagtimes.dt, file = "./Output/lagtimes.csv", append = T, 
-              row.names=F, col.names=F,  sep=",")
-} else write.csv(lagtimes.dt, file = "./Output/lagtimes.csv", row.names=F)
-# TODO Above will not work if paired = F. I will have to move later after  
-
-
-load(file="./Lagtimes/salt.rq.coef.rda")
-if (paired == T) { 
-  salt.rq.coef <- sample(salt.rq.coef, numberofiterations, T)
-} else {
-  salt.rq.coef <- sample(salt.rq.coef, it, T)
-}
 
 # Load RA incid
 RAincid.rr.l <- setkey(
@@ -850,7 +828,7 @@ if ("C16" %in% diseasestoexclude) {
 
 # SPOP load order --------------------------------------------------------------
 if (init.year == 2006) {
-  random.spop.file <- list.files("./SynthPop", 
+  random.spop.file <- list.files("~/Synthetic Populations/England 2005 - 2007", 
                                  pattern = glob2rx("spop050607*.rds"), 
                                  full.names = T) # pick a random file from the available population files
 } 
@@ -860,7 +838,7 @@ if (init.year == 2006) {
 #                                  full.names = T) # pick a random file from the available population files
 # }
 if (init.year == 2011) {
-  random.spop.file <- list.files("./SynthPop", 
+  random.spop.file <- list.files("~/Synthetic Populations/England 2011", 
                                  pattern = glob2rx("spop2011*.rds"), 
                                  full.names = T) # pick a random file from the available population files
 }
@@ -871,9 +849,9 @@ random.spop.file <- sample(random.spop.file, ifelse(paired, numberofiterations, 
 seed <- sample(1e6:1e7, ifelse(paired, numberofiterations, it), F) 
 
 cat(paste0(seed), "\n", 
-    file = "./Output/seed temp.txt",
+    file = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/seed temp.txt",
     append = F)
 
-rm(n.scenarios, lagtimes.dt)
+rm(n.scenarios)
 
 

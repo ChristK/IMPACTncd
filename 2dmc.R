@@ -19,11 +19,6 @@
 
 
 cat("Sample RR values for 2d Monte Carlo\n\n")
-# coefficients for salt model from the MC simulation
-load(file="./Lagtimes/salt.rq.coef.rda")
-salt.rq$coefficients <- salt.rq.coef[[counter[[iterations]]]] # length=500 so 
-# up to 500 iteratin in each run
-#salt.rq$coefficients <- apply(simplify2array(salt.rq.coef), 1:2, mean) # mean of MC
 
 cvd.lag    <- cvd.lag.l[[counter[[iterations]]]]
 cancer.lag <- cancer.lag.l[[counter[[iterations]]]]

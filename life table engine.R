@@ -18,7 +18,6 @@
 ## Fifth Floor, Boston, MA 02110-1301  USA.
 
 # Load files --------------------------------------------------------------
-# Create diseasestoexclude.ICD from diseasestoexclude user input
 diseasestoexclude.ICD <- diseasestoexclude
 if ("CHD" %in% diseasestoexclude) {
   remove <- "CHD"
@@ -47,6 +46,16 @@ if ("C34" %in% diseasestoexclude) {
   diseasestoexclude.ICD <-
     c(diseasestoexclude.ICD,"Malignant neoplasm of trachea, bronchus and lung")
 }
+
+if (file.exists(paste0("./LifeTables/Lifetable.diab", "_", paste0(diseasestoexclude, collapse = ""),
+                       yearstoproject, ".rds")) && 
+    file.exists(paste0("./LifeTables/Lifetable", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds")) && 
+    file.exists(paste0("./LifeTables/population.actual", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds"))) {
+  Lifetable.diab <- readRDS(paste0("./LifeTables/Lifetable.diab", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds")) 
+  Lifetable <- readRDS(paste0("./LifeTables/Lifetable", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds")) 
+  population.actual <- readRDS(paste0("./LifeTables/population.actual", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds")) 
+} else {
+# Create diseasestoexclude.ICD from diseasestoexclude user input
 
 population <-
   fread(
@@ -128,7 +137,7 @@ tt[, Mx.all := deaths / pop]
 tt[, Mx.disease := (deaths - disease) / (pop - disease)]
 # death rate modelled diseases excluded
 
-# Life tables loop --------------------------------------------------------
+# Life tables loop -----------------------------
 
 hor <- yearstoproject - 2013 + init.year
 if (hor < 1) hor <- 1
@@ -218,8 +227,7 @@ pp <-
     output
   }
 
-if (Sys.info()[1] == "Windows")
-  stopCluster(cl)
+if (Sys.info()[1] == "Windows")  stopCluster(cl)
 
 Lifetable.diab <- rbindlist(lapply(pp, `[[`, 2))
 Lifetable.diab[, age := as.integer(age)]
@@ -230,17 +238,37 @@ Lifetable[, age := as.integer(age)]
 setkey(Lifetable.diab, age, sex, qimd)
 setkey(Lifetable,      age, sex, qimd)
 
-
-# Population distribution  ----------------------
 # Match the sex and age structure of the initial year
 population.actual <- rbindlist(lapply(pp, `[[`, 3))[, .SD, .SDcols = c("age", "sex", "qimd", paste0(init.year))]
 setnames(population.actual, paste0(init.year), "pop.smooth")
+
+saveRDS(Lifetable.diab, paste0("./LifeTables/Lifetable.diab", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds")) 
+saveRDS(Lifetable, paste0("./LifeTables/Lifetable", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds")) 
+saveRDS(population.actual, paste0("./LifeTables/population.actual", "_", paste0(diseasestoexclude, collapse = ""), yearstoproject, ".rds")) 
+}
+
+# Population distribution  ----------------------
 population.actual[, agegroup := agegroup.fn(age)
                   ][between(age, 85, 89), agegroup := "85-89"
                     ][age > 89, agegroup := "90+"
                       ][, agegroup := ordered(agegroup)
                         ][, pop.group := sum(pop.smooth),
                           by = .(agegroup, sex, qimd)]
+
+population <-
+  fread(
+    "./Population/Population by adjusted IMD 2010 quintile_final.csv",
+    header = T, 
+    skip = 0
+  )
+setnames(population, names(population), str_trim(names(population)))
+population <-
+  melt(
+    population, id.vars = c("year", "sex", "qimd"), 
+    variable.name = "agegroup",
+    value.name = "pop"
+  )
+
 
 tt = copy(population[year == init.year]
 )[, year := NULL
@@ -259,7 +287,7 @@ population.actual[age > 89, pct2 := sum(pct), by = .(sex, qimd)] # aggregate age
 # 53107200 is the total mid 2011 population of England (52642600 for 2010)
 
 cat(paste0("Population fraction = ", pop.fraction, "\n"), 
-    file = "./Output/simulation parameters temp.txt",
+    file = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/simulation parameters temp.txt",
     append = T)
 
 
@@ -276,6 +304,28 @@ smokriskofdeath <-
                                                       2917 / 19.38)] 
 
 # Prevalence sec gradient -------------------------------------------------
+deaths.causes <-
+  fread(
+    "./LifeTables/deaths from selected causes by quintile_final_tcm77-388639.csv",
+    header = T,
+    skip = 0
+  )
+
+setnames(deaths.causes, names(deaths.causes), str_trim(names(deaths.causes)))
+deaths.causes <- deaths.causes[cause %in% diseasestoexclude.ICD,]
+deaths.causes <-
+  melt(
+    deaths.causes, id.vars = c("year", "sex", "qimd", "cause"), 
+    variable.name = "agegroup", 
+    value.name = "disease"
+  )
+
+deaths.causes.secgrad = copy(deaths.causes) # To be used later for prevalence sec gradient
+deaths.causes.secgrad <-
+  merge(
+    deaths.causes.secgrad, population, by = c("year", "sex", "qimd", "agegroup"),
+    all.x = T
+  )
 deaths.causes.secgrad <- 
   deaths.causes.secgrad[between(year, init.year - 4, init.year) & 
                          agegroup %in% unique(agegroup.fn(ageL:ageH))
@@ -341,4 +391,5 @@ if ("C34" %in% diseasestoexclude) {
 }
 #rm(list = c(apropos(glob2rx("mortal.sex-*"))))
 #rm(list = c(apropos(glob2rx("POP.sex-*"))))
-rm(tt, deaths.qimd, population, deaths.causes, diseasestoexclude.ICD, pp)
+suppressWarnings(rm(tt, deaths.qimd, population, deaths.causes, diseasestoexclude.ICD, pp))
+

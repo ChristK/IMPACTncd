@@ -35,7 +35,7 @@ setkey(POP, hserial)
 
 POP <- rbind(POP, 
              POP[hserial %in% tt, 
-                 sample_n(.SD,
+                 dplyr::sample_n(.SD,
                           births[, sum(newborns)], 
                           replace = T)
                  ][ , `:=`(age = 0, 

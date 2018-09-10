@@ -19,25 +19,25 @@
 
 
 dir.create(
-  path = "./Output/RF/", 
+  path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/RF/", 
   recursive = T, 
   showWarnings = F
 )
 
 dir.create(
-  path = "./Output/Other/",
+  path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Other/",
   recursive = T, 
   showWarnings = F
 )
 
 dir.create(
-  path = "./Output/Tables/", 
+  path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Tables/", 
   recursive = T, 
   showWarnings = F
 )
 
 dir.create(
-  path = "./Output/Validation/", 
+  path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Validation/", 
   recursive = T, 
   showWarnings = F
 )
@@ -49,7 +49,7 @@ cat("Collecting risk factors output...\n"
 
 all.files <- as.list(
   list.files(
-    path = "./Output", 
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/", 
     pattern = "riskfactors.rds", 
     full.names = T, 
     recursive = T
@@ -88,14 +88,14 @@ riskfactors[
 
 riskfactors[, sex := factor(sex, c("1", "2"), c("Men" ,"Women"))]
 
-lagtimes.dt <- fread("./Output/lagtimes.csv")
+lagtimes.dt <- fread("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/lagtimes.csv")
 lagtimes.dt[, mc := .I]
 
 riskfactors[lagtimes.dt, on="mc", `:=` (year.cvdlag = year - cvd.lag, 
                                         year.calag  = year - cancer.lag)]
 save(
   riskfactors,
-  file="./Output/RF/riskfactors.RData"
+  file = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/RF/riskfactors.RData"
 )
 
 pop.abs <- riskfactors[group=="SAQ",
@@ -109,7 +109,7 @@ setkey(pop.abs, year, scenario, sex, agegroup, qimd, mc)
 
 save(
   pop.abs,
-  file="./Output/RF/population.structure.RData"
+  file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/RF/population.structure.RData"
 )
 
 #rm(riskfactors)
@@ -121,7 +121,7 @@ cat("Collecting individual trajectories...\n"
 )
 all.files <- as.list(
   list.files(
-    path = "./Output", 
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output", 
     pattern = "indiv.traj.rds", 
     full.names = T, 
     recursive = T
@@ -141,7 +141,7 @@ indiv.traj[, sex := factor(sex, c("1", "2"), c("Men" ,"Women"))]
 
 save(
   indiv.traj,
-  file="./Output/Other/indiv.traj.RData"
+  file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Other/indiv.traj.RData"
 )
 
 
@@ -151,7 +151,7 @@ cat("Collecting high risk output...\n"
 
 all.files <- as.list(
   list.files(
-    path = "./Output", 
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output", 
     pattern = "highrisk.rds", 
     full.names = T, 
     recursive = T
@@ -177,7 +177,7 @@ if (nrow(highrisk)>0) {
   
   save(
     highrisk,
-    file="./Output/RF/highrisk.RData"
+    file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/RF/highrisk.RData"
   )
 }
 
@@ -191,7 +191,7 @@ cat("Collecting other causes mortality output...\n"
 
 all.files <- as.list(
   list.files(
-    path = "./Output",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output",
     pattern = "other.mortal.rds",
     full.names = T,
     recursive = T
@@ -232,7 +232,7 @@ other.mortality[, sex := factor(sex, c("1", "2"), c("Men" ,"Women"))]
 
 save(
   other.mortality,
-  file = "./Output/Other/other.mortality.RData"
+  file = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Other/other.mortality.RData"
 )
 
 #rm(other.mortality)
@@ -245,14 +245,14 @@ if ("CHD" %in% diseasestoexclude) {
   )
   
   dir.create(
-    path = "./Output/CHD/",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/CHD/",
     recursive = T,
     showWarnings = F
   )
   
   all.files <- as.list(
     list.files(
-      path = "./Output",
+      path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output",
       pattern = "chd.burden.rds",
       full.names = T,
       recursive = T
@@ -293,14 +293,14 @@ if ("CHD" %in% diseasestoexclude) {
   
   save(
     chd.burden,
-    file="./Output/CHD/chd.burden.RData"
+    file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/CHD/chd.burden.RData"
   )
   
   #rm(chd.burden)
   #gc()
   
-  #write.csv(healthylife.exp, file="./Output/CHD/healthylife.exp.csv", row.names = F)
-  #save(healthylife.exp.chd, file="./Output/CHD/indiv.incid.RData")
+  #write.csv(healthylife.exp, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/CHD/healthylife.exp.csv", row.names = F)
+  #save(healthylife.exp.chd, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/CHD/indiv.incid.RData")
 }
 
 
@@ -309,14 +309,14 @@ if ("stroke" %in% diseasestoexclude) {
   cat("Collecting stroke burden output...\n"
   )
   dir.create(
-    path = "./Output/Stroke/",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Stroke/",
     recursive = T,
     showWarnings = F
   )
   
   all.files <- as.list(
     list.files(
-      path = "./Output",
+      path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output",
       pattern = "stroke.burden.rds",
       full.names = T,
       recursive = T
@@ -357,14 +357,14 @@ if ("stroke" %in% diseasestoexclude) {
   
   save(
     stroke.burden, 
-    file="./Output/Stroke/stroke.burden.RData"
+    file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Stroke/stroke.burden.RData"
   )
   
   #rm(stroke.burden)
   #gc()
   
-  #write.csv(healthylife.exp, file="./Output/stroke/healthylife.exp.csv", row.names = F)
-  #save(healthylife.exp.stroke, file="./Output/Stroke/indiv.incid.RData")
+  #write.csv(healthylife.exp, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/stroke/healthylife.exp.csv", row.names = F)
+  #save(healthylife.exp.stroke, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Stroke/indiv.incid.RData")
 }
 
 
@@ -374,14 +374,14 @@ if ("CHD" %in% diseasestoexclude & "stroke" %in% diseasestoexclude) {
   )
   
   dir.create(
-    path = "./Output/CVD/",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/CVD/",
     recursive = T,
     showWarnings = F
   )
   
   all.files <- as.list(
     list.files(
-      path = "./Output",
+      path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output",
       pattern = "cvd.burden.rds",
       full.names = T,
       recursive = T
@@ -406,7 +406,7 @@ if ("CHD" %in% diseasestoexclude & "stroke" %in% diseasestoexclude) {
   
   save(
     cvd.burden,
-    file="./Output/CVD/cvd.burden.RData"
+    file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/CVD/cvd.burden.RData"
   )
 }
 
@@ -417,14 +417,14 @@ if ("C16" %in% diseasestoexclude) {
   )
   
   dir.create(
-    path = "./Output/Gastric ca/",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Gastric ca/",
     recursive = T,
     showWarnings = F
   )
   
   all.files <- as.list(
     list.files(
-      path = "./Output",
+      path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output",
       pattern = "c16.burden.rds",
       full.names = T,
       recursive = T
@@ -464,14 +464,14 @@ if ("C16" %in% diseasestoexclude) {
   
   save(
     c16.burden,
-    file="./Output/Gastric ca/c16.burden.RData"
+    file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Gastric ca/c16.burden.RData"
   )
   
   #rm(c16.burden)
   #gc()
   
-  #write.csv(healthylife.exp, file="./Output/Gastric ca/healthylife.exp.csv", row.names = F)
-  #save(healthylife.exp.c16, file="./Output/Gastric ca/indiv.incid.RData")
+  #write.csv(healthylife.exp, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Gastric ca/healthylife.exp.csv", row.names = F)
+  #save(healthylife.exp.c16, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Gastric ca/indiv.incid.RData")
 }
 
 # Lung cancer burden ---------------------------------------------------
@@ -480,14 +480,14 @@ if ("C34" %in% diseasestoexclude) {
   )
   
   dir.create(
-    path = "./Output/Lung ca/",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Lung ca/",
     recursive = T,
     showWarnings = F
   )
   
   all.files <- as.list(
     list.files(
-      path = "./Output",
+      path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output",
       pattern = "c34.burden.rds",
       full.names = T,
       recursive = T
@@ -527,14 +527,14 @@ if ("C34" %in% diseasestoexclude) {
   
   save(
     c34.burden,
-    file="./Output/Lung ca/c34.burden.RData"
+    file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Lung ca/c34.burden.RData"
   )
   
   #rm(c34.burden)
   #gc()
   
-  #write.csv(healthylife.exp, file="./Output/Lung ca/healthylife.exp.csv", row.names = F)
-  #save(healthylife.exp.c34, file="./Output/Lung ca/indiv.incid.RData")
+  #write.csv(healthylife.exp, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Lung ca/healthylife.exp.csv", row.names = F)
+  #save(healthylife.exp.c34, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Lung ca/indiv.incid.RData")
 }
 
 # Life expectancy ---------------------------------------------------------
@@ -543,7 +543,7 @@ cat("Calculating life expectancy...\n"
 
 all.files <- as.list(
   list.files(
-    path = "./Output/",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/",
     pattern = "ind.mortal.rds0",
     full.names = T,
     recursive = T
@@ -559,7 +559,7 @@ life.exp0 <- rbindlist(
   T, T
 )
 
-save(life.exp0, file="./Output/Other/life.exp0.RData")
+save(life.exp0, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Other/life.exp0.RData")
 
 #rm(life.exp0)
 #gc()
@@ -568,7 +568,7 @@ save(life.exp0, file="./Output/Other/life.exp0.RData")
 # Life expectancy at 65 ---------------------------------------------------
 all.files <- as.list(
   list.files(
-    path = "./Output",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output",
     pattern = "ind.mortal.rds65",
     full.names = T,
     recursive = T
@@ -584,7 +584,7 @@ life.exp65 <- rbindlist(
   T, T
 )
 
-save(life.exp65, file="./Output/Other/life.exp65.RData")
+save(life.exp65, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Other/life.exp65.RData")
 
 #rm(life.exp65)
 #gc()
@@ -597,7 +597,7 @@ cat(
 # Gather all objects starting with healthylife.exp.
 all.files <- as.list(
   list.files(
-    path = "./Output/",
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/",
     pattern = "ind.incid.rds",
     full.names = T,
     recursive = T
@@ -615,7 +615,7 @@ hlife.exp <- rbindlist(
 
 save(
   hlife.exp, 
-  file="./Output/Other/hlife.exp.RData"
+  file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Other/hlife.exp.RData"
 )
 
 gc()
@@ -632,7 +632,7 @@ Tables <- mclapply(
 
 save(
   Tables,
-  file="./Output/Tables/Tables.rda"
+  file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Tables/Tables.rda"
 )
 
 # lapply(
@@ -641,7 +641,7 @@ save(
 #   ), 
 #   function(x) write.csv(
 #     Tables[[x]],
-#     file = paste0("./Output/Tables/", x,".csv"),
+#     file = paste0("/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Tables/", x,".csv"),
 #     quote = T,
 #     row.names = F
 #   )
@@ -650,7 +650,7 @@ save(
 
 # Export graphs from tables -----------------------------------------------
 dir.create(
-  path = "./Output/Graphs.tbl/", 
+  path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Graphs.tbl/", 
   recursive = T, 
   showWarnings = F
 )
@@ -660,13 +660,13 @@ Graphs <- mclapply(names(Tables),
                    mc.cores = clusternumber)
 names(Graphs) <- names(Tables)
 
-save(Graphs, file="./Output/Graphs.tbl/Graphs.tbl.rda")
+save(Graphs, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Graphs.tbl/Graphs.tbl.rda")
 
 # Export pdfs
 mclapply(names(Graphs), 
          function(x) ggsave(filename=paste0(x,".pdf"),
                             plot=Graphs[[x]], 
-                            path = "./Output/Graphs.tbl", 
+                            path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Graphs.tbl", 
                             width = 11.69,
                             height = 8.27), mc.cores = clusternumber)
 
@@ -674,7 +674,7 @@ mclapply(names(Graphs),
 # Export graphs -----------------------------------------------------------
 if (export.graphs == T) {
   dir.create(
-    path = "./Output/Graphs/", 
+    path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Graphs/", 
     recursive = T, 
     showWarnings = F
   )
@@ -726,13 +726,13 @@ if (export.graphs == T) {
   } 
   
   
-  save(Graphs, file="./Output/Graphs/Graphs.rda")
+  save(Graphs, file="/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Graphs/Graphs.rda")
   
   # Export pdfs
   mclapply(names(Graphs), 
            function(x) ggsave(filename=paste0(x,".pdf"),
                               plot=Graphs[[x]], 
-                              path = "./Output/Graphs", 
+                              path = "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/Graphs", 
                               width = 11.69,
                               height = 8.27), mc.cores = clusternumber)
   
@@ -744,21 +744,21 @@ if (export.graphs == T) {
 # Calculate DPP/CPP included in the analysis output. current code not dynamic
 
 # Run validation ------------------------------------------------
-loadcmp(file = "./validation.Rc")
+source(file = "./validation.R")
 
 # Clear intermediate files ------------------------------------------------
 if (cleardirectories == T) {
   scenarios.list <- list.files(
     path = "./Scenarios",
-    pattern = glob2rx("*.Rc"),
+    pattern = glob2rx("*.R"),
     full.names = F,
     recursive = F
   )
   
   scenario.dirs <- as.list(
     paste0(
-      "./Output/",
-      gsub(".Rc", "", scenarios.list
+      "/mnt/storage_slow/Model_Outputs/Responsibility_Deal/Output/",
+      gsub(".R", "", scenarios.list
       )
     )
   )

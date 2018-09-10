@@ -441,7 +441,7 @@ load(file="./Lagtimes/HSE.ts.RData")
 #load(file="./Models/IMPACTncd/Lagtimes/HSE.ts.RData")
 
 # Salt
-loadcmp(file="./salt.Rc")
+source(file="./salt.R")
 #source(file="./Models/IMPACTncd/salt.R")
 HSE.ts[bmival<16 & age>19, bmival := 16]
 HSE.ts[bmival>50 & age>19, bmival := 50]

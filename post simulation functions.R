@@ -3142,3 +3142,4 @@ GraphsfromTables <- cmpfun(
 # delete empty functions
 Graphs.fn[sapply(Graphs.fn, function(x) length(formals(x)) == 0 && length(body(x)) == 1)] <- NULL
 Tables.fn[sapply(Tables.fn, function(x) length(formals(x)) == 0 && length(body(x)) == 1)] <- NULL
+

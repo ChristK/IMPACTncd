@@ -23,26 +23,23 @@ options(datatable.verbose = F)
 
 # User input
 init.year <- 2006
-
-widesynthpop <- F
-
 n <- 1e5  # Define the sample size
-
-yearstoproject <- 3  # NEED TO force >=1 and up to 50
-
-numberofiterations <- 5
+yearstoproject <- 25  # NEED TO force >=1 and up to 50
+numberofiterations <- 10
+clusternumber <- 12L # Change to your number of CPU cores 
+process.output <- TRUE
 
 ageL <- 30  # Define lower age limit to diseases-model simulation (min = 30)
 
 ageH <- 84  # Define lower age limit to diseases-model simulation (max = 84)
-
-alignment <- F # T or F (apply correction factor to counterpoise levin's and exposure error)
 
 qdrisk <- T # Use QDrisk score for diabetes incidence
 
 Fertility.Assumption <- "N"  # Select (N)ormal, (H)igh or (L)ow fertility rate asumptions based on ONS scenarios. They do matter for accurate population statistics
 
 cvd.lag <- 5 
+cancer.lag <- 8 
+
 fatality.annual.improvement.chd    <- 3L # 3 means 3% annual improvement in fatality
 fatality.annual.improvement.stroke <- 3L # 3 means 3% annual improvement in fatality
 fatality.annual.improvement.c16    <- 2L
@@ -53,44 +50,37 @@ fatality.sec.gradient.stroke <- 40L # Percentage of difference in fatality betwe
 fatality.sec.gradient.c16    <- 30L
 fatality.sec.gradient.c34    <- 30L
 
-cancer.lag <- 8 
-
-clusternumber <- 4L # Change to your number of CPU cores 
-
 paired <- T 
 
 cleardirectories <- F # If T delete auxiliary output directories when simulation finish
 
 export.graphs <- F
 
-diseasestoexclude <- c("CHD", "stroke", "C34", "C16")  # Define disease to be excluded from lifetables
+diseasestoexclude <- c("CHD", "stroke", "C16")  # Define disease to be excluded from lifetables
 # ICD10 code reminder for disease coding (http://apps.who.int/classifications/icd10/browse/2010/en#/I20-I25)
 
-# *************************************************************************************************
+
+# **********************
 
 cat("Initialising IMPACTncd...\n\n")
 options(warn = 1)
 
 if (Sys.info()[1] == "Linux") {
-  if (system("whoami", T )== "mdxasck2") {
+  if (system("whoami", T) == "mdxasck2") {
     setwd("~/IMPACTncd/")
-    clusternumber <- ifelse (clusternumber<70, 70, clusternumber)  # overwrites previous if <60
+    # all.files <- list.files('./SynthPop', pattern = glob2rx('spop2011*.rds'),
+    # full.names = T) spop.l <- lapply(all.files, readRDS) rm(all.files)
   } else {
-    setwd(paste("/home/", 
-                system("whoami", T), 
-                "/Dropbox/PhD/Models/IMPACTncd/", 
-                sep = "", 
-                collapse = ""))
+    setwd(paste("/home/", system("whoami", T), "/pCloudDrive/My Models/Responsibility deal/", 
+                sep = "", collapse = ""))
   }
-} else if (Sys.info()[1] == "Darwin") {
-    setwd("/Volumes/home/dropbox/PhD/Models/IMPACTncd/")
 } else {
   get.dropbox.folder <- function() {
     if (!require(RCurl)) 
       stop("You need to install RCurl package.")
     if (Sys.info()["sysname"] != "Windows") 
-      stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry.")
-    db.file <- paste(Sys.getenv("LOCALAPPDATA"), "\\Dropbox\\host.db", sep = "")
+      stop("Currently, 'get.dropbox.folder' works for Windows and Linux only. Sorry...")
+    db.file <- paste(Sys.getenv("APPDATA"), "\\Dropbox\\host.db", sep = "")
     base64coded <- readLines(db.file, warn = F)[2]
     base64(base64coded, encode = F)
   }
@@ -117,11 +107,11 @@ sys.source(file = "./load synthetic population.R", my.env)
 
 # Actual simulation
 i = init.year - 2011
-loadcmp(file = "./risk factor trajectories.Rc", my.env)
-loadcmp(file = "./2dmc.Rc", my.env)
-loadcmp(file = paste0("./Scenarios/", scenarios.list[[iterations]]), my.env)
-loadcmp(file = "./birth engine.Rc", my.env)
-loadcmp(file = "./ageing engine.Rc", my.env)
+sys.source(file = "./risk factor trajectories.R", my.env)
+sys.source(file = "./2dmc.R", my.env)
+sys.source(file = paste0("./Scenarios/", scenarios.list[[iterations]]), my.env)
+sys.source(file = "./birth engine.R", my.env)
+sys.source(file = "./ageing engine.R", my.env)
 
 
 # Estimating incidence and mortality of modelled NCDs
@@ -131,18 +121,18 @@ diseases <- sample(diseases) # randomly change the order of diseases each year
 lapply(diseases, function(f) f()) # run all functions in the list
 
 # Summarising individual outputs
-loadcmp(file = "./individual summary.Rc", my.env)
+sys.source(file = "./individual summary.R", my.env)
 
 cat("Advance age\n")
 POP[, `:=`(age = age + 1)]  # make pop older
 agegroup.fn(POP)
 
 for (i in (init.year - 2010) : (init.year - 2012 + yearstoproject)) {
-  loadcmp(file = "./birth engine.Rc", my.env)
-  loadcmp(file = "./ageing engine.Rc", my.env)
+  sys.source(file = "./birth engine.R", my.env)
+  sys.source(file = "./ageing engine.R", my.env)
   diseases <- sample(diseases) # randomly change the order of diseases each year
   lapply(diseases, function(f) f()) # run all functions in the list
-  loadcmp(file = "./individual summary.Rc", my.env)
+  sys.source(file = "./individual summary.R", my.env)
   POP[, `:=`(age = age + 1)]  # make pop older
   agegroup.fn(POP)
 }

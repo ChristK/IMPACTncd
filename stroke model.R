@@ -260,7 +260,7 @@ if (i == yearstoproject + init.year - 2012) {
 indiv.incid[[which(diseasestoexclude=="stroke")]] <- 
   POP[stroke.incidence == 2011 + i, 
       .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha
-      )][,`:=` (scenario = gsub(".Rc", "", scenarios.list[[iterations]]), 
+      )][,`:=` (scenario = gsub(".R", "", scenarios.list[[iterations]]), 
                 mc = haha, year = 2011 + i, cause = "stroke")]
 
 
@@ -280,7 +280,7 @@ indiv.incid[[which(diseasestoexclude=="stroke")]] <-
 indiv.mort[[which(diseasestoexclude=="stroke")+1]] <-
   POP[dead == T, .(age, sex, qimd, agegroup, eqv5, id, hserial, hpnssec8, sha)
       ][,`:=` (year = 2011 + i, cause = "stroke",
-               scenario = gsub(".Rc", "", scenarios.list[[iterations]]),
+               scenario = gsub(".R", "", scenarios.list[[iterations]]),
                mc = haha)]
 
 POP = copy(POP[dead == F | is.na(dead)== T,])
